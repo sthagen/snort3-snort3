@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -101,7 +101,10 @@ void DetectionEngine::thread_term()
 DetectionEngine::DetectionEngine()
 {
     context = Analyzer::get_switcher()->interrupt();
-    context->file_data = { nullptr, 0 };
+
+    context->file_data = DataPointer(nullptr, 0);
+    context->script_data = DataPointer(nullptr, 0);
+
     reset();
 }
 
@@ -289,6 +292,12 @@ void DetectionEngine::set_file_data(const DataPointer& dp)
 
 DataPointer& DetectionEngine::get_file_data(IpsContext* c)
 { return c->file_data; }
+
+void DetectionEngine::set_script_data(const DataPointer& dp)
+{ Analyzer::get_switcher()->get_context()->script_data = dp; }
+
+DataPointer& DetectionEngine::get_script_data(IpsContext* c)
+{ return c->script_data; }
 
 void DetectionEngine::set_data(unsigned id, IpsContextData* p)
 { Analyzer::get_switcher()->get_context()->set_context_data(id, p); }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -147,8 +147,8 @@ public:
     std::string dhcp55;
     std::string dhcp60;
 
-    int16_t smb_major;
-    int16_t smb_minor;
+    uint16_t smb_major;
+    uint16_t smb_minor;
     uint32_t smb_flags;
 
     void clear()
@@ -171,7 +171,7 @@ public:
         dhcp60.clear();
         smb_major = 0;
         smb_minor = 0;
-        smb_flags=0;
+        smb_flags = 0;
     }
 };
 

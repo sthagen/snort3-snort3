@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -169,6 +169,7 @@ AppIdSession::AppIdSession(IpProtocol, const SfIp* ip, uint16_t, AppIdInspector&
     OdpContext&, uint16_t) : snort::FlowData(inspector_id, (snort::Inspector*)&inspector),
     config(stub_config), api(*(new AppIdSessionApi(this, *ip))), odp_ctxt(stub_odp_ctxt) { }
 AppIdSession::~AppIdSession() = default;
+DiscoveryFilter::~DiscoveryFilter(){}
 void AppIdSession::free_flow_data()
 {
     snort_free(smb_data);

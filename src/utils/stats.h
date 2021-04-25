@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -47,6 +47,7 @@ struct PacketCount
     PegCount raw_key_searches;
     PegCount raw_header_searches;
     PegCount method_searches;
+    PegCount script_searches;
     PegCount stat_code_searches;
     PegCount stat_msg_searches;
     PegCount cookie_searches;

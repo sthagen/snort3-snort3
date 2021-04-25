@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -68,13 +68,6 @@ const uint8_t* service_strstr(const uint8_t* haystack, unsigned haystack_len,
 #define APPID_SESSION_DATA_SERVICE_MODSTATE_BIT  0x20000000
 #define APPID_SESSION_DATA_CLIENT_MODSTATE_BIT   0x40000000
 #define APPID_SESSION_DATA_DETECTOR_MODSTATE_BIT 0x80000000
-#define APPID_SESSION_BIDIRECTIONAL_CHECKED \
-    (APPID_SESSION_INITIATOR_CHECKED | \
-    APPID_SESSION_RESPONDER_CHECKED)
-#define APPID_SESSION_DO_RNA \
-    (APPID_SESSION_RESPONDER_MONITORED | \
-    APPID_SESSION_INITIATOR_MONITORED | APPID_SESSION_DISCOVER_USER | \
-    APPID_SESSION_SPECIAL_MONITORED)
 
 enum APPID_DISCOVERY_STATE
 {
@@ -240,7 +233,7 @@ public:
         AppidSessionDirection, AppIdInspector&, OdpContext&);
     static AppIdSession* create_future_session(const snort::Packet*, const snort::SfIp*, uint16_t,
         const snort::SfIp*, uint16_t, IpProtocol, SnortProtocolId, bool swap_app_direction=false);
-    void initialize_future_session(AppIdSession&, uint64_t, AppidSessionDirection);
+    void initialize_future_session(AppIdSession&, uint64_t);
 
     size_t size_of() override
     { return sizeof(*this); }

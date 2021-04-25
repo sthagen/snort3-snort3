@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -796,6 +796,9 @@ uint8_t Stream::get_tcp_options_len(Flow* flow, bool to_server)
 
 bool Stream::set_packet_action_to_hold(Packet* p)
 {
+    if ( !p or !p->flow or !p->flow->session )
+        return false;
+
     return p->flow->session->set_packet_action_to_hold(p);
 }
 
@@ -805,6 +808,44 @@ void Stream::set_no_ack_mode(Flow* flow, bool on_off)
 
     TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
     tcp_session->set_no_ack(on_off);
+}
+
+void Stream::partial_flush(Flow* flow, bool to_server)
+{
+    if ( flow->pkt_type == PktType::TCP )
+    {
+        if ( to_server )
+            ((TcpStreamSession*)flow->session)->server.perform_partial_flush();
+        else
+            ((TcpStreamSession*)flow->session)->client.perform_partial_flush();
+    }
+}
+
+bool Stream::get_held_pkt_seq(Flow* flow, uint32_t& seq)
+{
+    if (!flow or !flow->session or !(flow->pkt_type == PktType::TCP))
+        return false;
+
+    TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
+
+    if (tcp_session->held_packet_dir == SSN_DIR_NONE) 
+        return false;
+
+    if (tcp_session->held_packet_dir == SSN_DIR_FROM_CLIENT)
+    {
+        seq = tcp_session->server.held_pkt_seq;
+        tcp_session->held_packet_dir = SSN_DIR_NONE;
+        return true;
+    }
+
+    if (tcp_session->held_packet_dir == SSN_DIR_FROM_SERVER)
+    {
+        seq = tcp_session->client.held_pkt_seq;
+        tcp_session->held_packet_dir = SSN_DIR_NONE;
+        return true;
+    }
+
+    return false;
 }
 
 #ifdef UNIT_TEST

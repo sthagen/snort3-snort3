@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -255,6 +255,12 @@ void PacketTracer::activate(const Packet& p)
     }
     else
         s_pkt_trace->active = false;
+}
+
+void PacketTracer::pt_timer_start()
+{
+    pt_timer->reset();
+    pt_timer->start();
 }
 
 // -----------------------------------------------------------------------------

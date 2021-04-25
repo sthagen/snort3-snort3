@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -121,6 +121,7 @@ public:
     TcpStreamConfig* tcp_config = nullptr;
     TcpEventLogger tel;
     bool cleaning = false;
+    uint8_t held_packet_dir = SSN_DIR_NONE;
 
 private:
     bool no_ack = false;

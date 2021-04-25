@@ -22,13 +22,15 @@
 
 #include "main/snort_types.h"
 
+#include "js_norm_state.h"
+
 namespace snort
 {
 class JSNormalizer
 {
 public:
     static int normalize(const char* srcbuf, uint16_t srclen, char* dstbuf, uint16_t dstlen,
-        const char** ptr, int* bytes_copied, int norm_depth);
+        const char** ptr, int* bytes_copied, JSNormState& state);
 };
 }
 

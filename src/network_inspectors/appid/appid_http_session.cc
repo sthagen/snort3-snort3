@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -90,6 +90,37 @@ void AppIdHttpSession::set_http_change_bits(AppidChangeBits& change_bits, HttpFi
         break;
     case REQ_REFERER_FID:
         change_bits.set(APPID_REFERER_BIT);
+        break;
+    default:
+        break;
+    }
+}
+
+void AppIdHttpSession::set_scan_flags(HttpFieldIds id)
+{
+    switch (id)
+    {
+    case REQ_URI_FID:
+        asd.scan_flags |= SCAN_HTTP_URI_FLAG;
+        break;
+    case MISC_VIA_FID:
+        asd.scan_flags |= SCAN_HTTP_VIA_FLAG;
+        break;
+    case REQ_AGENT_FID:
+        asd.scan_flags |= SCAN_HTTP_USER_AGENT_FLAG;
+        break;
+    case RSP_CONTENT_TYPE_FID:
+        asd.scan_flags |= SCAN_HTTP_CONTENT_TYPE_FLAG;
+        break;
+    case MISC_SERVER_FID:
+        asd.scan_flags |= SCAN_HTTP_VENDOR_FLAG;
+        break;
+    case MISC_XWW_FID:
+        asd.scan_flags |= SCAN_HTTP_XWORKINGWITH_FLAG;
+        break;
+    case REQ_HOST_FID:
+    case MISC_URL_FID:
+        asd.scan_flags |= SCAN_HTTP_HOST_URL_FLAG;
         break;
     default:
         break;
@@ -481,7 +512,6 @@ int AppIdHttpSession::process_http_packet(AppidSessionDirection direction,
     const std::string* host = meta_data[REQ_HOST_FID];
     const std::string* referer = meta_data[REQ_REFERER_FID];
     const std::string* uri = meta_data[REQ_URI_FID];
-    bool is_payload_processed = false;
 
     // For fragmented HTTP headers, do not process if none of the fields are set.
     // These fields will get set when the HTTP header is reassembled.
@@ -747,6 +777,7 @@ void AppIdHttpSession::update_url(AppidChangeBits& change_bits)
         else
             meta_data[MISC_URL_FID] = new std::string(std::string("http://") + *host + *uri);
         change_bits.set(APPID_URL_BIT);
+        asd.scan_flags |= SCAN_HTTP_HOST_URL_FLAG;
     }
 }
 
@@ -772,6 +803,7 @@ void AppIdHttpSession::set_field(HttpFieldIds id, const std::string* str,
         delete meta_data[id];
         meta_data[id] = str;
         set_http_change_bits(change_bits, id);
+        set_scan_flags(id);
 
         if (appidDebug->is_active())
             print_field(id, str);
@@ -788,6 +820,7 @@ void AppIdHttpSession::set_field(HttpFieldIds id, const uint8_t* str, int32_t le
         delete meta_data[id];
         meta_data[id] = new std::string((const char*)str, len);
         set_http_change_bits(change_bits, id);
+        set_scan_flags(id);
 
         if (appidDebug->is_active())
             print_field(id, meta_data[id]);

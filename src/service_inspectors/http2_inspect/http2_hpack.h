@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -57,14 +57,14 @@ public:
         const uint32_t encoded_header_length, uint32_t& bytes_consumed);
     const HpackTableEntry* get_hpack_table_entry(const uint8_t* encoded_header_buffer,
         const uint32_t encoded_header_length, const Http2HpackIntDecode& decode_int,
-        uint32_t& bytes_consumed);
+        uint32_t& bytes_consumed, uint64_t &index);
     bool write_header_part(const Field& header, const uint8_t* suffix, uint32_t suffix_length,
         uint8_t* decoded_header_buffer, const uint32_t decoded_header_length,
         uint32_t& bytes_written);
     bool decode_indexed_name(const uint8_t* encoded_header_buffer,
         const uint32_t encoded_header_length, const Http2HpackIntDecode& decode_int,
         uint32_t& bytes_consumed, uint8_t* decoded_header_buffer, const uint32_t decoded_header_length,
-        uint32_t& bytes_written, Field& name);
+        uint32_t& bytes_written, Field& name, bool with_indexing);
     bool decode_literal_header_line(const uint8_t* encoded_header_buffer,
         const uint32_t encoded_header_length, const uint8_t name_index_mask,
         const Http2HpackIntDecode& decode_int, bool with_indexing, uint32_t& bytes_consumed,

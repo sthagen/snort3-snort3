@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -227,23 +227,23 @@ bool Http2StreamSplitter::finish(Flow* flow)
     }
 
     // Loop through all nonzero streams with open message bodies and call NHI finish()
-    for (const Http2FlowData::StreamInfo& stream_info : session_data->streams)
+    for (const Http2Stream* stream : session_data->streams)
     {
-        if ((stream_info.id == 0)                                                 ||
-            (stream_info.stream->get_state(source_id) >= STREAM_COMPLETE)         ||
-            (stream_info.stream->get_hi_flow_data() == nullptr)                   ||
-            (stream_info.stream->get_hi_flow_data()->get_type_expected(source_id)
-                != HttpEnums::SEC_BODY_H2)                                        ||
+        if ((stream->get_stream_id() == 0)                            ||
+            (stream->get_state(source_id) >= STREAM_COMPLETE)         ||
+            (stream->get_hi_flow_data() == nullptr)                   ||
+            (stream->get_hi_flow_data()->get_type_expected(source_id)
+                != HttpEnums::SEC_BODY_H2)                            ||
             (session_data->processing_partial_header &&
-                (stream_info.id == session_data->current_stream[source_id])))
+                (stream->get_stream_id() == session_data->current_stream[source_id])))
         {
             continue;
         }
 
-        session_data->stream_in_hi = stream_info.id;
+        session_data->stream_in_hi = stream->get_stream_id();
         if (session_data->hi_ss[source_id]->finish(flow))
         {
-            assert(stream_info.id == session_data->current_stream[source_id]);
+            assert(stream->get_stream_id() == session_data->current_stream[source_id]);
             need_reassemble = true;
 #ifdef REG_TEST
             if (HttpTestManager::use_test_input(HttpTestManager::IN_HTTP2))

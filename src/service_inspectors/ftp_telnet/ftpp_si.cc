@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -359,15 +359,30 @@ void FTPFreesession(FTP_SESSION* ssn)
  */
 bool FTPDataDirection(Packet* p, FTP_DATA_SESSION* ftpdata)
 {
-    uint32_t direction;
-    uint32_t pktdir = Stream::get_packet_direction(p);
+    Stream::get_packet_direction(p);
 
     if (ftpdata->mode == FTPP_XFER_ACTIVE)
-        direction = ftpdata->direction ?  PKT_FROM_SERVER : PKT_FROM_CLIENT;
-    else
-        direction = ftpdata->direction ?  PKT_FROM_CLIENT : PKT_FROM_SERVER;
+    {
+       // download
+       if (!p->is_from_application_client() && p->is_from_client())
+           return true;
 
-    return (pktdir == direction);
+      // upload
+      if (p->is_from_application_client() && !p->is_from_client()) 
+          return true;
+    }
+    else
+    {
+       // download
+       if (!p->is_from_client() && !p->is_from_application_client())
+           return true;
+
+      // upload
+      if (p->is_from_client() && p->is_from_application_client()) 
+          return true;
+    }
+
+    return false;
 }
 
 /*

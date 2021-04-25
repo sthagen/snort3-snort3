@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -53,31 +53,6 @@ bool Http2HeadersFrameWithStartline::process_start_line(HttpFlowData*& http_flow
 {
     if (session_data->abort_flow[source_id])
         return false;
-
-    if (!stream->get_hi_flow_data())
-    {
-        if (session_data->concurrent_streams < CONCURRENT_STREAMS_LIMIT)
-        {
-            session_data->concurrent_streams += 1;
-            if (session_data->concurrent_streams >
-                Http2Module::get_peg_counts(PEG_MAX_CONCURRENT_STREAMS))
-
-            {
-                Http2Module::increment_peg_counts(PEG_MAX_CONCURRENT_STREAMS);
-            }
-        }
-        else
-        {
-            *session_data->infractions[source_id] += INF_TOO_MANY_STREAMS;
-            session_data->events[source_id]->create_event(EVENT_TOO_MANY_STREAMS);
-            Http2Module::increment_peg_counts(PEG_FLOWS_OVER_STREAM_LIMIT);
-            session_data->abort_flow[SRC_CLIENT] = true;
-            session_data->abort_flow[SRC_SERVER] = true;
-            stream->set_state(SRC_CLIENT, STREAM_ERROR);
-            stream->set_state(SRC_SERVER, STREAM_ERROR);
-            return false;
-        }
-    }
 
     // http_inspect scan() of start line
     {

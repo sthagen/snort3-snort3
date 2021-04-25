@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -39,6 +39,7 @@ extern const BaseApi* ips_metadata;
 extern const BaseApi* ips_pkt_data;
 extern const BaseApi* ips_reference;
 extern const BaseApi* ips_replace;
+extern const BaseApi* ips_script_data;
 extern const BaseApi* ips_service;
 extern const BaseApi* ips_sha256;
 extern const BaseApi* ips_sha512;
@@ -105,6 +106,7 @@ static const BaseApi* ips_options[] =
     ips_pkt_data,
     ips_reference,
     ips_replace,
+    ips_script_data,
     ips_service,
     ips_sha256,
     ips_sha512,

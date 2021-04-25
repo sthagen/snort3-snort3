@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,23 +28,21 @@
 class DataDecryptEventHandler : public snort::DataHandler
 {
 public:
-    DataDecryptEventHandler() : DataHandler(MOD_NAME)
-    {
-    }
+    DataDecryptEventHandler() : DataHandler(MOD_NAME){ }
 
     void handle(snort::DataEvent& event, snort::Flow* flow) override
     {
         assert(flow);
         AppIdSession* asd = snort::appid_api.get_appid_session(*flow);
-        if (!asd)
-            return;
+        if (!asd or
+            !asd->get_session_flags(APPID_SESSION_DISCOVER_APP | APPID_SESSION_SPECIAL_MONITORED))
+                return;
         const DataDecryptEvent& data_decrypt_event = static_cast<DataDecryptEvent&>(event);
         if (data_decrypt_event.get_type() == DataDecryptEvent::DATA_DECRYPT_MONITOR_EVENT)
         {
             asd->set_session_flags(APPID_SESSION_DECRYPT_MONITOR);
         }
     }
-
 };
 
 #endif

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -57,6 +57,7 @@ AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&) :
     StashGenericObject(STASH_GENERIC_OBJECT_APPID) {}
 }
 
+DiscoveryFilter::~DiscoveryFilter(){}
 // Stubs for AppInfoManager
 AppInfoTableEntry* AppInfoManager::get_app_info_entry(AppId)
 {

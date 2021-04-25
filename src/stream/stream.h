@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -241,6 +241,9 @@ public:
 
     static bool set_packet_action_to_hold(Packet*);
     static void set_no_ack_mode(Flow*, bool);
+    static void partial_flush(Flow*, bool to_server);
+
+    static bool get_held_pkt_seq(Flow*, uint32_t&);
 
 private:
     static void set_ip_protocol(Flow*);

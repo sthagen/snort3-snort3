@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -36,8 +36,9 @@ public:
         assert(flow);
 
         AppIdSession* asd = snort::appid_api.get_appid_session(*flow);
-        if (!asd)
-            return; // appid disabled
+        if (!asd or
+            !asd->get_session_flags(APPID_SESSION_DISCOVER_APP | APPID_SESSION_SPECIAL_MONITORED))
+                return;
         else
         {
             // Skip sessions using old odp context after reload detectors
@@ -62,8 +63,7 @@ public:
         if (fp) // initialize data session
         {
             fp->set_service_id(APP_ID_DCE_RPC, asd->get_odp_ctxt());
-            asd->initialize_future_session(*fp, APPID_SESSION_IGNORE_ID_FLAGS,
-                APP_ID_FROM_RESPONDER);
+            asd->initialize_future_session(*fp, APPID_SESSION_IGNORE_ID_FLAGS);
         }
     }
 };

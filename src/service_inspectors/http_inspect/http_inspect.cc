@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -124,11 +124,16 @@ HttpInspect::HttpInspect(const HttpParaList* params_) :
         HttpTestManager::set_show_scan(params->show_scan);
     }
 #endif
+
+    if (params->script_detection)
+    {
+        script_finder = new ScriptFinder(params->script_detection_handle);
+    }
 }
 
 bool HttpInspect::configure(SnortConfig* )
 {
-    if (params->js_norm_param.normalize_javascript)
+    if ( params->js_norm_param.js_norm )
         params->js_norm_param.js_norm->configure();
 
     return true;
@@ -153,6 +158,8 @@ void HttpInspect::show(const SnortConfig*) const
     ConfigLogger::log_flag("normalize_javascript", params->js_norm_param.normalize_javascript);
     ConfigLogger::log_value("max_javascript_whitespaces",
         params->js_norm_param.max_javascript_whitespaces);
+    ConfigLogger::log_value("js_normalization_depth",
+        params->js_norm_param.js_normalization_depth);
     ConfigLogger::log_value("bad_characters", bad_chars.c_str());
     ConfigLogger::log_value("ignore_unreserved", unreserved_chars.c_str());
     ConfigLogger::log_flag("percent_u", params->uri_param.percent_u);
@@ -598,7 +605,7 @@ void HttpInspect::clear(Packet* p)
     if (h2i_flow_data != nullptr)
     {
         current_section = h2i_flow_data->get_hi_msg_section();
-        // assert(current_section != nullptr); // FIXIT-E fix H2I so that this is correct
+        assert(current_section != nullptr);
         h2i_flow_data->set_hi_msg_section(nullptr);
     }
     else

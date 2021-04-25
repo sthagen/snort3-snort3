@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 // Copyright (C) 2003 Brian Caswell <bmc@snort.org>
 // Copyright (C) 2003 Michael J. Pomraning <mjp@securepipe.com>
@@ -47,7 +47,7 @@ using namespace snort;
 #define PCRE_STUDY_JIT_COMPILE 0
 #endif
 
-#define NO_JIT // uncomment to disable JIT for Xcode
+//#define NO_JIT // uncomment to disable JIT for Xcode
 
 #ifdef NO_JIT
 #define PCRE_STUDY_FLAGS 0

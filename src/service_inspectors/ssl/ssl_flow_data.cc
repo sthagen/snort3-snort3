@@ -1,6 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
-// Copyright (C) 2005-2013 Sourcefire, Inc.
+// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -17,21 +16,17 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-// service_battle_field.h author Sourcefire Inc.
-
-#ifndef SERVICE_BATTLEFIELD_H
-#define SERVICE_BATTLEFIELD_H
-
-#include "service_detector.h"
-
-class ServiceDiscovery;
-
-class BattleFieldServiceDetector : public ServiceDetector
-{
-public:
-    BattleFieldServiceDetector(ServiceDiscovery*);
-
-    int validate(AppIdDiscoveryArgs&) override;
-};
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
 
+#include <flow/flow.h>
+#include "ssl_flow_data.h"
+
+unsigned SslBaseFlowData::inspector_id = 0;
+
+SSLData* SslBaseFlowData::get_ssl_session_data(snort::Flow* flow)
+{
+    SslBaseFlowData* fd = (SslBaseFlowData*)flow->get_flow_data(SslBaseFlowData::inspector_id);
+    return fd ? &fd->get_session() : nullptr;
+}

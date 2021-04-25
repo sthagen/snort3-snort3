@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -45,12 +45,10 @@
 #include "detector_plugins/detector_sip.h"
 #include "detector_plugins/detector_smtp.h"
 #include "lua_detector_api.h"
-#include "service_battle_field.h"
 #include "service_bgp.h"
 #include "service_bit.h"
 #include "service_bootp.h"
 #include "service_dcerpc.h"
-#include "service_direct_connect.h"
 #include "service_ftp.h"
 #include "service_irc.h"
 #include "service_lpr.h"
@@ -87,12 +85,10 @@ static ServiceDetector* ftp_service;
 
 void ServiceDiscovery::initialize(AppIdInspector& inspector)
 {
-    new BattleFieldServiceDetector(this);
     new BgpServiceDetector(this);
     new BitServiceDetector(this);
     new BootpServiceDetector(this);
     new DceRpcServiceDetector(this);
-    new DirectConnectServiceDetector(this);
     new DnsTcpServiceDetector(this);
     new DnsUdpServiceDetector(this);
     new FtpServiceDetector(this);
@@ -707,6 +703,7 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p,
             asd.get_odp_ctxt().get_dns_matchers().scan_hostname((const uint8_t*)(dsession->get_host()),
                 dsession->get_host_len(), client_id, payload_id);
             asd.set_client_appid_data(client_id, change_bits);
+            asd.set_payload_appid_data(payload_id);
         }
         else if (asd.get_service_id() == APP_ID_RTMP)
             asd.examine_rtmp_metadata(change_bits);

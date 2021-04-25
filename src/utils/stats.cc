@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -185,6 +185,7 @@ const PegInfo pc_names[] =
     { CountType::SUM, "raw_key_searches", "fast pattern searches in raw key buffer" },
     { CountType::SUM, "raw_header_searches", "fast pattern searches in raw header buffer" },
     { CountType::SUM, "method_searches", "fast pattern searches in method buffer" },
+    { CountType::SUM, "script_searches", "fast pattern searches in script buffer" },
     { CountType::SUM, "stat_code_searches", "fast pattern searches in status code buffer" },
     { CountType::SUM, "stat_msg_searches", "fast pattern searches in status message buffer" },
     { CountType::SUM, "cookie_searches", "fast pattern searches in cookie buffer" },

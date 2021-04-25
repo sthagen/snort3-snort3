@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -77,15 +77,15 @@ void Http2Stream::clear_frame()
     delete current_frame;
     current_frame = nullptr;
 
-    if ((state[SRC_CLIENT] >= STREAM_COMPLETE) && (state[SRC_SERVER] >= STREAM_COMPLETE) &&
-        (hi_flow_data != nullptr))
+    if ((state[SRC_CLIENT] >= STREAM_COMPLETE) && (state[SRC_SERVER] >= STREAM_COMPLETE))
     {
-        session_data->deallocate_hi_memory(hi_flow_data);
-        delete hi_flow_data;
-        hi_flow_data = nullptr;
-
-        assert(session_data->concurrent_streams > 0);
-        session_data->concurrent_streams -= 1;
+        if (hi_flow_data != nullptr)
+        {
+            session_data->deallocate_hi_memory(hi_flow_data);
+            delete hi_flow_data;
+            hi_flow_data = nullptr;
+        }
+        session_data->delete_stream = true;
     }
 }
 

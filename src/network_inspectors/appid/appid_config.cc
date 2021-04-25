@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -130,6 +130,8 @@ bool AppIdContext::init_appid(SnortConfig* sc, AppIdInspector& inspector)
     }
 
     map_app_names_to_snort_ids(sc, config);
+    if (config.enable_rna_filter)
+        discovery_filter = new DiscoveryFilter(config.rna_conf_path);
     return true;
 }
 

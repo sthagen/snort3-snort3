@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -817,7 +817,7 @@ bool HostTracker::set_visibility(bool v)
 
     visibility = v ? container_id : HostCacheIp::invalid_id;
 
-    if ( visibility == HostCacheIp::invalid_id )
+    if ( old_visibility != visibility )
     {
         for ( auto& proto : network_protos )
             proto.second = false;
@@ -849,6 +849,9 @@ bool HostTracker::set_visibility(bool v)
 
         tcp_fpids.clear();
         ua_fps.clear();
+        udp_fpids.clear();
+        smb_fpids.clear();
+        netbios_name.clear();
     }
 
     return old_visibility == visibility;

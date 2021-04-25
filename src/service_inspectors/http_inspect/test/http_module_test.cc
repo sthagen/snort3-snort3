@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -64,11 +64,11 @@ int32_t substr_to_code(const uint8_t*, const int32_t, const StrCode []) { return
 long HttpTestManager::print_amount {};
 bool HttpTestManager::print_hex {};
 
-HttpJsNorm::HttpJsNorm(int, const HttpParaList::UriParam& uri_param_, int) :
-    normalizer(nullptr), max_javascript_whitespaces(0), uri_param(uri_param_),
-    normalization_depth(0), javascript_search_mpse(nullptr), htmltype_search_mpse(nullptr) {}
+HttpJsNorm::HttpJsNorm(const HttpParaList::UriParam& uri_param_) :
+    uri_param(uri_param_), javascript_search_mpse(nullptr), htmltype_search_mpse(nullptr) {}
 HttpJsNorm::~HttpJsNorm() = default;
 void HttpJsNorm::configure(){}
+int64_t Parameter::get_int(char const*) { return 0; }
 
 TEST_GROUP(http_peg_count_test)
 {

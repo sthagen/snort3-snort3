@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -53,6 +53,7 @@ enum CursorActionType
     CAT_SET_OTHER,
     CAT_SET_RAW,
     CAT_SET_COOKIE,
+    CAT_SET_SCRIPT,
     CAT_SET_STAT_MSG,
     CAT_SET_STAT_CODE,
     CAT_SET_METHOD,

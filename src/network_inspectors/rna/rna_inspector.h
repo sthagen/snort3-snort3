@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -31,6 +31,7 @@ struct Packet;
 class TcpFpProcessor;
 class UaFpProcessor;
 class UdpFpProcessor;
+class SmbFpProcessor;
 }
 
 struct RnaConfig;
@@ -51,8 +52,9 @@ public:
     void tterm() override;
 
     void get_or_create_fp_processor(snort::TcpFpProcessor*&, snort::UaFpProcessor*&,
-        snort::UdpFpProcessor*&);
-    void set_fp_processor(snort::TcpFpProcessor*, snort::UaFpProcessor*, snort::UdpFpProcessor*);
+        snort::UdpFpProcessor*&, snort::SmbFpProcessor*&);
+    void set_fp_processor(snort::TcpFpProcessor*, snort::UaFpProcessor*,
+        snort::UdpFpProcessor*, snort::SmbFpProcessor*);
 
     RnaPnd* get_pnd() const { return pnd; }
 

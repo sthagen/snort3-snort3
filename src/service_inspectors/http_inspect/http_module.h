@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -46,13 +46,15 @@ public:
     bool decompress_swf = false;
     bool decompress_zip = false;
     bool script_detection = false;
+    snort::LiteralSearch::Handle* script_detection_handle = nullptr;
 
     struct JsNormParam
     {
     public:
         ~JsNormParam();
         bool normalize_javascript = false;
-        int normalization_depth = 0;
+        bool is_javascript_normalization = false;
+        int64_t js_normalization_depth = 0;
         int max_javascript_whitespaces = 200;
         class HttpJsNorm* js_norm = nullptr;
     };
@@ -108,6 +110,23 @@ public:
 #endif
 };
 
+class ScriptFinder
+{
+public:
+    ScriptFinder(snort::LiteralSearch::Handle* h) : handle(h), 
+        finder(snort::LiteralSearch::instantiate(h, (const uint8_t*)"</SCRIPT>", 9, true, true))
+    {}
+
+    ~ScriptFinder() { delete finder; }
+
+    int search(const uint8_t* buf, unsigned len) const
+    { return finder->search(handle, buf, len); }
+
+private:
+    snort::LiteralSearch::Handle* const handle;
+    const snort::LiteralSearch* const finder;
+};
+
 class HttpModule : public snort::Module
 {
 public:
@@ -118,6 +137,7 @@ public:
     bool set(const char*, snort::Value&, snort::SnortConfig*) override;
     unsigned get_gid() const override { return HttpEnums::HTTP_GID; }
     const snort::RuleMap* get_rules() const override { return http_events; }
+
     const HttpParaList* get_once_params()
     {
         HttpParaList* ret_val = params;
@@ -135,8 +155,6 @@ public:
         { peg_counts[counter]--; }
     static PegCount get_peg_counts(HttpEnums::PEG_COUNT counter)
         { return peg_counts[counter]; }
-
-    static void get_script_finder(snort::LiteralSearch*&, snort::LiteralSearch::Handle*&);
 
     snort::ProfileStats* get_profile() const override;
 
@@ -165,6 +183,7 @@ private:
     static const PegInfo peg_names[];
     static THREAD_LOCAL snort::ProfileStats http_profile;
     static THREAD_LOCAL PegCount peg_counts[];
+    snort::LiteralSearch::Handle* const script_detection_handle;
 };
 
 #endif

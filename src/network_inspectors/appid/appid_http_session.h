@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -166,6 +166,7 @@ protected:
     void process_chp_buffers(AppidChangeBits&, HttpPatternMatchers&);
     void free_chp_matches(ChpMatchDescriptor& cmd, unsigned max_matches);
     void set_http_change_bits(AppidChangeBits& change_bits, HttpFieldIds id);
+    void set_scan_flags(HttpFieldIds id);
     void print_field(HttpFieldIds id, const std::string* str);
 
     AppIdSession& asd;
@@ -197,6 +198,7 @@ protected:
     unsigned response_code_packets = 0;
 #endif
     uint32_t http2_stream_id = 0;
+    bool is_payload_processed = false;
 };
 
 #endif

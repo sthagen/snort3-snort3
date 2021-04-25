@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -86,7 +86,7 @@ char* snort_strdup(const char* str)
     return p;
 }
 }
-
+DiscoveryFilter::~DiscoveryFilter(){}
 void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
 void show_stats(PegCount*, const PegInfo*, const IndexVec&, const char*, FILE*) { }
 

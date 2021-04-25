@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -278,8 +278,9 @@ ScanResult HttpHeaderCutter::cut(const uint8_t* buffer, uint32_t length,
     return SCAN_NOT_FOUND;
 }
 
-HttpBodyCutter::HttpBodyCutter(bool accelerated_blocking_, CompressId compression_)
-    : accelerated_blocking(accelerated_blocking_), compression(compression_)
+HttpBodyCutter::HttpBodyCutter(bool accelerated_blocking_, ScriptFinder* finder_,
+    CompressId compression_)
+    : accelerated_blocking(accelerated_blocking_), compression(compression_), finder(finder_)
 {
     if (accelerated_blocking)
     {
@@ -306,7 +307,6 @@ HttpBodyCutter::HttpBodyCutter(bool accelerated_blocking_, CompressId compressio
         match_string = inspect_string;
         match_string_upper = inspect_upper;
         string_length = sizeof(inspect_string);
-        HttpModule::get_script_finder(finder, handle);
     }
 }
 
@@ -903,7 +903,7 @@ bool HttpBodyCutter::dangerous(const uint8_t* data, uint32_t length)
         if ( partial_match and find_partial(input_buf, input_length, true) )
             return true;
 
-        if ( finder->search(handle, input_buf, input_length) >= 0 )
+        if ( finder->search(input_buf, input_length) >= 0 )
             return true;
 
         uint32_t delta = input_length - string_length + 1;

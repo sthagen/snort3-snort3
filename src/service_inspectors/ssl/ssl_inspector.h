@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -22,41 +22,31 @@
 // Implementation header with definitions, datatypes and flowdata class for SSL service inspector.
 
 #include "flow/flow.h"
+#include "ssl_flow_data.h"
 
-#define SSLPP_ENCRYPTED_FLAGS \
-    (SSL_HS_SDONE_FLAG | SSL_CLIENT_KEYX_FLAG | \
-    SSL_CAPP_FLAG | SSL_SAPP_FLAG)
-#define SSLPP_ENCRYPTED_FLAGS2 \
-    (SSL_HS_SDONE_FLAG | SSL_CHANGE_CIPHER_FLAG | \
-    SSL_CAPP_FLAG | SSL_SAPP_FLAG)
-
-struct SSLData
-{
-    uint32_t ssn_flags;
-    uint16_t partial_rec_len[4];
-};
-
-class SslFlowData : public snort::FlowData
+class SslFlowData : public SslBaseFlowData
 {
 public:
     SslFlowData();
     ~SslFlowData() override;
 
     static void init()
-    { inspector_id = snort::FlowData::create_flow_data_id(); }
+    { assign_ssl_inspector_id(snort::FlowData::create_flow_data_id()); }
 
     size_t size_of() override
     { return sizeof(*this); }
 
+    SSLData& get_session() override
+    { return session; }
+
 public:
-    static unsigned inspector_id;
-    SSLData session;
     struct {
         bool orig_flag : 1;
         bool switch_in : 1;
     } finalize_info;
+
+private:
+    SSLData session;
 };
-//Function: API to get the ssl flow data from the packet flow.
-SSLData* get_ssl_session_data(snort::Flow* flow);
 
 #endif

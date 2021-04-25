@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -350,10 +350,7 @@ static void rule_tree_match(
 {
     PMX* pmx = (PMX*)user;
 
-    detection_option_tree_root_t* root = (detection_option_tree_root_t*)tree;
     detection_option_eval_data_t eval_data;
-    NCListNode* ncl;
-
     eval_data.p = context->packet;
     eval_data.pmd = pmx->pmd;
     eval_data.flowbit_failed = 0;
@@ -367,7 +364,7 @@ static void rule_tree_match(
          * may muck with an unintended rule */
 
         /* Set flag for not contents so they aren't evaluated */
-        for (ncl = (NCListNode*)neg_list; ncl != nullptr; ncl = ncl->next)
+        for ( NCListNode* ncl = (NCListNode*)neg_list; ncl != nullptr; ncl = ncl->next)
         {
             PMX* neg_pmx = (PMX*)ncl->pmx;
             assert(neg_pmx->pmd->last_check);
@@ -382,6 +379,10 @@ static void rule_tree_match(
             last_check->rebuild_flag = (eval_data.p->packet_flags & PKT_REBUILT_STREAM);
         }
 
+        if ( !tree )
+            return;
+
+        detection_option_tree_root_t* root = (detection_option_tree_root_t*)tree;
         int ret = detection_option_tree_evaluate(root, eval_data);
 
         if ( ret )
@@ -729,7 +730,7 @@ private:
 bool MpseStash::push(void* user, void* tree, int index, void* context, void* list)
 {
     detection_option_tree_root_t* root = (detection_option_tree_root_t*)tree;
-    bool checker = root->otn->checks_flowbits();
+    bool checker = !root or root->otn->checks_flowbits();
     MatchStore& store = checker ? defer : queue;
 
     for ( auto it = store.rbegin(); it != store.rend(); it++ )
@@ -929,24 +930,40 @@ static int fp_search(PortGroup* port_group, Packet* p, bool srvc)
         search_buffer(
             gadget, buf, buf.IBT_COOKIE, p, port_group, PM_TYPE_COOKIE, pc.cookie_searches);
     }
+
+    if ( MpseGroup* so = port_group->mpsegrp[PM_TYPE_SCRIPT] )
     {
-        // file searches file only
-        if ( MpseGroup* so = port_group->mpsegrp[PM_TYPE_FILE] )
+        // FIXIT-M script data should be obtained from
+        // inspector gadget as is done with search_buffer
+        DataPointer script_data = p->context->script_data;
+
+        if ( script_data.len )
         {
-            // FIXIT-M file data should be obtained from
-            // inspector gadget as is done with search_buffer
-            DataPointer file_data = p->context->file_data;
+            debug_logf(detection_trace, TRACE_FP_SEARCH, p,
+                "%" PRIu64 " fp search %s[%d]\n", p->context->packet_number,
+                pm_type_strings[PM_TYPE_SCRIPT], script_data.len);
 
-            if ( file_data.len )
-            {
-                debug_logf(detection_trace, TRACE_FP_SEARCH, p,
-                    "%" PRIu64 " fp search %s[%d]\n", p->context->packet_number,
-                    pm_type_strings[PM_TYPE_FILE], file_data.len);
-
-                batch_search(so, p, file_data.data, file_data.len, pc.file_searches);
-            }
+            batch_search(so, p, script_data.data, script_data.len, pc.script_searches);
         }
     }
+
+    // file searches file only
+    if ( MpseGroup* so = port_group->mpsegrp[PM_TYPE_FILE] )
+    {
+        // FIXIT-M file data should be obtained from
+        // inspector gadget as is done with search_buffer
+        DataPointer file_data = p->context->file_data;
+
+        if ( file_data.len )
+        {
+            debug_logf(detection_trace, TRACE_FP_SEARCH, p,
+                "%" PRIu64 " fp search %s[%d]\n", p->context->packet_number,
+                pm_type_strings[PM_TYPE_FILE], file_data.len);
+
+            batch_search(so, p, file_data.data, file_data.len, pc.file_searches);
+        }
+    }
+
     return 0;
 }
 

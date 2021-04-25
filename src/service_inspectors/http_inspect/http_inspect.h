@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,7 @@
 //-------------------------------------------------------------------------
 
 #include "framework/cursor.h"
+#include "helpers/literal_search.h"
 #include "log/messages.h"
 
 #include "http_buffer_info.h"
@@ -41,7 +42,7 @@ class HttpInspect : public snort::Inspector
 {
 public:
     HttpInspect(const HttpParaList* params_);
-    ~HttpInspect() override { delete params; }
+    ~HttpInspect() override { delete params; delete script_finder; }
 
     bool get_buf(snort::InspectionBuffer::Type ibt, snort::Packet* p,
         snort::InspectionBuffer& b) override;
@@ -84,6 +85,8 @@ private:
     static void http_set_flow_data(snort::Flow* flow, HttpFlowData* flow_data);
 
     const HttpParaList* const params;
+    snort::LiteralSearch::Handle* s_handle = nullptr;
+    ScriptFinder* script_finder = nullptr;
 
     // Registrations for "extra data"
     const uint32_t xtra_trueip_id;

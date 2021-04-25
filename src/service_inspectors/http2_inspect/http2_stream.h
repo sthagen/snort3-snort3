@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -36,7 +36,7 @@ class Http2Stream
 public:
     Http2Stream(uint32_t stream_id, Http2FlowData* session_data_);
     ~Http2Stream();
-    uint32_t get_stream_id() { return stream_id; }
+    uint32_t get_stream_id() const { return stream_id; }
     void eval_frame(const uint8_t* header_buffer, uint32_t header_len, const uint8_t* data_buffer,
         uint32_t data_len, HttpCommon::SourceId source_id);
     void clear_frame();

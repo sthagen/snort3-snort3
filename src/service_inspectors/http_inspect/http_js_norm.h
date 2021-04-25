@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,37 +32,40 @@
 // HttpJsNorm class
 //-------------------------------------------------------------------------
 
-class JsNormBase;
-
 class HttpJsNorm
 {
 public:
-    HttpJsNorm(int max_javascript_whitespaces_, const HttpParaList::UriParam& uri_param_,
-        int normalization_depth);
+    HttpJsNorm(const HttpParaList::UriParam& uri_param_);
     ~HttpJsNorm();
-    void normalize(const Field& input, Field& output, HttpInfractions* infractions,
-        HttpEventGen* events) const;
+    void legacy_normalize(const Field& input, Field& output, HttpInfractions* infractions,
+        HttpEventGen* events, int max_javascript_whitespaces) const;
+    void enhanced_normalize(const Field& input, Field& output, HttpInfractions* infractions,
+        HttpEventGen* events, int64_t js_normalization_depth) const;
+
     void configure();
 private:
     bool configure_once = false;
 
-    JsNormBase* normalizer;
-
     enum JsSearchId { JS_JAVASCRIPT };
+    enum JsSrcAttrSearchId { JS_ATTR_SRC };
     enum HtmlSearchId { HTML_JS, HTML_EMA, HTML_VB };
 
     static constexpr const char* script_start = "<SCRIPT";
     static constexpr int script_start_length = sizeof("<SCRIPT") - 1;
+    static constexpr const char* script_src_attr = "SRC";
+    static constexpr int script_src_attr_length = sizeof("SRC") - 1;
 
-    const int max_javascript_whitespaces;
     const HttpParaList::UriParam& uri_param;
-    const int normalization_depth;
 
     snort::SearchTool* javascript_search_mpse;
+    snort::SearchTool* js_src_attr_search_mpse;
     snort::SearchTool* htmltype_search_mpse;
 
     static int search_js_found(void*, void*, int index, void*, void*);
+    static int search_js_src_attr_found(void*, void*, int index, void*, void*);
     static int search_html_found(void* id, void*, int, void*, void*);
+
+    bool is_external_script(const char* it, const char* script_tag_end) const;
 };
 
 #endif

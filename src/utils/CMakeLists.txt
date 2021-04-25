@@ -19,8 +19,6 @@ set( UTIL_INCLUDES
     util_utf.h
 )
 
-set (FLEX_EXECUTABLE flex++)
-
 FLEX_TARGET ( js_tokenizer ${CMAKE_CURRENT_SOURCE_DIR}/js_tokenizer.l
     ${CMAKE_CURRENT_BINARY_DIR}/js_tokenizer.cc
     COMPILE_FLAGS -Ca
@@ -34,6 +32,7 @@ add_library ( utils OBJECT
     dnet_header.h
     dyn_array.cc
     dyn_array.h
+    js_norm_state.h
     js_normalizer.cc
     js_normalizer.h
     js_tokenizer.h

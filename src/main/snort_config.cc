@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -982,6 +982,12 @@ void SnortConfig::clear_reload_resource_tuner_list()
     for (ReloadResourceTuner* rrt : reload_tuners)
         delete rrt;
     reload_tuners.clear();
+}
+
+void SnortConfig::update_reload_id()
+{
+    static unsigned reload_id_tracker = 0;
+    reload_id = ++reload_id_tracker;
 }
 
 void SnortConfig::cleanup_fatal_error()

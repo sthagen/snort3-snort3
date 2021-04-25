@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -47,6 +47,7 @@ snort::SearchTool::SearchTool(char const*, bool) { }
 snort::SearchTool::~SearchTool() = default;
 
 AppIdDiscovery::~AppIdDiscovery() = default;
+DiscoveryFilter::~DiscoveryFilter(){}
 void ClientDiscovery::initialize(AppIdInspector&) { }
 void ClientDiscovery::reload() { }
 void AppIdDiscovery::register_detector(const string&, AppIdDetector*, IpProtocol) { }

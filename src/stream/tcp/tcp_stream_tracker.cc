@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,9 +25,12 @@
 
 #include "tcp_stream_tracker.h"
 
+#include <daq.h>
+
 #include "log/messages.h"
 #include "main/analyzer.h"
 #include "main/snort.h"
+#include "memory/memory_cap.h"
 #include "packet_io/active.h"
 #include "profiler/profiler_defs.h"
 #include "protocols/eth.h"
@@ -627,7 +630,12 @@ bool TcpStreamTracker::set_held_packet(Packet* p)
     if ( held_packet != null_iterator )
         return false;
 
+    // Temporarily increase memcap until message is finalized in case
+    // DAQ makes a copy of the data buffer.
+    memory::MemoryCap::update_allocations(daq_msg_get_data_len(p->daq_msg));
+
     held_packet = hpq->append(p->daq_msg, p->ptrs.tcph->seq(), *this);
+    held_pkt_seq = p->ptrs.tcph->seq();
 
     tcpStats.total_packets_held++;
     if ( ++tcpStats.current_packets_held > tcpStats.max_packets_held )
@@ -671,17 +679,33 @@ void TcpStreamTracker::finalize_held_packet(Packet* cp)
 {
     if ( held_packet != null_iterator )
     {
+        DAQ_Msg_h msg = held_packet->get_daq_msg();
+        uint32_t msglen = daq_msg_get_data_len(msg);
+
         if ( cp->active->packet_was_dropped() )
         {
             DAQ_Verdict verdict = held_packet->has_expired() ? DAQ_VERDICT_BLACKLIST : DAQ_VERDICT_BLOCK;
-            Analyzer::get_local_analyzer()->finalize_daq_message(held_packet->get_daq_msg(), verdict);
+            Analyzer::get_local_analyzer()->finalize_daq_message(msg, verdict);
             tcpStats.held_packets_dropped++;
         }
         else
         {
-            Analyzer::get_local_analyzer()->finalize_daq_message(held_packet->get_daq_msg(), DAQ_VERDICT_PASS);
-            tcpStats.held_packets_passed++;
+            if ( cp->active->packet_retry_requested() )
+            {
+                tcpStats.held_packet_retries++;
+                Analyzer::get_local_analyzer()->add_to_retry_queue(msg);
+            }
+            else
+            {
+                Analyzer::get_local_analyzer()->finalize_daq_message(msg, DAQ_VERDICT_PASS);
+                tcpStats.held_packets_passed++;
+            }
+
+            TcpStreamSession* tcp_session = (TcpStreamSession*)cp->flow->session;
+            tcp_session->held_packet_dir = SSN_DIR_NONE;
         }
+
+        memory::MemoryCap::update_deallocations(msglen);
 
         hpq->erase(held_packet);
         held_packet = null_iterator;
@@ -696,18 +720,25 @@ void TcpStreamTracker::finalize_held_packet(Flow* flow)
 {
     if ( held_packet != null_iterator )
     {
+        DAQ_Msg_h msg = held_packet->get_daq_msg();
+        uint32_t msglen = daq_msg_get_data_len(msg);
+
         if ( (flow->session_state & STREAM_STATE_BLOCK_PENDING) ||
              (flow->ssn_state.session_flags & SSNFLAG_BLOCK) )
         {
             DAQ_Verdict verdict = held_packet->has_expired() ? DAQ_VERDICT_BLACKLIST : DAQ_VERDICT_BLOCK;
-            Analyzer::get_local_analyzer()->finalize_daq_message(held_packet->get_daq_msg(), verdict);
+            Analyzer::get_local_analyzer()->finalize_daq_message(msg, verdict);
             tcpStats.held_packets_dropped++;
         }
         else
         {
-            Analyzer::get_local_analyzer()->finalize_daq_message(held_packet->get_daq_msg(), DAQ_VERDICT_PASS);
+            TcpStreamSession* tcp_session = (TcpStreamSession*)flow->session;
+            tcp_session->held_packet_dir = SSN_DIR_NONE;
+            Analyzer::get_local_analyzer()->finalize_daq_message(msg, DAQ_VERDICT_PASS);
             tcpStats.held_packets_passed++;
         }
+
+        memory::MemoryCap::update_deallocations(msglen);
 
         hpq->erase(held_packet);
         held_packet = null_iterator;

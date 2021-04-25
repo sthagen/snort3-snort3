@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -201,7 +201,7 @@ int TftpServiceDetector::validate(AppIdDiscoveryArgs& args)
                 tmp_td->state = TFTP_STATE_ERROR;
                 return APPID_ENOMEM;
             }
-            args.asd.initialize_future_session(*pf, APPID_SESSION_EXPECTED_EVALUATE, APP_ID_FROM_RESPONDER);
+            args.asd.initialize_future_session(*pf, APPID_SESSION_EXPECTED_EVALUATE);
             pf->set_initiator_ip(*sip);
             pf->service_disco_state = APPID_DISCO_STATE_STATEFUL;
             pf->scan_flags |= SCAN_HOST_PORT_FLAG;

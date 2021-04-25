@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,7 +23,6 @@
 
 #include "http_module.h"
 
-#include "helpers/literal_search.h"
 #include "log/messages.h"
 
 #include "http_enum.h"
@@ -34,26 +33,15 @@
 using namespace snort;
 using namespace HttpEnums;
 
-LiteralSearch::Handle* s_handle = nullptr;
-LiteralSearch* s_script = nullptr;
-
-HttpModule::HttpModule() : Module(HTTP_NAME, HTTP_HELP, http_params)
+HttpModule::HttpModule() : Module(HTTP_NAME, HTTP_HELP, http_params),
+    script_detection_handle(LiteralSearch::setup())
 {
-    s_handle = LiteralSearch::setup();
-    s_script = LiteralSearch::instantiate(s_handle, (const uint8_t*)"</SCRIPT>", 9, true, true);
 }
 
 HttpModule::~HttpModule()
 {
     delete params;
-    delete s_script;
-    LiteralSearch::cleanup(s_handle);
-}
-
-void HttpModule::get_script_finder(LiteralSearch*& finder, LiteralSearch::Handle*& handle)
-{
-    finder = s_script;
-    handle = s_handle;
+    LiteralSearch::cleanup(script_detection_handle);
 }
 
 const Parameter HttpModule::http_params[] =
@@ -79,18 +67,15 @@ const Parameter HttpModule::http_params[] =
     { "decompress_zip", Parameter::PT_BOOL, nullptr, "false",
       "decompress zip files in response bodies" },
 
-    // FIXIT-D remove
-    { "detained_inspection", Parameter::PT_BOOL, nullptr, "false",
-      "obsolete, do not configure" },
-
     { "script_detection", Parameter::PT_BOOL, nullptr, "false",
       "inspect JavaScript immediately upon script end" },
 
     { "normalize_javascript", Parameter::PT_BOOL, nullptr, "false",
-      "normalize JavaScript in response bodies" },
+      "use legacy normalizer to normalize JavaScript in response bodies" },
 
-    { "normalization_depth", Parameter::PT_INT, "-1:65535", "0",
-      "number of input JavaScript bytes to normalize" },
+    { "js_normalization_depth", Parameter::PT_INT, "-1:max53", "0",
+      "number of input JavaScript bytes to normalize with enhanced normalizer "
+      "(-1 max allowed value) (experimental)" },
 
     { "max_javascript_whitespaces", Parameter::PT_INT, "1:65535", "200",
       "maximum consecutive whitespaces allowed within the JavaScript obfuscated data" },
@@ -205,10 +190,6 @@ bool HttpModule::set(const char*, Value& val, SnortConfig*)
     {
         params->decompress_zip = val.get_bool();
     }
-    else if (val.is("detained_inspection"))
-    {
-        // obsolete parameter FIXIT-D
-    }
     else if (val.is("script_detection"))
     {
         params->script_detection = val.get_bool();
@@ -216,11 +197,20 @@ bool HttpModule::set(const char*, Value& val, SnortConfig*)
     else if (val.is("normalize_javascript"))
     {
         params->js_norm_param.normalize_javascript = val.get_bool();
+
+        if ( !params->js_norm_param.is_javascript_normalization )
+            params->js_norm_param.is_javascript_normalization =
+                params->js_norm_param.normalize_javascript;
     }
-    else if (val.is("normalization_depth"))
+    else if (val.is("js_normalization_depth"))
     {
-        int v = val.get_int32();
-        params->js_norm_param.normalization_depth = (v == -1) ? 65535 : v;
+        int64_t v = val.get_int64();
+        params->js_norm_param.js_normalization_depth = (v == -1) ?
+          Parameter::get_int("max53") : v;
+
+        if ( !params->js_norm_param.is_javascript_normalization )
+            params->js_norm_param.is_javascript_normalization =
+                (params->js_norm_param.js_normalization_depth > 0);
     }
     else if (val.is("max_javascript_whitespaces"))
     {
@@ -398,15 +388,17 @@ bool HttpModule::end(const char*, int, SnortConfig*)
                 params->uri_param.iis_unicode_map_file.c_str(),
                 params->uri_param.iis_unicode_code_page);
     }
-    if (params->js_norm_param.normalize_javascript)
-    {
-        params->js_norm_param.js_norm =
-            new HttpJsNorm(params->js_norm_param.max_javascript_whitespaces, params->uri_param,
-            params->js_norm_param.normalization_depth);
-    }
+
+    if ( params->js_norm_param.normalize_javascript and
+      params->js_norm_param.js_normalization_depth )
+        ParseError("Cannot use normalize_javascript and js_normalization_depth together.");
+
+    if ( params->js_norm_param.is_javascript_normalization )
+        params->js_norm_param.js_norm = new HttpJsNorm(params->uri_param);
+
+    params->script_detection_handle = script_detection_handle;
 
     prepare_http_header_list(params);
-
     return true;
 }
 

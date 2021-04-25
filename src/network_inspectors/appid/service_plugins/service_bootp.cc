@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -230,7 +230,7 @@ int BootpServiceDetector::validate(AppIdDiscoveryArgs& args)
                         goto fail;
 
                     if (option53 && (memcmp(eh->ether_dst, bh->chaddr, 6) == 0))
-                        add_new_dhcp_lease(args.asd, bh->chaddr, bh->yiaddr, pkt->pkth->ingress_group,
+                        add_new_dhcp_lease(args.asd, bh->chaddr, bh->yiaddr,
                             ntohl(subnet), ntohl(leaseTime),
                             router);
                     goto success;
@@ -322,25 +322,13 @@ void BootpServiceDetector::add_dhcp_info(AppIdSession& asd, unsigned op55_len, c
     }
 }
 
-static unsigned isIPv4HostMonitored(uint32_t, int32_t)
-{
-    // FIXIT-M Defaulting to checking everything everywhere until RNA config is reimplemented
-    return IPFUNCS_HOSTS_IP | IPFUNCS_USER_IP | IPFUNCS_APPLICATION;
-}
-
 void BootpServiceDetector::add_new_dhcp_lease(AppIdSession& asd, const uint8_t* mac, uint32_t ip,
-    int32_t zone,
     uint32_t subnetmask, uint32_t leaseSecs, uint32_t router)
 {
     if (memcmp(mac, zeromac, 6) == 0 || ip == 0)
         return;
 
-    if (!asd.get_session_flags(APPID_SESSION_DO_RNA)
-        || asd.get_session_flags(APPID_SESSION_HAS_DHCP_INFO))
-        return;
-
-    unsigned flags = isIPv4HostMonitored(ntohl(ip), zone);
-    if (!(flags & IPFUNCS_HOSTS_IP))
+    if (asd.get_session_flags(APPID_SESSION_HAS_DHCP_INFO))
         return;
 
     asd.set_session_flags(APPID_SESSION_HAS_DHCP_INFO);

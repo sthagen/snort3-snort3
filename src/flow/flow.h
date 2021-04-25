@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -439,7 +439,7 @@ public:  // FIXIT-M privatize if possible
     unsigned inspection_policy_id;
     unsigned ips_policy_id;
     unsigned network_policy_id;
-    unsigned reputation_id;
+    unsigned reload_id;
 
     uint32_t default_session_timeout;
 

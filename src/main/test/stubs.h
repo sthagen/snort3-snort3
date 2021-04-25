@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -163,6 +163,7 @@ void DetectionEngine::idle() { }
 void DetectionEngine::reset() { }
 void DetectionEngine::wait_for_context() { }
 void DetectionEngine::set_file_data(const DataPointer&) { }
+void DetectionEngine::set_script_data(const DataPointer&) { }
 void DetectionEngine::clear_replacement() { }
 void DetectionEngine::disable_all(Packet*) { }
 unsigned get_instance_id() { return 0; }

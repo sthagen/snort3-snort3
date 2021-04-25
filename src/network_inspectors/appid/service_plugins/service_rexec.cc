@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -183,7 +183,7 @@ int RexecServiceDetector::validate(AppIdDiscoveryArgs& args)
                 }
                 pf->service_disco_state = APPID_DISCO_STATE_STATEFUL;
                 pf->scan_flags |= SCAN_HOST_PORT_FLAG;
-                args.asd.initialize_future_session(*pf, REXEC_EXPECTED_SESSION_FLAGS, APP_ID_FROM_RESPONDER);
+                args.asd.initialize_future_session(*pf, REXEC_EXPECTED_SESSION_FLAGS);
                 pf->service_disco_state = APPID_DISCO_STATE_STATEFUL;
                 rd->child = tmp_rd;
                 rd->state = REXEC_STATE_SERVER_CONNECT;

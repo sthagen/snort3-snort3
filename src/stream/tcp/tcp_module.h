@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -103,6 +103,7 @@ struct TcpStats
     PegCount held_packets_passed;
     PegCount held_packet_timeouts;
     PegCount held_packet_purges;
+    PegCount held_packet_retries;
     PegCount current_packets_held;
     PegCount max_packets_held;
     PegCount partial_flushes;

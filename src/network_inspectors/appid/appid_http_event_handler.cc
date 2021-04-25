@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -65,6 +65,8 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
     }
     else if ( asd->get_odp_ctxt_version() != pkt_thread_odp_ctxt->get_version() )
         return; // Skip detection for sessions using old odp context after odp reload
+    if (!asd->get_session_flags(APPID_SESSION_DISCOVER_APP | APPID_SESSION_SPECIAL_MONITORED))
+        return;
 
     const uint8_t* header_start;
     int32_t header_length;
@@ -112,25 +114,18 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
     {
         header_start = http_event->get_host(header_length);
         if (header_length > 0)
-        {
             hsession->set_field(REQ_HOST_FID, header_start, header_length, change_bits);
-            asd->scan_flags |= SCAN_HTTP_HOST_URL_FLAG;
-        }
 
         header_start = http_event->get_uri(header_length);
         if (header_length > 0)
         {
             hsession->set_field(REQ_URI_FID, header_start, header_length, change_bits);
-            asd->scan_flags |= SCAN_HTTP_URI_FLAG;
             hsession->update_url(change_bits);
         }
 
         header_start = http_event->get_user_agent(header_length);
         if (header_length > 0)
-        {
             hsession->set_field(REQ_AGENT_FID, header_start, header_length, change_bits);
-            asd->scan_flags |= SCAN_HTTP_USER_AGENT_FLAG;
-        }
 
         header_start = http_event->get_cookie(header_length);
         hsession->set_field(REQ_COOKIE_FID, header_start, header_length, change_bits);
@@ -146,18 +141,13 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
     {
         header_start = http_event->get_content_type(header_length);
         if (header_length > 0)
-        {
             hsession->set_field(RSP_CONTENT_TYPE_FID, header_start, header_length, change_bits);
-            asd->scan_flags |= SCAN_HTTP_CONTENT_TYPE_FLAG;
-        }
+
         header_start = http_event->get_location(header_length);
         hsession->set_field(RSP_LOCATION_FID, header_start, header_length, change_bits);
         header_start = http_event->get_server(header_length);
         if (header_length > 0)
-        {
             hsession->set_field(MISC_SERVER_FID, header_start, header_length, change_bits);
-            asd->scan_flags |= SCAN_HTTP_VENDOR_FLAG;
-        }
 
         int32_t responseCodeNum = http_event->get_response_code();
         if (responseCodeNum > 0 && responseCodeNum < 700)
@@ -177,18 +167,12 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
 
     header_start = http_event->get_x_working_with(header_length);
     if (header_length > 0)
-    {
         hsession->set_field(MISC_XWW_FID, header_start, header_length, change_bits);
-        asd->scan_flags |= SCAN_HTTP_XWORKINGWITH_FLAG;
-    }
 
     //  The Via header can be in both the request and response.
     header_start = http_event->get_via(header_length);
     if (header_length > 0)
-    {
         hsession->set_field(MISC_VIA_FID, header_start, header_length, change_bits);
-        asd->scan_flags |= SCAN_HTTP_VIA_FLAG;
-    }
 
     if (http_event->get_is_http2())
     {

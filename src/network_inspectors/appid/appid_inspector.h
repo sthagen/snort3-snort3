@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -32,7 +32,6 @@ namespace snort
 struct Packet;
 struct SnortConfig;
 }
-class SipEventHandler;
 
 class AppIdInspector : public snort::Inspector
 {
@@ -49,16 +48,9 @@ public:
     void eval(snort::Packet*) override;
     AppIdContext& get_ctxt() const;
 
-    SipEventHandler& get_sip_event_handler()
-    {
-        return *my_seh;
-    }
-
 private:
     const AppIdConfig* config = nullptr;
     AppIdContext* ctxt = nullptr;
-    SipEventHandler* my_seh = nullptr;
-
 };
 
 extern THREAD_LOCAL OdpThreadContext* odp_thread_local_ctxt;

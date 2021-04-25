@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2017-2020 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2017-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -77,6 +77,7 @@ public:
     static SO_PUBLIC void log(TracerMute, const char* format, ...) __attribute__((format (printf, 2, 3)));
 
     static SO_PUBLIC void daq_log(const char* format, ...) __attribute__((format (printf, 1, 2)));
+    static SO_PUBLIC void pt_timer_start();
 
 protected:
 

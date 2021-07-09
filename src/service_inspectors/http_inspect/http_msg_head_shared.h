@@ -58,6 +58,7 @@ public:
     // verdicts.
     uint64_t get_file_cache_index();
     const Field& get_content_disposition_filename();
+    bool is_external_js();
 
 protected:
     HttpMsgHeadShared(const uint8_t* buffer, const uint16_t buf_size,
@@ -132,6 +133,8 @@ private:
     bool file_cache_index_computed = false;
 
     bool own_msg_buffer;
+    const uint32_t extra_memory_allocations;
+    int js_external = HttpCommon::STAT_NOT_COMPUTE;
 };
 
 #endif

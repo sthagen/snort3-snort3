@@ -51,7 +51,7 @@ void memory::MemoryCap::update_allocations(size_t) {}
 
 void memory::MemoryCap::update_deallocations(size_t) {}
 
-bool memory::MemoryCap::free_space(size_t) { return false; }
+void memory::MemoryCap::free_space(size_t) { }
 
 bool HighAvailabilityManager::active() { return false; }
 
@@ -65,7 +65,7 @@ void FlowStash::reset() {}
 
 void DetectionEngine::onload(Flow*) {}
 
-Packet* DetectionEngine::set_next_packet(Packet*) { return nullptr; }
+Packet* DetectionEngine::set_next_packet(Packet*, Flow*) { return nullptr; }
 
 IpsContext* DetectionEngine::get_context() { return nullptr; }
 

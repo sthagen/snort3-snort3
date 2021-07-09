@@ -33,6 +33,9 @@
 #define SNORT_FILE_TYPE_UNKNOWN          UINT16_MAX
 #define SNORT_FILE_TYPE_CONTINUE         0
 
+const std::string VerdictName[] =
+{"Unknown", "Log", "Stop", "Block", "Reset", "Pending", "Stop Capture", "INVALID"};
+
 class FileConfig;
 class FileSegments;
 
@@ -82,6 +85,8 @@ public:
     FileVerdict verdict = FILE_VERDICT_UNKNOWN;
     bool processing_complete = false;
     struct timeval pending_expire_time = {0, 0};
+    void set_processing_flow(Flow* flow) { processing_flow = flow; }
+    Flow* get_processing_flow() { return processing_flow; }
 
 protected:
     std::string file_name;
@@ -92,6 +97,7 @@ protected:
     uint8_t* sha256 = nullptr;
     uint64_t file_id = 0;
     FileCapture* file_capture = nullptr;
+    Flow* processing_flow = nullptr;
     bool file_type_enabled = false;
     bool file_signature_enabled = false;
     bool file_capture_enabled = false;
@@ -137,6 +143,7 @@ public:
     char* get_UTF8_fname(size_t* converted_len);
     void set_not_cacheable() { cacheable = false; }
     bool is_cacheable() { return cacheable; }
+    bool segments_queued() { return (file_segments != nullptr); }
 
 private:
     uint64_t processed_bytes = 0;

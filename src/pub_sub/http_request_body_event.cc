@@ -15,23 +15,43 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
-// js_norm_state.h author Oleksandr Serhiienko <oserhiie@cisco.com>
+// http_request_body_event.cc author Katura Harvey <katharve@cisco.com>
 
-#ifndef JS_NORM_STATE_H
-#define JS_NORM_STATE_H
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
 
-#include "main/snort_types.h"
+#include "http_request_body_event.h"
 
-namespace snort
+#include "service_inspectors/http_inspect/http_flow_data.h"
+
+using namespace snort;
+
+const uint8_t* HttpRequestBodyEvent::get_request_body_data(int32_t& length, int32_t& offset)
 {
-#define ALERT_UNEXPECTED_TAG 0x1
+    offset = msg_offset;
 
-struct JSNormState
-{
-    int64_t norm_depth;
-    uint16_t alerts;
-};
+    if (http_msg_body)
+    {
+        const Field& body = http_msg_body->get_msg_text_new();
+        length = http_msg_body->get_publish_length();
+        if (length > 0)
+        {
+            assert(body.length() >= length);
+            return body.start();
+        }
+    }
+
+    length = 0;
+    return nullptr;
 }
 
-#endif // JS_NORM_STATE_H
+bool HttpRequestBodyEvent::is_last_request_body_piece()
+{
+    return last_piece;
+}
 
+uint32_t HttpRequestBodyEvent::get_http2_stream_id() const
+{
+    return http_flow_data->get_h2_stream_id();
+}

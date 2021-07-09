@@ -28,7 +28,9 @@ static const int MAX_OCTETS = 63780;
 static const int DATA_SECTION_SIZE = 16384;
 static const int FRAME_HEADER_LENGTH = 9;
 static const uint32_t NO_STREAM_ID = 0xFFFFFFFF;
-static const uint32_t CONCURRENT_STREAMS_LIMIT = 100;
+
+// Perform memory allocation and deallocation tracking for Http2Stream objects in increments of 25
+static const uint32_t STREAM_MEMORY_TRACKING_INCREMENT = 25;
 
 static const uint32_t HTTP2_GID = 121;
 
@@ -43,8 +45,7 @@ enum StreamState { STREAM_EXPECT_HEADERS, STREAM_EXPECT_BODY, STREAM_BODY, STREA
 
 // Message buffers available to clients
 // This enum must remain synchronized with Http2Api::classic_buffer_names[]
-enum HTTP2_BUFFER { HTTP2_BUFFER_FRAME_HEADER = 1, HTTP2_BUFFER_FRAME_DATA,
-    HTTP2_BUFFER_DECODED_HEADER, HTTP2_BUFFER__MAX };
+enum HTTP2_BUFFER { HTTP2_BUFFER_FRAME_HEADER = 1, HTTP2_BUFFER_DECODED_HEADER, HTTP2_BUFFER__MAX };
 
 // Peg counts
 // This enum must remain synchronized with Http2Module::peg_names[] in http2_tables.cc
@@ -85,6 +86,9 @@ enum EventSid
     EVENT_INVALID_RST_STREAM_FRAME = 28,
     EVENT_BAD_RST_STREAM_SEQUENCE = 29,
     EVENT_HEADER_UPPERCASE = 30,
+    EVENT_INVALID_WINDOW_UPDATE_FRAME = 31,
+    EVENT_WINDOW_UPDATE_FRAME_ZERO_INCREMENT = 32,
+    EVENT_REQUEST_WITHOUT_METHOD = 33,
     EVENT__MAX_VALUE
 };
 
@@ -138,27 +142,29 @@ enum Infraction
     INF_INVALID_RST_STREAM_FRAME = 43,
     INF_BAD_RST_STREAM_SEQUENCE = 44,
     INF_HEADER_UPPERCASE = 45,
+    INF_INVALID_WINDOW_UPDATE_FRAME = 46,
+    INF_WINDOW_UPDATE_FRAME_ZERO_INCREMENT = 47,
     INF__MAX_VALUE
 };
 
 enum HeaderFrameFlags
 {
-    ACK = 0x1,
-    END_STREAM = 0x1,
-    END_HEADERS = 0x4,
-    PADDED = 0x8,
-    PRIORITY = 0x20,
-    NO_HEADER = 0x80, //No valid flags use this bit
+    FLAG_ACK = 0x1,
+    FLAG_END_STREAM = 0x1,
+    FLAG_END_HEADERS = 0x4,
+    FLAG_PADDED = 0x8,
+    FLAG_PRIORITY = 0x20,
+    FLAG_NO_HEADER = 0x80, //No valid flags use this bit
 };
 
 enum SettingsFrameIds
 {
-    HEADER_TABLE_SIZE = 1,
-    ENABLE_PUSH,
-    MAX_CONCURRENT_STREAMS,
-    INITIAL_WINDOW_SIZE,
-    MAX_FRAME_SIZE,
-    MAX_HEADER_LIST_SIZE,
+    SFID_HEADER_TABLE_SIZE = 1,
+    SFID_ENABLE_PUSH,
+    SFID_MAX_CONCURRENT_STREAMS,
+    SFID_INITIAL_WINDOW_SIZE,
+    SFID_MAX_FRAME_SIZE,
+    SFID_MAX_HEADER_LIST_SIZE,
 };
 
 enum ScanState { SCAN_FRAME_HEADER, SCAN_PADDING_LENGTH, SCAN_DATA, SCAN_EMPTY_DATA };

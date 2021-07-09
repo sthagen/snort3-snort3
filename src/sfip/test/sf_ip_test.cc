@@ -248,6 +248,8 @@ static FuncTest ftests[] =
 
 static int RunFunc(const char* func, const char* arg1, const char* arg2)
 {
+    SfIp::test_features = true;
+
     SfCidr cidr1, cidr2;
     const SfIp* ip1, * ip2;
     int result = SFIP_FAILURE;
@@ -408,4 +410,23 @@ TEST_CASE("sfip copy", "[sfip]")
 {
     for ( unsigned i = 0; i < NUM_TESTS; ++i )
         CHECK(CopyCheck(i) == 1);
+}
+
+TEST_CASE("uri parsing", "[sfip]")
+{
+    std::string ip_str;
+    SfIp ip;
+
+    // Validity of IP strings: empty, large, protocol, port, path
+    CHECK(parse_ip_from_uri(ip_str, ip) == false);
+    ip_str = "1111:2222:3333:4444:5555:6666:7777:8888:9999";
+    CHECK(parse_ip_from_uri(ip_str, ip) == false);
+    ip_str = "http://";
+    CHECK(parse_ip_from_uri(ip_str, ip) == false);
+    ip_str = "http://1.2.3.4:80";
+    CHECK(parse_ip_from_uri(ip_str, ip));
+    ip_str = "https://1.2.3.5/about.html";
+    CHECK(parse_ip_from_uri(ip_str, ip));
+    ip_str = "[1111::2222]/about.html";
+    CHECK(parse_ip_from_uri(ip_str, ip));
 }

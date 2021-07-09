@@ -24,6 +24,7 @@
 #include "http_msg_body.h"
 
 #include "file_api/file_flows.h"
+#include "pub_sub/http_request_body_event.h"
 
 #include "http_api.h"
 #include "http_common.h"
@@ -31,6 +32,7 @@
 #include "http_js_norm.h"
 #include "http_msg_header.h"
 #include "http_msg_request.h"
+#include "http_test_manager.h"
 
 using namespace snort;
 using namespace HttpCommon;
@@ -45,6 +47,31 @@ HttpMsgBody::HttpMsgBody(const uint8_t* buffer, const uint16_t buf_size,
 {
     transaction->set_body(this);
     get_related_sections();
+}
+
+void HttpMsgBody::publish()
+{
+    if (publish_length <= 0)
+        return;
+
+    const int32_t& pub_depth_remaining = session_data->publish_depth_remaining[source_id];
+    int32_t& publish_octets = session_data->publish_octets[source_id];
+    const bool last_piece = (session_data->cutter[source_id] == nullptr) || tcp_close ||
+        (pub_depth_remaining == 0);
+
+    HttpRequestBodyEvent http_request_body_event(this, publish_octets, last_piece, session_data);
+
+    DataBus::publish(HTTP2_REQUEST_BODY_EVENT_KEY, http_request_body_event, flow);
+    publish_octets += publish_length;
+#ifdef REG_TEST
+    if (HttpTestManager::use_test_output(HttpTestManager::IN_HTTP))
+    {
+        fprintf(HttpTestManager::get_output_file(),
+            "Published %" PRId32 " bytes of request body. last: %s\n", publish_length,
+            (last_piece ? "true" : "false"));
+        fflush(HttpTestManager::get_output_file());
+    }
+#endif
 }
 
 void HttpMsgBody::bookkeeping_regular_flush(uint32_t& partial_detect_length,
@@ -70,8 +97,8 @@ void HttpMsgBody::clean_partial(uint32_t& partial_inspected_octets, uint32_t& pa
         delete[] partial_detect_buffer;
         session_data->update_deallocations(partial_detect_length);
         assert(detect_length <= session_data->detect_depth_remaining[source_id]);
-        bookkeeping_regular_flush(partial_detect_length, partial_detect_buffer, partial_js_detect_length,
-            detect_length);
+        bookkeeping_regular_flush(partial_detect_length, partial_detect_buffer,
+            partial_js_detect_length, detect_length);
     }
 }
 
@@ -96,70 +123,81 @@ void HttpMsgBody::analyze()
     else
         msg_text_new.set(msg_text);
 
-    do_utf_decoding(msg_text_new, decoded_body);
-
-    if (session_data->file_depth_remaining[source_id] > 0)
+    int32_t& pub_depth_remaining = session_data->publish_depth_remaining[source_id];
+    if (pub_depth_remaining > 0)
     {
-        do_file_processing(decoded_body);
+        publish_length = (pub_depth_remaining > msg_text_new.length()) ?
+            msg_text_new.length() : pub_depth_remaining;
+        pub_depth_remaining -= publish_length;
     }
 
-    if (session_data->detect_depth_remaining[source_id] > 0)
+    if (session_data->file_depth_remaining[source_id] > 0 or
+        session_data->detect_depth_remaining[source_id] > 0)
     {
-        do_file_decompression(decoded_body, decompressed_file_body);
+        do_utf_decoding(msg_text_new, decoded_body);
 
-        uint32_t& partial_detect_length = session_data->partial_detect_length[source_id];
-        uint8_t*& partial_detect_buffer = session_data->partial_detect_buffer[source_id];
-        uint32_t& partial_js_detect_length = session_data->partial_js_detect_length[source_id];
-
-        if (partial_detect_length > 0)
+        if (session_data->file_depth_remaining[source_id] > 0)
         {
-            const int32_t total_length = partial_detect_length + decompressed_file_body.length();
-            uint8_t* const cumulative_buffer = new uint8_t[total_length];
-            memcpy(cumulative_buffer, partial_detect_buffer, partial_detect_length);
-            memcpy(cumulative_buffer + partial_detect_length, decompressed_file_body.start(),
-                decompressed_file_body.length());
-            cumulative_data.set(total_length, cumulative_buffer, true);
-            do_js_normalization(cumulative_data, js_norm_body);
-            if ((int32_t)partial_js_detect_length == js_norm_body.length())
+            do_file_processing(decoded_body);
+        }
+
+        if (session_data->detect_depth_remaining[source_id] > 0)
+        {
+            do_file_decompression(decoded_body, decompressed_file_body);
+
+            uint32_t& partial_detect_length = session_data->partial_detect_length[source_id];
+            uint8_t*& partial_detect_buffer = session_data->partial_detect_buffer[source_id];
+            uint32_t& partial_js_detect_length = session_data->partial_js_detect_length[source_id];
+
+            if (partial_detect_length > 0)
             {
-                clean_partial(partial_inspected_octets, partial_detect_length,
-                    partial_detect_buffer, partial_js_detect_length, js_norm_body.length());
-                return;
+                const int32_t total_length = partial_detect_length + decompressed_file_body.length();
+                uint8_t* const cumulative_buffer = new uint8_t[total_length];
+                memcpy(cumulative_buffer, partial_detect_buffer, partial_detect_length);
+                memcpy(cumulative_buffer + partial_detect_length, decompressed_file_body.start(),
+                    decompressed_file_body.length());
+                cumulative_data.set(total_length, cumulative_buffer, true);
+                do_js_normalization(cumulative_data, js_norm_body, true);
+                if ((int32_t)partial_js_detect_length == js_norm_body.length())
+                {
+                    clean_partial(partial_inspected_octets, partial_detect_length,
+                        partial_detect_buffer, partial_js_detect_length, js_norm_body.length());
+                    return;
+                }
             }
+            else
+                do_js_normalization(decompressed_file_body, js_norm_body, false);
+
+            const int32_t detect_length =
+                (js_norm_body.length() <= session_data->detect_depth_remaining[source_id]) ?
+                js_norm_body.length() : session_data->detect_depth_remaining[source_id];
+
+            detect_data.set(detect_length, js_norm_body.start());
+
+            delete[] partial_detect_buffer;
+            session_data->update_deallocations(partial_detect_length);
+
+            if (!session_data->partial_flush[source_id])
+            {
+                bookkeeping_regular_flush(partial_detect_length, partial_detect_buffer,
+                    partial_js_detect_length, detect_length);
+            }
+            else
+            {
+                Field* decompressed = (cumulative_data.length() > 0) ?
+                    &cumulative_data : &decompressed_file_body;
+                uint8_t* const save_partial = new uint8_t[decompressed->length()];
+                memcpy(save_partial, decompressed->start(), decompressed->length());
+                partial_detect_buffer = save_partial;
+                partial_detect_length = decompressed->length();
+                partial_js_detect_length = js_norm_body.length();
+                session_data->update_allocations(partial_detect_length);
+            }
+
+            set_file_data(const_cast<uint8_t*>(detect_data.start()),
+                (unsigned)detect_data.length());
         }
-        else
-            do_js_normalization(decompressed_file_body, js_norm_body);
-
-        const int32_t detect_length =
-            (js_norm_body.length() <= session_data->detect_depth_remaining[source_id]) ?
-            js_norm_body.length() : session_data->detect_depth_remaining[source_id];
-
-        detect_data.set(detect_length, js_norm_body.start());
-
-        delete[] partial_detect_buffer;
-        session_data->update_deallocations(partial_detect_length);
-
-        if (!session_data->partial_flush[source_id])
-        {
-            bookkeeping_regular_flush(partial_detect_length, partial_detect_buffer,
-                partial_js_detect_length, detect_length);
-        }
-        else
-        {
-            Field* decompressed = (cumulative_data.length() > 0) ?
-                &cumulative_data : &decompressed_file_body;
-            uint8_t* const save_partial = new uint8_t[decompressed->length()];
-            memcpy(save_partial, decompressed->start(), decompressed->length());
-            partial_detect_buffer = save_partial;
-            partial_detect_length = decompressed->length();
-            partial_js_detect_length = js_norm_body.length();
-            session_data->update_allocations(partial_detect_length);
-        }
-
-        set_file_data(const_cast<uint8_t*>(detect_data.start()),
-            (unsigned)detect_data.length());
     }
-
     body_octets += msg_text.length();
     partial_inspected_octets = session_data->partial_flush[source_id] ? msg_text.length() : 0;
 }
@@ -277,28 +315,62 @@ void HttpMsgBody::fd_event_callback(void* context, int event)
     }
 }
 
-void HttpMsgBody::do_js_normalization(const Field& input, Field& output)
+void HttpMsgBody::do_js_normalization(const Field& input, Field& output, bool partial_detect)
 {
-    if ( !params->js_norm_param.is_javascript_normalization or source_id == SRC_CLIENT )
+    if (!params->js_norm_param.is_javascript_normalization or source_id == SRC_CLIENT)
         output.set(input);
-    else if ( params->js_norm_param.normalize_javascript )
+    else if (params->js_norm_param.normalize_javascript)
         params->js_norm_param.js_norm->legacy_normalize(input, output,
             transaction->get_infractions(source_id), session_data->events[source_id],
             params->js_norm_param.max_javascript_whitespaces);
-    else if ( params->js_norm_param.js_normalization_depth )
+    else if (params->js_norm_param.js_normalization_depth)
     {
         output.set(input);
 
-        params->js_norm_param.js_norm->enhanced_normalize(input, enhanced_js_norm_body,
-            transaction->get_infractions(source_id), session_data->events[source_id],
-            params->js_norm_param.js_normalization_depth);
+        bool js_continuation = session_data->js_normalizer;
+        uint8_t*& buf = session_data->js_detect_buffer[source_id];
+        uint32_t& len = session_data->js_detect_length[source_id];
+
+        if (partial_detect)
+            session_data->release_js_ctx();
+        else
+        {
+            session_data->update_deallocations(len);
+            delete[] buf;
+            buf = nullptr;
+            len = 0;
+        }
+
+        auto http_header = get_header(source_id);
+        if (http_header and http_header->is_external_js())
+            params->js_norm_param.js_norm->enhanced_external_normalize(input, enhanced_js_norm_body,
+                transaction->get_infractions(source_id), session_data);
+        else
+            params->js_norm_param.js_norm->enhanced_inline_normalize(input, enhanced_js_norm_body,
+                transaction->get_infractions(source_id), session_data);
 
         const int32_t norm_length =
             (enhanced_js_norm_body.length() <= session_data->detect_depth_remaining[source_id]) ?
             enhanced_js_norm_body.length() : session_data->detect_depth_remaining[source_id];
 
         if ( norm_length > 0 )
+        {
             set_script_data(enhanced_js_norm_body.start(), (unsigned int)norm_length);
+
+            if (partial_detect)
+                return;
+
+            if (js_continuation)
+            {
+                auto nscript_len = enhanced_js_norm_body.length();
+                uint8_t* nscript = new uint8_t[nscript_len];
+
+                memcpy(nscript, enhanced_js_norm_body.start(), nscript_len);
+                buf = nscript;
+                len = nscript_len;
+                session_data->update_allocations(len);
+            }
+        }
     }
 }
 
@@ -396,6 +468,11 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
 const Field& HttpMsgBody::get_classic_client_body()
 {
     return classic_normalize(detect_data, classic_client_body, false, params->uri_param);
+}
+
+int32_t HttpMsgBody::get_publish_length() const
+{
+    return publish_length;
 }
 
 #ifdef REG_TEST

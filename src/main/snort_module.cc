@@ -120,9 +120,9 @@ static const Command snort_cmds[] =
     { "pause", main_pause, nullptr, "suspend packet processing" },
 
     { "resume", main_resume, s_pktnum, "continue packet processing. "
-      "If number of packet is specified, will resume for n packets and pause" },
+      "If number of packets is specified, will resume for n packets and pause" },
 
-    { "detach", main_detach, nullptr, "exit shell w/o shutdown" },
+    { "detach", main_detach, nullptr, "detach from control shell (without shutting down)" },
     { "quit", main_quit, nullptr, "shutdown and dump-stats" },
     { "help", main_help, nullptr, "this output" },
 
@@ -131,7 +131,7 @@ static const Command snort_cmds[] =
 #endif
 
 //-------------------------------------------------------------------------
-// why not
+// hex conversion helper funcs
 //-------------------------------------------------------------------------
 
 [[noreturn]] static void c2x(const char* s)
@@ -181,8 +181,10 @@ static const Command snort_cmds[] =
 
 static const TraceOption snort_trace_options[] =
 {
-    { "main", TRACE_MAIN, "enable main trace logging" },
     { "inspector_manager", TRACE_INSPECTOR_MANAGER, "enable inspector manager trace logging" },
+#ifdef DEBUG_MSGS
+    { "main", TRACE_MAIN, "enable main trace logging" },
+#endif
 
     { nullptr, 0, nullptr }
 };
@@ -375,6 +377,9 @@ static const Parameter s_params[] =
 
     { "--enable-inline-test", Parameter::PT_IMPLIED, nullptr, nullptr,
       "enable Inline-Test Mode Operation" },
+
+    { "--enable-test-features", Parameter::PT_IMPLIED, nullptr, nullptr,
+      "enable features used in testing" },
 
     { "--gen-msg-map", Parameter::PT_IMPLIED, nullptr, nullptr,
       "dump configured rules in gen-msg.map format for use by other tools" },
@@ -917,6 +922,12 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
 
     else if ( v.is("--enable-inline-test") )
         sc->run_flags |= RUN_FLAG__INLINE_TEST;
+
+    else if ( v.is("--enable-test-features") )
+    {
+        sc->run_flags |= RUN_FLAG__TEST_FEATURES;
+        SfIp::test_features = true;
+    }
 
     else if ( v.is("--gen-msg-map") )
     {

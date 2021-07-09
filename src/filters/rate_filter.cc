@@ -113,7 +113,7 @@ int RateFilter_Test(const OptTreeNode* otn, Packet* p)
     const SfIp* dip;
     SfIp cleared;
 
-    if ( p->ptrs.ip_api.is_ip() )
+    if ( p->has_ip_hdr() )
     {
         sip = p->ptrs.ip_api.get_src();
         dip = p->ptrs.ip_api.get_dst();
@@ -133,12 +133,12 @@ int RateFilter_Test(const OptTreeNode* otn, Packet* p)
         // events and these require: src -> client, dst -> server.
         if ( p->is_from_server() )
         {
-            return SFRF_TestThreshold(
-                rfc, gid, sid, dip, sip, p->pkth->ts.tv_sec, SFRF_COUNT_INCREMENT);
+            return SFRF_TestThreshold(rfc, gid, sid, get_network_policy()->policy_id,
+                dip, sip, p->pkth->ts.tv_sec, SFRF_COUNT_INCREMENT);
         }
     }
 
-    return SFRF_TestThreshold(
-        rfc, gid, sid, sip, dip, p->pkth->ts.tv_sec, SFRF_COUNT_INCREMENT);
+    return SFRF_TestThreshold(rfc, gid, sid, get_network_policy()->policy_id,
+        sip, dip, p->pkth->ts.tv_sec, SFRF_COUNT_INCREMENT);
 }
 

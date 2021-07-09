@@ -58,8 +58,6 @@ using AppIdFreeFCN = void (*)(void*);
 const uint8_t* service_strstr(const uint8_t* haystack, unsigned haystack_len,
     const uint8_t* needle, unsigned needle_len);
 
-#define MAX_ATTR_LEN           1024
-
 #define SF_DEBUG_FILE   stdout
 #define MIN_SFTP_PACKET_COUNT   30
 #define MAX_SFTP_PACKET_COUNT   55
@@ -108,8 +106,14 @@ enum MatchedTlsType
 class TlsSession
 {
 public:
+    TlsSession()
+    {
+        memory::MemoryCap::update_allocations(sizeof(*this));
+    }
+
     ~TlsSession()
     {
+        memory::MemoryCap::update_deallocations(sizeof(*this));
         if (tls_host)
             snort_free(tls_host);
         if (tls_first_alt_name)

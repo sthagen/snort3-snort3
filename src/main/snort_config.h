@@ -72,11 +72,13 @@ enum RunFlag
     RUN_FLAG__IP_FRAGS_ONLY       = 0x00200000,
     RUN_FLAG__DUMP_RULE_STATE     = 0x00400000,
 
+    RUN_FLAG__TEST_FEATURES       = 0x00800000,
+
 #ifdef SHELL
-    RUN_FLAG__SHELL               = 0x00800000,
+    RUN_FLAG__SHELL               = 0x01000000,
 #endif
 #ifdef PIGLET
-    RUN_FLAG__PIGLET              = 0x01000000,
+    RUN_FLAG__PIGLET              = 0x02000000,
 #endif
 };
 
@@ -119,7 +121,8 @@ enum TunnelFlags
     TUNNEL_6IN6   = 0x20,
     TUNNEL_GRE    = 0x40,
     TUNNEL_MPLS   = 0x80,
-    TUNNEL_VXLAN  = 0x100
+    TUNNEL_VXLAN  = 0x100,
+    TUNNEL_GENEVE = 0x200
 };
 
 enum DumpConfigType
@@ -393,6 +396,8 @@ public:
 
     uint16_t tunnel_mask = 0;
 
+    int16_t max_aux_ip = 16;
+
     // FIXIT-L this is temporary for legacy paf_max required only for HI;
     // it is not appropriate for multiple stream_tcp with different
     // paf_max; the HI splitter should pull from there
@@ -486,6 +491,9 @@ public:
 
     bool is_address_anomaly_check_enabled() const
     { return address_anomaly_check_enabled; }
+
+    bool aux_ip_is_enabled() const
+    { return max_aux_ip >= 0; }
 
     // mode related
     bool dump_config_mode() const
@@ -604,6 +612,9 @@ public:
 
     bool assure_established() const
     { return run_flags & RUN_FLAG__ASSURE_EST; }
+
+    bool test_features() const
+    { return run_flags & RUN_FLAG__TEST_FEATURES; }
 
     // other stuff
     uint8_t min_ttl() const

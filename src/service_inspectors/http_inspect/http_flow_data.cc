@@ -24,6 +24,8 @@
 #include "http_flow_data.h"
 
 #include "decompress/file_decomp.h"
+#include "service_inspectors/http2_inspect/http2_flow_data.h"
+#include "utils/js_normalizer.h"
 
 #include "http_cutter.h"
 #include "http_common.h"
@@ -46,7 +48,7 @@ unsigned HttpFlowData::inspector_id = 0;
 uint64_t HttpFlowData::instance_count = 0;
 #endif
 
-HttpFlowData::HttpFlowData() : FlowData(inspector_id)
+HttpFlowData::HttpFlowData(Flow* flow) : FlowData(inspector_id)
 {
 #ifdef REG_TEST
     if (HttpTestManager::use_test_output(HttpTestManager::IN_HTTP))
@@ -64,6 +66,15 @@ HttpFlowData::HttpFlowData() : FlowData(inspector_id)
     if (HttpModule::get_peg_counts(PEG_MAX_CONCURRENT_SESSIONS) <
         HttpModule::get_peg_counts(PEG_CONCURRENT_SESSIONS))
         HttpModule::increment_peg_counts(PEG_MAX_CONCURRENT_SESSIONS);
+
+    Http2FlowData* h2i_flow_data = nullptr;
+    if (Http2FlowData::inspector_id != 0)
+        h2i_flow_data = (Http2FlowData*)flow->get_flow_data(Http2FlowData::inspector_id);
+    if (h2i_flow_data != nullptr)
+    {
+        for_http2 = true;
+        h2_stream_id = h2i_flow_data->get_processing_stream_id();
+    }
 }
 
 HttpFlowData::~HttpFlowData()
@@ -79,6 +90,14 @@ HttpFlowData::~HttpFlowData()
     if (HttpModule::get_peg_counts(PEG_CONCURRENT_SESSIONS) > 0)
         HttpModule::decrement_peg_counts(PEG_CONCURRENT_SESSIONS);
 
+#ifndef UNIT_TEST_BUILD
+    if (js_normalizer)
+    {
+        update_deallocations(JSNormalizer::size());
+        delete js_normalizer;
+    }
+#endif
+
     for (int k=0; k <= 1; k++)
     {
         delete infractions[k];
@@ -88,12 +107,15 @@ HttpFlowData::~HttpFlowData()
         update_deallocations(partial_buffer_length[k]);
         delete[] partial_detect_buffer[k];
         update_deallocations(partial_detect_length[k]);
+        delete[] js_detect_buffer[k];
+        update_deallocations(js_detect_length[k]);
         HttpTransaction::delete_transaction(transaction[k], nullptr);
         delete cutter[k];
         if (compress_stream[k] != nullptr)
         {
             inflateEnd(compress_stream[k]);
             delete compress_stream[k];
+            update_deallocations(zlib_inflate_memory);
         }
         if (mime_state[k] != nullptr)
         {
@@ -127,12 +149,14 @@ void HttpFlowData::half_reset(SourceId source_id)
     data_length[source_id] = STAT_NOT_PRESENT;
     body_octets[source_id] = STAT_NOT_PRESENT;
     file_octets[source_id] = STAT_NOT_PRESENT;
+    publish_octets[source_id] = STAT_NOT_PRESENT;
     partial_inspected_octets[source_id] = 0;
     section_size_target[source_id] = 0;
     stretch_section_to_packet[source_id] = false;
     accelerated_blocking[source_id] = false;
     file_depth_remaining[source_id] = STAT_NOT_PRESENT;
     detect_depth_remaining[source_id] = STAT_NOT_PRESENT;
+    publish_depth_remaining[source_id] = STAT_NOT_PRESENT;
     detection_status[source_id] = DET_REACTIVATING;
 
     compression[source_id] = CMP_NONE;
@@ -141,6 +165,7 @@ void HttpFlowData::half_reset(SourceId source_id)
         inflateEnd(compress_stream[source_id]);
         delete compress_stream[source_id];
         compress_stream[source_id] = nullptr;
+        update_deallocations(zlib_inflate_memory);
     }
     if (mime_state[source_id] != nullptr)
     {
@@ -184,6 +209,7 @@ void HttpFlowData::trailer_prep(SourceId source_id)
         inflateEnd(compress_stream[source_id]);
         delete compress_stream[source_id];
         compress_stream[source_id] = nullptr;
+        update_deallocations(zlib_inflate_memory);
     }
     detection_status[source_id] = DET_REACTIVATING;
 }
@@ -204,12 +230,39 @@ void HttpFlowData::garbage_collect()
     }
 }
 
+#ifndef UNIT_TEST_BUILD
+snort::JSNormalizer& HttpFlowData::acquire_js_ctx()
+{
+    if (js_normalizer)
+        return *js_normalizer;
+
+    js_normalizer = new JSNormalizer();
+    update_allocations(JSNormalizer::size());
+
+    return *js_normalizer;
+}
+
+void HttpFlowData::release_js_ctx()
+{
+    if (!js_normalizer)
+        return;
+
+    update_deallocations(JSNormalizer::size());
+    delete js_normalizer;
+    js_normalizer = nullptr;
+}
+#else
+snort::JSNormalizer& HttpFlowData::acquire_js_ctx() { return *js_normalizer; }
+void HttpFlowData::release_js_ctx() {}
+#endif
+
 bool HttpFlowData::add_to_pipeline(HttpTransaction* latest)
 {
     if (pipeline == nullptr)
     {
         pipeline = new HttpTransaction*[MAX_PIPELINE];
         HttpModule::increment_peg_counts(PEG_PIPELINED_FLOWS);
+        update_allocations(sizeof(HttpTransaction*) * MAX_PIPELINE);
     }
     assert(!pipeline_overflow && !pipeline_underflow);
     int new_back = (pipeline_back+1) % MAX_PIPELINE;
@@ -242,6 +295,8 @@ void HttpFlowData::delete_pipeline()
     {
         delete pipeline[k];
     }
+    if (pipeline != nullptr)
+        update_deallocations(sizeof(HttpTransaction*) * MAX_PIPELINE);
     delete[] pipeline;
 }
 
@@ -278,6 +333,11 @@ void HttpFlowData::finish_h2_body(HttpCommon::SourceId source_id, HttpEnums::H2B
         body_octets[source_id] += partial_inspected_octets[source_id];
         partial_inspected_octets[source_id] = 0;
     }
+}
+
+uint32_t HttpFlowData::get_h2_stream_id() const
+{
+    return h2_stream_id;
 }
 
 #ifdef REG_TEST

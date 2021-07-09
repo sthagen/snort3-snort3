@@ -123,6 +123,11 @@ const Parameter HttpModule::http_params[] =
     { "xff_headers", Parameter::PT_STRING, nullptr, "x-forwarded-for true-client-ip",
       "specifies the xff type headers to parse and consider in the same order "
       "of preference as defined" },
+
+    { "request_body_app_detection", Parameter::PT_BOOL, nullptr, "false",
+      "make HTTP/2 request message bodies available for application detection "
+          "(detection requires AppId)" },
+
 #ifdef REG_TEST
     { "test_input", Parameter::PT_BOOL, nullptr, "false",
       "read HTTP messages from text file" },
@@ -197,20 +202,16 @@ bool HttpModule::set(const char*, Value& val, SnortConfig*)
     else if (val.is("normalize_javascript"))
     {
         params->js_norm_param.normalize_javascript = val.get_bool();
-
-        if ( !params->js_norm_param.is_javascript_normalization )
-            params->js_norm_param.is_javascript_normalization =
-                params->js_norm_param.normalize_javascript;
+        params->js_norm_param.is_javascript_normalization =
+            params->js_norm_param.is_javascript_normalization
+            or params->js_norm_param.normalize_javascript;
     }
     else if (val.is("js_normalization_depth"))
     {
         int64_t v = val.get_int64();
-        params->js_norm_param.js_normalization_depth = (v == -1) ?
-          Parameter::get_int("max53") : v;
-
-        if ( !params->js_norm_param.is_javascript_normalization )
-            params->js_norm_param.is_javascript_normalization =
-                (params->js_norm_param.js_normalization_depth > 0);
+        params->js_norm_param.js_normalization_depth = v;
+        params->js_norm_param.is_javascript_normalization =
+            params->js_norm_param.is_javascript_normalization or (v != 0);
     }
     else if (val.is("max_javascript_whitespaces"))
     {
@@ -312,6 +313,11 @@ bool HttpModule::set(const char*, Value& val, SnortConfig*)
         }
         params->xff_headers[hdr_idx] = end_header;
     }
+    else if (val.is("request_body_app_detection"))
+    {
+        params->publish_request_body = val.get_bool();
+    }
+
 #ifdef REG_TEST
     else if (val.is("test_input"))
     {
@@ -394,7 +400,7 @@ bool HttpModule::end(const char*, int, SnortConfig*)
         ParseError("Cannot use normalize_javascript and js_normalization_depth together.");
 
     if ( params->js_norm_param.is_javascript_normalization )
-        params->js_norm_param.js_norm = new HttpJsNorm(params->uri_param);
+        params->js_norm_param.js_norm = new HttpJsNorm(params->uri_param, params->js_norm_param.js_normalization_depth);
 
     params->script_detection_handle = script_detection_handle;
 

@@ -30,6 +30,7 @@ public:
 
     void show(const snort::SnortConfig*) const override;
     void eval(snort::Packet*) override;
+    bool configure(snort::SnortConfig*) override;
 
 private:
     ReputationConfig config;

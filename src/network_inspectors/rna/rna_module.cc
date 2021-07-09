@@ -31,10 +31,10 @@
 #include <sstream>
 #include <sys/stat.h>
 
+#include "control/control.h"
 #include "host_tracker/host_cache.h"
 #include "log/messages.h"
 #include "lua/lua.h"
-#include "main/request.h"
 #include "main/snort_config.h"
 #include "managers/inspector_manager.h"
 #include "managers/module_manager.h"
@@ -92,12 +92,12 @@ static int purge_data(lua_State* L)
     if ( rna )
     {
         HostCacheMac* mac_cache = new HostCacheMac(MAC_CACHE_INITIAL_SIZE);
-        main_broadcast_command(new DataPurgeAC(mac_cache), (L != nullptr));
+        ControlConn* ctrlcon = ControlConn::query_from_lua(L);
+        main_broadcast_command(new DataPurgeAC(mac_cache), ctrlcon);
 
         host_cache.invalidate();
 
-        SharedRequest request = get_dispatched_request();
-        request->respond("data purge done\n", false, true);
+        ctrlcon->respond("data purge done\n");
         LogMessage("data purge done\n");
     }
 
@@ -592,8 +592,12 @@ void RnaModule::set_trace(const Trace* trace) const
 
 const TraceOption* RnaModule::get_trace_options() const
 {
+#ifndef DEBUG_MSGS
+    return nullptr;
+#else
     static const TraceOption rna_trace_options(nullptr, 0, nullptr);
     return &rna_trace_options;
+#endif
 }
 
 bool RnaModule::log_mac_cache(const char* outfile)

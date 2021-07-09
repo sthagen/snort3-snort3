@@ -27,7 +27,6 @@
 
 #include "sf_ip.h"
 
-#include <cassert>
 #include <cmath> // For ceil
 
 #include "main/thread.h"
@@ -38,23 +37,7 @@
 
 using namespace snort;
 
-/* Support function */
-// note that an ip6 address may have a trailing dotted quad form
-// but that it always has at least 2 ':'s; furthermore there is
-// no valid ip4 format (including mask) with 2 ':'s
-// we don't have to figure out if the format is entirely legal
-// we just have to be able to tell correct formats apart
-static inline int sfip_str_to_fam(const char* str)
-{
-    const char* s;
-    assert(str);
-    s = strchr(str, (int)':');
-    if ( s && strchr(s+1, (int)':') )
-        return AF_INET6;
-    if ( strchr(str, (int)'.') )
-        return AF_INET;
-    return AF_UNSPEC;
-}
+bool SfIp::test_features{ false };
 
 /* Masks off 'val' bits from the IP contained within 'ip' */
 inline int SfIp::cidr_mask(int val)
@@ -424,46 +407,49 @@ const char* snort_inet_ntop(int family, const void* ip_raw, char* buf, int bufsi
         return buf;
     }
 
-#if !defined(REG_TEST) && !defined(CATCH_TEST_BUILD)
-    if (!inet_ntop(family, ip_raw, buf, bufsize))
-        snprintf(buf, bufsize, "ERROR");
-#else
-    /* 4 fields of at most 3 characters each */
-    if (family == AF_INET)
+    if ( !SfIp::test_features )
     {
-        int i;
-        const uint8_t* p = (const uint8_t*)ip_raw;
-
-        for (i=0; p < ((const uint8_t*)ip_raw) + 4; p++)
-        {
-            i += sprintf(&buf[i], "%d", *p);
-
-            /* If this is the last iteration, this could technically cause one
-             *  extra byte to be written past the end. */
-            if (i < bufsize && ((p + 1) < ((const uint8_t*)ip_raw+4)))
-                buf[i] = '.';
-
-            i++;
-        }
+        if (!inet_ntop(family, ip_raw, buf, bufsize))
+            snprintf(buf, bufsize, "ERROR");
     }
     else
     {
-        int i;
-        const uint16_t* p = (const uint16_t*)ip_raw;
-
-        for (i=0; p < ((const uint16_t*)ip_raw) + 8; p++)
+        /* 4 fields of at most 3 characters each */
+        if (family == AF_INET)
         {
-            i += sprintf(&buf[i], "%04x", ntohs(*p));
+            int i;
+            const uint8_t* p = (const uint8_t*)ip_raw;
 
-            /* If this is the last iteration, this could technically cause one
-             *  extra byte to be written past the end. */
-            if (i < bufsize && ((p + 1) < ((const uint16_t*)ip_raw) + 8))
-                buf[i] = ':';
+            for (i=0; p < ((const uint8_t*)ip_raw) + 4; p++)
+            {
+                i += sprintf(&buf[i], "%d", *p);
 
-            i++;
+                /* If this is the last iteration, this could technically cause one
+                 *  extra byte to be written past the end. */
+                if (i < bufsize && ((p + 1) < ((const uint8_t*)ip_raw+4)))
+                    buf[i] = '.';
+
+                i++;
+            }
+        }
+        else
+        {
+            int i;
+            const uint16_t* p = (const uint16_t*)ip_raw;
+
+            for (i=0; p < ((const uint16_t*)ip_raw) + 8; p++)
+            {
+                i += sprintf(&buf[i], "%04x", ntohs(*p));
+
+                /* If this is the last iteration, this could technically cause one
+                 *  extra byte to be written past the end. */
+                if (i < bufsize && ((p + 1) < ((const uint16_t*)ip_raw) + 8))
+                    buf[i] = ':';
+
+                i++;
+            }
         }
     }
-#endif
     return buf;
 }
 

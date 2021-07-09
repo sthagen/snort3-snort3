@@ -36,6 +36,7 @@
 #include "managers/inspector_manager.h"
 #include "managers/mpse_manager.h"
 #include "packet_io/active.h"
+#include "packet_tracer/packet_tracer.h"
 #include "parser/parser.h"
 #include "profiler/profiler_defs.h"
 #include "protocols/packet.h"
@@ -145,13 +146,16 @@ Packet* DetectionEngine::get_encode_packet()
 // we need to stay in the current context until rebuild is successful
 // any events while rebuilding will be logged against the current packet
 // however, rebuild is always in the next context, not current.
-Packet* DetectionEngine::set_next_packet(Packet* parent)
+Packet* DetectionEngine::set_next_packet(Packet* parent, Flow* flow)
 {
     static THREAD_LOCAL Active shutdown_active;
     static THREAD_LOCAL ActiveAction* shutdown_action = nullptr;
 
     wait_for_context();
     IpsContext* c = Analyzer::get_switcher()->get_next();
+
+    Packet* p = c->packet;
+
     if ( parent )
     {
         if ( parent->flow )
@@ -161,11 +165,11 @@ Packet* DetectionEngine::set_next_packet(Packet* parent)
     }
     else
     {
+        if ( flow )
+            p->context->snapshot_flow(flow);
         c->packet_number = get_packet_number();
         c->wire_packet = nullptr;
     }
-
-    Packet* p = c->packet;
 
     p->pkth = c->pkth;
     p->data = c->buf;
@@ -222,6 +226,9 @@ void DetectionEngine::finish_inspect_with_latency(Packet* p)
 void DetectionEngine::finish_inspect(Packet* p, bool inspected)
 {
     log_events(p);
+
+    if ( PacketTracer::is_daq_activated() )
+        populate_trace_data();
 
     if ( p->active )
     {
@@ -615,6 +622,9 @@ bool DetectionEngine::inspect(Packet* p)
 
             if ( !all_disabled(p) )
             {
+                if ( PacketTracer::is_daq_activated() )
+                    PacketTracer::pt_timer_start();
+
                 if ( detect(p, true) )
                     return false; // don't finish out offloaded packets
             }

@@ -42,7 +42,8 @@ public:
 
     const uint8_t* get_content_type(int32_t &length);
     const uint8_t* get_cookie(int32_t &length);
-    const uint8_t* get_host(int32_t &length);
+    const uint8_t* get_authority(int32_t &length);
+    const uint8_t* get_uri_host(int32_t &length);
     const uint8_t* get_location(int32_t &length);
     const uint8_t* get_referer(int32_t &length);
     const uint8_t* get_server(int32_t &length);
@@ -66,4 +67,3 @@ private:
 };
 }
 #endif
-

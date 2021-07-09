@@ -26,10 +26,12 @@
 #include "http_api.h"
 #include "http_common.h"
 #include "http_enum.h"
+#include "http_test_manager.h"
 
 using namespace HttpCommon;
 using namespace HttpEnums;
 using namespace snort;
+using namespace std;
 
 HttpMsgRequest::HttpMsgRequest(const uint8_t* buffer, const uint16_t buf_size,
     HttpFlowData* session_data_, SourceId source_id_, bool buf_owner, Flow* flow_,
@@ -38,6 +40,7 @@ HttpMsgRequest::HttpMsgRequest(const uint8_t* buffer, const uint16_t buf_size,
 {
     transaction->set_request(this);
     get_related_sections();
+    session_data->release_js_ctx();
 }
 
 HttpMsgRequest::~HttpMsgRequest()
@@ -115,7 +118,7 @@ void HttpMsgRequest::parse_start_line()
     {
         uri = new HttpUri(start_line.start() + first_end + 1, last_begin - first_end - 1,
             method_id, params->uri_param, transaction->get_infractions(source_id),
-            session_data->events[source_id]);
+            session_data->events[source_id], session_data);
     }
     else
     {
@@ -160,7 +163,7 @@ bool HttpMsgRequest::handle_zero_nine()
                 uri_end--);
             uri = new HttpUri(start_line.start() + uri_begin, uri_end - uri_begin + 1, method_id,
                 params->uri_param, transaction->get_infractions(source_id),
-                session_data->events[source_id]);
+                session_data->events[source_id], session_data);
         }
         else
         {
@@ -317,6 +320,47 @@ void HttpMsgRequest::publish()
         session_data->ssl_search_abandoned = true;
         DataBus::publish(SSL_SEARCH_ABANDONED, DetectionEngine::get_current_packet());
     }
+
+    if (SnortConfig::get_conf()->aux_ip_is_enabled())
+    {
+        string aux_ip_str = get_aux_ip();
+
+        if (!aux_ip_str.empty())
+        {
+            SfIp aux_ip;
+            if (parse_ip_from_uri(aux_ip_str, aux_ip))
+                flow->stash->store(aux_ip);
+        }
+    }
+}
+
+string HttpMsgRequest::get_aux_ip()
+{
+    string ip_str;
+
+    if (!uri)
+        return ip_str;
+
+    const Field& auth = uri->get_authority();
+
+    if (!(auth.length() > 0) or auth.start() == nullptr)
+        return ip_str;
+
+    // The following rules out most host values that are not IP addresses before we
+    // waste resources on them. The subscriber must do more careful validation. IPv4
+    // must begin with a digit while IPv6 within a URI must begin with a '['.
+    if (((auth.start()[0] >= '0') && (auth.start()[0] <= '9')) ||
+        (auth.start()[0] == '['))
+    {
+        const Field& host = uri->get_host();
+        if (host.length() > 0)
+        {
+            ip_str = string((const char*)host.start(), (size_t)host.length());
+            return ip_str;
+        }
+    }
+
+    return ip_str;
 }
 
 #ifdef REG_TEST

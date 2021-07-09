@@ -39,16 +39,23 @@ class HttpMsgSection;
 class HttpCutter;
 class HttpQueryParser;
 
+namespace snort
+{
+class JSNormalizer;
+}
+
 class HttpFlowData : public snort::FlowData
 {
 public:
-    HttpFlowData();
+    HttpFlowData(snort::Flow* flow);
     ~HttpFlowData() override;
     static unsigned inspector_id;
     static void init() { inspector_id = snort::FlowData::create_flow_data_id(); }
     size_t size_of() override;
 
+    friend class HttpBodyCutter;
     friend class HttpInspect;
+    friend class HttpJsNorm;
     friend class HttpMsgSection;
     friend class HttpMsgStart;
     friend class HttpMsgRequest;
@@ -80,11 +87,14 @@ public:
     void reset_partial_flush(HttpCommon::SourceId source_id)
     { partial_flush[source_id] = false; }
 
+    uint32_t get_h2_stream_id() const;
+
 private:
     // HTTP/2 handling
     bool for_http2 = false;
     HttpEnums::H2BodyState h2_body_state[2] = { HttpEnums::H2_BODY_NOT_COMPLETE,
          HttpEnums::H2_BODY_NOT_COMPLETE };
+    uint32_t h2_stream_id = 0;
 
     // Convenience routines
     void half_reset(HttpCommon::SourceId source_id);
@@ -135,9 +145,9 @@ private:
     // *** Inspector => StreamSplitter (facts about the message section that is coming next)
     HttpEnums::SectionType type_expected[2] = { HttpEnums::SEC_REQUEST, HttpEnums::SEC_STATUS };
     uint64_t last_request_was_connect = false;
-    // length of the data from Content-Length field
     z_stream* compress_stream[2] = { nullptr, nullptr };
     uint64_t zero_nine_expected = 0;
+    // length of the data from Content-Length field
     int64_t data_length[2] = { HttpCommon::STAT_NOT_PRESENT, HttpCommon::STAT_NOT_PRESENT };
     uint32_t section_size_target[2] = { 0, 0 };
     HttpEnums::CompressId compression[2] = { HttpEnums::CMP_NONE, HttpEnums::CMP_NONE };
@@ -159,16 +169,21 @@ private:
         HttpCommon::STAT_NOT_PRESENT };
     int64_t detect_depth_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
         HttpCommon::STAT_NOT_PRESENT };
+    int32_t publish_depth_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
+        HttpCommon::STAT_NOT_PRESENT };
     uint64_t expected_trans_num[2] = { 1, 1 };
 
     // number of user data octets seen so far (regular body or chunks)
     int64_t body_octets[2] = { HttpCommon::STAT_NOT_PRESENT, HttpCommon::STAT_NOT_PRESENT };
     // normalized octets forwarded to file or MIME processing
     int64_t file_octets[2] = { HttpCommon::STAT_NOT_PRESENT, HttpCommon::STAT_NOT_PRESENT };
+    int32_t publish_octets[2] = { HttpCommon::STAT_NOT_PRESENT, HttpCommon::STAT_NOT_PRESENT };
     uint32_t partial_inspected_octets[2] = { 0, 0 };
     uint8_t* partial_detect_buffer[2] = { nullptr, nullptr };
     uint32_t partial_detect_length[2] = { 0, 0 };
     uint32_t partial_js_detect_length[2] = { 0, 0 };
+    uint8_t* js_detect_buffer[2] = { nullptr, nullptr };
+    uint32_t js_detect_length[2] = { 0, 0 };
     int32_t status_code_num = HttpCommon::STAT_NOT_PRESENT;
     HttpEnums::VersionId version_id[2] = { HttpEnums::VERS__NOT_PRESENT,
                                             HttpEnums::VERS__NOT_PRESENT };
@@ -176,6 +191,13 @@ private:
 
     bool cutover_on_clear = false;
     bool ssl_search_abandoned = false;
+
+    // *** HttpJsNorm
+    snort::JSNormalizer* js_normalizer = nullptr;
+    bool js_built_in_event = false;
+
+    snort::JSNormalizer& acquire_js_ctx();
+    void release_js_ctx();
 
     // *** Transaction management including pipelining
     static const int MAX_PIPELINE = 100;  // requests seen - responses seen <= MAX_PIPELINE
@@ -192,6 +214,11 @@ private:
 
     // Transactions with uncleared sections awaiting deletion
     HttpTransaction* discard_list = nullptr;
+
+
+    // Memory footprint required by zlib inflation. Formula from https://zlib.net/zlib_tech.html
+    // Accounts for a 32k sliding window and 11520 bytes of inflate_huft allocations
+    static const size_t zlib_inflate_memory = (1 << 15) + 1440*2*sizeof(int);
 
 #ifdef REG_TEST
     static uint64_t instance_count;

@@ -33,7 +33,7 @@
 #include "packet_io/active.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
-
+#include "pub_sub/auxiliary_ip_event.h"
 
 #include "reputation_parse.h"
 
@@ -49,6 +49,9 @@ const PegInfo reputation_peg_names[] =
 { CountType::SUM, "trusted", "number of packets trusted" },
 { CountType::SUM, "monitored", "number of packets monitored" },
 { CountType::SUM, "memory_allocated", "total memory allocated" },
+{ CountType::SUM, "aux_ip_blocked", "number of auxiliary ip packets blocked" },
+{ CountType::SUM, "aux_ip_trusted", "number of auxiliary ip packets trusted" },
+{ CountType::SUM, "aux_ip_monitored", "number of auxiliary ip packets monitored" },
 { CountType::END, nullptr, nullptr }
 };
 
@@ -71,6 +74,7 @@ const char* AllowActionOption[] =
  * Function prototype(s)
  */
 static void snort_reputation(ReputationConfig* GlobalConf, Packet* p);
+static void populate_trace_data(IPdecision& decision, Packet* p);
 
 static inline IPrepInfo* reputation_lookup(ReputationConfig* config, const SfIp* ip)
 {
@@ -244,6 +248,79 @@ static IPdecision reputation_decision(ReputationConfig* config, Packet* p)
     return decision_final;
 }
 
+static IPdecision snort_reputation_aux_ip(ReputationConfig* config, Packet* p, const SfIp* ip)
+{
+    IPdecision decision = DECISION_NULL;
+
+    if (!config->ip_list)
+        return decision;
+
+    uint32_t ingress_intf = 0;
+    uint32_t egress_intf = 0;
+
+    if (p->pkth)
+    {
+        ingress_intf = p->pkth->ingress_index;
+        if (p->pkth->egress_index < 0)
+            egress_intf = ingress_intf;
+        else
+            egress_intf = p->pkth->egress_index;
+    }
+
+    IPrepInfo* result = reputation_lookup(config, ip);
+    if (result)
+    {
+        decision = get_reputation(config, result, &p->iplist_id, ingress_intf,
+            egress_intf);
+
+        if (decision == BLOCKED)
+        {
+            if (p->flow)
+                p->flow->flags.reputation_blocklist = true;
+
+            // Prior to IPRep logging, IPS policy must be set to the default policy,
+            set_ips_policy(SnortConfig::get_conf(), 0);
+
+            DetectionEngine::queue_event(GID_REPUTATION, REPUTATION_EVENT_BLOCKLIST_DST);
+            p->active->drop_packet(p, true);
+
+            // disable all preproc analysis and detection for this packet
+            DetectionEngine::disable_all(p);
+            p->active->block_session(p, true);
+            p->active->set_drop_reason("reputation");
+            reputationstats.aux_ip_blocked++;
+            if (PacketTracer::is_active())
+            {
+                char ip_str[INET6_ADDRSTRLEN];
+                sfip_ntop(ip, ip_str, sizeof(ip_str));
+                PacketTracer::log("Reputation: packet blocked for auxiliary ip %s, drop\n",
+                    ip_str);
+            }
+        }
+        else if (decision == MONITORED)
+        {
+            if (p->flow)
+            {
+                p->flow->flags.reputation_monitor = true;
+                p->flow->iplist_monitor_id = p->iplist_id;
+            }
+
+            DetectionEngine::queue_event(GID_REPUTATION, REPUTATION_EVENT_MONITOR_DST);
+            reputationstats.aux_ip_monitored++;
+        }
+        else if (decision == TRUSTED)
+        {
+            if (p->flow)
+                p->flow->flags.reputation_allowlist = true;
+
+            DetectionEngine::queue_event(GID_REPUTATION, REPUTATION_EVENT_ALLOWLIST_DST);
+            p->active->trust_session(p, true);
+            reputationstats.aux_ip_trusted++;
+        }
+    }
+    return decision;
+}
+
 static void snort_reputation(ReputationConfig* config, Packet* p)
 {
     IPdecision decision;
@@ -254,10 +331,7 @@ static void snort_reputation(ReputationConfig* config, Packet* p)
     decision = reputation_decision(config, p);
     Active* act = p->active;
 
-    if (DECISION_NULL == decision)
-        return;
-
-    else if (BLOCKED_SRC == decision or BLOCKED_DST == decision)
+    if (BLOCKED_SRC == decision or BLOCKED_DST == decision)
     {
         unsigned blocklist_event = (BLOCKED_SRC == decision) ?
             REPUTATION_EVENT_BLOCKLIST_SRC : REPUTATION_EVENT_BLOCKLIST_DST;
@@ -278,6 +352,26 @@ static void snort_reputation(ReputationConfig* config, Packet* p)
         reputationstats.blocked++;
         if (PacketTracer::is_active())
             PacketTracer::log("Reputation: packet blocked, drop\n");
+
+        if (PacketTracer::is_daq_activated())
+            populate_trace_data(decision, p);
+
+        return;
+    }
+
+    else if ( p->flow and p->flow->reload_id > 0 )
+    {
+        const auto& aux_ip_list =  p->flow->stash->get_aux_ip_list();
+        for ( const auto& ip : aux_ip_list )
+        {
+            if ( BLOCKED == snort_reputation_aux_ip(config, p, &ip) )
+                return;
+        }
+    }
+
+    if (DECISION_NULL == decision)
+    {
+        return;
     }
 
     else if (MONITORED_SRC == decision or MONITORED_DST == decision)
@@ -310,6 +404,9 @@ static void snort_reputation(ReputationConfig* config, Packet* p)
         act->trust_session(p, true);
         reputationstats.trusted++;
     }
+
+    if (PacketTracer::is_daq_activated())
+        populate_trace_data(decision, p);
 }
 
 static const char* to_string(NestedIP nip)
@@ -371,6 +468,45 @@ static const char* to_string(IPdecision ipd)
     }
 }
 
+static void populate_trace_data(IPdecision& decision, Packet* p)
+{
+    char addr[INET6_ADDRSTRLEN];
+    const SfIp* ip = nullptr;
+
+    if (BLOCKED_SRC == decision or MONITORED_SRC == decision or TRUSTED_SRC == decision)
+    {
+        ip = p->ptrs.ip_api.get_src();
+    }
+    else if (BLOCKED_DST == decision or MONITORED_DST == decision or TRUSTED_DST == decision)
+    {
+        ip = p->ptrs.ip_api.get_dst();
+    }
+    
+    sfip_ntop(ip, addr, sizeof(addr));
+
+    PacketTracer::daq_log("SI-IP+%" PRId64"+%s list id %u+Matched ip %s, action %s$",
+        TO_NSECS(pt_timer->get()), 
+        (TRUSTED_SRC == decision or TRUSTED_DST == decision)?"Do_not_block":"Block", 
+        p->iplist_id, addr, to_string(decision));
+}
+
+class AuxiliaryIpRepHandler : public DataHandler
+{
+public:
+    AuxiliaryIpRepHandler(ReputationConfig& rc) : DataHandler(REPUTATION_NAME), conf(rc) { }
+    void handle(DataEvent&, Flow*) override;
+
+private:
+    ReputationConfig& conf;
+};
+
+void AuxiliaryIpRepHandler::handle(DataEvent& event, Flow*)
+{
+    Profile profile(reputation_perf_stats);
+    snort_reputation_aux_ip(&conf, DetectionEngine::get_current_packet(),
+        static_cast<AuxiliaryIpEvent*>(&event)->get_ip());
+}
+
 //-------------------------------------------------------------------------
 // class stuff
 //-------------------------------------------------------------------------
@@ -417,8 +553,17 @@ void Reputation::eval(Packet* p)
     if (p->is_rebuilt())
         return;
 
+    if (PacketTracer::is_daq_activated())
+        PacketTracer::pt_timer_start();
+
     snort_reputation(&config, p);
     ++reputationstats.packets;
+}
+
+bool Reputation::configure(SnortConfig* sc)
+{
+    DataBus::subscribe_global( AUXILIARY_IP_EVENT, new AuxiliaryIpRepHandler(config), sc );
+    return true;
 }
 
 //-------------------------------------------------------------------------

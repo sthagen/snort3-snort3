@@ -41,6 +41,9 @@
 
 uint32_t ThirdPartyAppIdContext::next_version = 0;
 
+void memory::MemoryCap::update_allocations(size_t) { }
+void memory::MemoryCap::update_deallocations(size_t) { }
+
 namespace snort
 {
 // Stubs for packet
@@ -125,7 +128,6 @@ void DataBus::publish(const char*, DataEvent& event, Flow*)
 static HttpPatternMatchers* http_matchers;
 DnsPatternMatchers::~DnsPatternMatchers() = default;
 HttpPatternMatchers::~HttpPatternMatchers() = default;
-void HttpPatternMatchers::get_http_offsets(Packet*, AppIdHttpSession*) {}
 SipPatternMatchers::~SipPatternMatchers() = default;
 SslPatternMatchers::~SslPatternMatchers() = default;
 

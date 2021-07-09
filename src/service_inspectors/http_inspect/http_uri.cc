@@ -25,11 +25,27 @@
 
 #include "http_common.h"
 #include "http_enum.h"
+#include "http_flow_data.h"
 #include "hash/hash_key_operations.h"
 
 using namespace HttpCommon;
 using namespace HttpEnums;
 using namespace snort;
+
+HttpUri::HttpUri(const uint8_t* start, int32_t length, HttpEnums::MethodId method_id_,
+    const HttpParaList::UriParam& uri_param_, HttpInfractions* infractions_,
+    HttpEventGen* events_, HttpFlowData* session_data_) :
+    uri(length, start), infractions(infractions_), events(events_), method_id(method_id_),
+    uri_param(uri_param_), session_data(session_data_)
+{
+    normalize();
+    classic_norm.update_allocations(session_data);
+}
+
+HttpUri::~HttpUri()
+{
+    classic_norm.update_deallocations(session_data);
+}
 
 void HttpUri::parse_uri()
 {
@@ -92,17 +108,9 @@ void HttpUri::parse_uri()
     }
 }
 
-void HttpUri::parse_authority()
+int32_t HttpUri::find_host_len(const Field& authority)
 {
-    if (authority.length() <= 0)
-    {
-        host.set(STAT_NO_SOURCE);
-        port.set(STAT_NO_SOURCE);
-        return;
-    }
-    
     int32_t host_len = 0;
-
     // IPv6 addresses are surrounded by [] to protect embedded colons
     if (authority.start()[0] == '[')
     {
@@ -112,6 +120,20 @@ void HttpUri::parse_authority()
 
     for (; (host_len < authority.length()) && (authority.start()[host_len] != ':');
         host_len++);
+
+    return host_len;
+}
+
+void HttpUri::parse_authority()
+{
+    if (authority.length() <= 0)
+    {
+        host.set(STAT_NO_SOURCE);
+        port.set(STAT_NO_SOURCE);
+        return;
+    }
+
+    int32_t host_len = find_host_len(authority);
     host.set(host_len, authority.start());
     if (host.length() < authority.length())
     {
@@ -404,3 +426,4 @@ const Field& HttpUri::get_norm_host()
 
     return host_norm;
 }
+

@@ -53,7 +53,7 @@ public:
     void set_overrides(const char*);
     void set_overrides(Shell*);
 
-    bool configure(snort::SnortConfig*, bool is_fatal = true, bool is_root = false);
+    bool configure(snort::SnortConfig*, bool is_root = false);
     void install(const char*, const struct luaL_Reg*);
     void execute(const char*, std::string&);
 
@@ -66,6 +66,9 @@ public:
     bool get_loaded() const
     { return loaded; }
 
+    lua_State* get_lua() const
+    { return lua; }
+
 public:
     static bool is_trusted(const std::string& key);
     static void allowlist_append(const char* keyword, bool is_prefix);
@@ -73,7 +76,8 @@ public:
     static void config_open_table(bool is_root_node, bool is_list, int idx,
         const std::string& table_name, const snort::Parameter* p);
     static void set_config_value(const std::string& fqn, const snort::Value& value);
-    static void add_config_child_node(const std::string& node_name, snort::Parameter::Type type);
+    static void add_config_child_node(const std::string& node_name, snort::Parameter::Type type,
+        bool is_root_list_item);
     static void update_current_config_node(const std::string& node_name = "");
     static void config_close_table();
     static void set_config_output(ConfigOutput* config_output);
@@ -118,9 +122,9 @@ private:
     void allowlist_update(const char* keyword, bool is_prefix);
 
     bool load_lua_sandbox();
-    void set_sandbox_env();
+    bool set_sandbox_env();
     bool load_string(const char* s, bool load_in_sandbox, const char* message);
-    bool load_config(const char* file, bool load_in_sandbox, bool is_fatal);
+    bool load_config(const char* file, bool load_in_sandbox);
 
 private:
     bool loaded;

@@ -1,3 +1,127 @@
+2021/06/30 - 3.1.7.0
+
+appid: enhance netbios service detector to identify SMB versions as web app
+appid: update documentation
+appid: update the DNS detector to support the all record request
+control: resolve socket issues due to race conditions
+doc: updates for http2_inspect
+framework: update base API version to 3
+main: implement test_features run flag to enable debug-like output
+mime: track memory for mime sessions
+payload_injector: don't inject if there are unflushed S2C TCP packets queued
+reputation: include list id for daq trace log
+sfip: fix unit tests for non-regtest builds
+snort2lua: fix lua conversion of unsupported http preproc options without parameters
+snort2lua: remove footprint size config
+stream: fix is_ack_valid to return true even when current ack is to the left of snd_una, per RFC793
+
+2021/06/16 - 3.1.6.0
+
+appid: extract auxiliary ip when uri is provided by third-party
+appid: perform detection on request body for HTTP2 traffic.
+appid: remove error message when userappid.conf is not present
+appid: remove unused metadata offset functionality
+appid: support fragmented metadata
+appid: use 32 bits for storing protocol field in RPC port map message
+codecs: geneve - add support for Geneve encapsulation
+codecs: geneve - add vni to alert_csv and alert_json
+codecs: support inner flow NAT
+control: allow compile with shell disabled
+control: clean up cppcheck issues
+control: expose ContrlConn API
+control: refactor control channel management to better handle control responses
+control: remove SHELL compile flag from header
+control: remove unused IdleProcessing functionality
+dce_rpc: SMB multichannel - add smb multichannel file support
+dce_rpc: SMB multichannel - handle negotiate command to create expected flow
+dce_rpc: SMB multichannel - introduce locks
+dce_rpc: SMB multichannel - make session cache global
+dce_rpc: SMB multichannel - own memory tracking in global cache
+dce_rpc: fix warnings
+dce_rpc: handle reload prune for smb session cache
+dce_rpc: store shared pointer of session tracker
+doc: update JS normalizer options
+file_api: increase file count only once per file
+file_api: store processing flow in context
+filters: change rate filter to use network policy id instead of ips policy id
+filters: support rate filter to work with PDUs
+flow: enable support for multiple expected sessions
+ftp: create additional expected session if negotiated IP is different from server IP on packet
+gtp : check protocol type according to gtp version
+host_cache: remove unused lua mock code from the tests
+http2_inspect: don't perform valid sequence check on rst_stream frame
+http2_inspect: improve request line generation and checks
+http2_inspect: rule options and doc clean up
+http2_inspect: track dynamic table memory allocation
+http_inspect: add JS Normalizer to dev_notes
+http_inspect: add JS normalization for external scripts
+http_inspect: additional memory tracking
+http_inspect: extend built-in alerts for Javascript processing
+http_inspect: improve MPSE in HttpJsNorm (script start conditions)
+http_inspect: limit section size target for file processing
+http_inspect: publish event for http/2 request bodies
+http_inspect: support partial detect for Javascripts
+http_inspect: track memory footprint of zlib inflation
+http_inspect: update test mock api
+iec104: delete trailing spaces
+ips_options: fix intrusion alerts generation for tcp rpc PORTMAP traffic when rpc_decode is bound to the flow
+main: add support for resuming particular thread
+main: fix config dump for list-based inspector aliases
+mime: store extra data in stash
+packet_io: enable expected session flags
+protocols: remove inline specifiers for functions defined within a structure declaration
+pub_sub: add get_uri_host() to HttpEvent
+pub_sub: update HttpEvent::get_host to get_authority - now always includes port if there is one
+reputation: daq trace log
+reputation: support auxiliary IP matching upon reload
+rna: filter DHCP events and some refactoring
+rna: update last seen time on deleted host rediscovery
+stream: enable support for multiple expected sessions
+stream_tcp: populate flow contents in context for non-wire packets
+time: make Periodic class SO_PUBLIC
+trace: place trace options under the DEBUG_MSGS macro
+utils: fix warning about empty statement
+utils: refactor JSTokenizer
+utils: rework JSNormalizer class
+
+2021/05/20 - 3.1.5.0
+
+appid: Publish an event when appid debug command is issued
+appid: do memory accounting of api stash object, dns/tls/third-party sessions
+appid: mark payload detection as done after either http request or response is inspected
+appid: set monitor flags on future flows
+dce_rpc: fix expected session protocol id
+dce_rpc: update memory tracking for smb session data
+dce_rpc: use find_else_insert in smb session cache to avoid deadlock
+file_api: fix spell source error
+flow: Adding stash API to save auxiliary IP
+flow: Enhancing APIs to stash auxiliary IP
+flow: memory tracking updates
+hash: add new insert method in lru_cache_shared
+http2_inspect: add assert in clear
+http2_inspect: concurrent streams limit is configurable
+http2_inspect: fix non-standard c++
+http2_inspect: handle trailer after reaching flow depth
+http2_inspect: implement window_update frame
+http2_inspect: optimize processing after reaching flow depth
+http2_inspect: track stream memory incrementally instead of all up front
+http2_inspect: update discard print
+http2_inspect: update state and delete streams after reaching flow depth
+http_inspect: IP reputation support
+http_inspect: don't disable detection for flow if it's an HTTP/2 flow
+ips_options: fix relative base64_decode
+memory: free_space cleanup
+netflow: additional check before v5/v9 decode
+netflow: version 9 decoding and filtering
+packet_tracer: IPS daq trace log
+packet_tracer: file daq trace log
+parser: Remove rule merge in dump mode
+parser: reduce RTNs only after states applied
+reputation: track monitor ID via flow; minor code cleanup
+shell: exit gracefully when sanbox lua is misconfigured
+stream_tcp: Deleting session when both talker and listener are closed
+stream_tcp: Using window base for reset validation
+
 2021/04/21 - 3.1.4.0
 
 -- appid: (fix style) Local variable 'version' shadows outer variable

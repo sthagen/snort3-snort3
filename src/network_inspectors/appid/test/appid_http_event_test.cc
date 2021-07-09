@@ -49,6 +49,9 @@ void ApplicationDescriptor::set_id(const Packet&, AppIdSession&, AppidSessionDir
 
 using namespace snort;
 
+void memory::MemoryCap::update_allocations(size_t) { }
+void memory::MemoryCap::update_deallocations(size_t) { }
+
 namespace snort
 {
 AppIdApi appid_api;
@@ -179,7 +182,7 @@ const uint8_t* HttpEvent::get_cookie(int32_t& length)
     return global_field.start();
 }
 
-const uint8_t* HttpEvent::get_host(int32_t& length)
+const uint8_t* HttpEvent::get_authority(int32_t& length)
 {
     global_field.set(0, nullptr);
     if (host)

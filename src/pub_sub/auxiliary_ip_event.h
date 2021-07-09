@@ -1,6 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
-// Copyright (C) 2011-2013 Sourcefire, Inc.
+// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -16,21 +15,26 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+// auxiliary_ip_event.h author Masud Hasan <mashasan@cisco.com>
 
-#ifndef IDLE_PROCESSING_H
-#define IDLE_PROCESSING_H
+#ifndef AUXILIARY_IP_EVENT_H
+#define AUXILIARY_IP_EVENT_H
 
-using IdleHook = void (*)();
+#include "framework/data_bus.h"
+#include "sfip/sf_ip.h"
 
-class IdleProcessing
+#define AUXILIARY_IP_EVENT "auxiliary_ip_event"
+
+class AuxiliaryIpEvent : public snort::DataEvent
 {
 public:
-    static void register_handler(IdleHook);
-    static void execute();
+   AuxiliaryIpEvent(const snort::SfIp& aux_ip) : ip(aux_ip) { }
 
-    // only needs to be called if changing out the handler set
-    static void unregister_all();
+   const snort::SfIp* get_ip()
+   { return &ip; }
+
+private:
+   const snort::SfIp& ip;
 };
 
 #endif
-

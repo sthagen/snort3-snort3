@@ -272,7 +272,7 @@ bool TcpCodec::decode(const RawData& raw, CodecData& codec, DecodeData& snort)
     snort.tcph = tcph;
 
     const DAQ_NAPTInfo_t* napti = (const DAQ_NAPTInfo_t*) daq_msg_get_meta(raw.daq_msg, DAQ_PKT_META_NAPT_INFO);
-    if (napti && codec.ip_layer_cnt == 1)
+    if (napti && codec.ip_layer_cnt == napti->ip_layer)
     {
         snort.sp = ntohs(napti->src_port);
         snort.dp = ntohs(napti->dst_port);
@@ -627,7 +627,7 @@ bool TcpCodec::encode(const uint8_t* const raw_in, const uint16_t /*raw_len*/,
         if (enc.flags & ENC_FLAG_INLINE)
         {
             uint32_t seq = 0;
-            
+
             if(Stream::get_held_pkt_seq(flow, seq))
                 tcph_out->th_seq = htonl(seq);
             else

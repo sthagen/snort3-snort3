@@ -543,7 +543,7 @@ static bool begin(Module* m, const Parameter* p, const char* s, int idx, int dep
             {
                 const Parameter* table_item_params = reinterpret_cast<const Parameter*>(p->range);
 
-                Shell::add_config_child_node(get_sub_table(fqn), p->type);
+                Shell::add_config_child_node(get_sub_table(fqn), p->type, false);
 
                 if ( !begin(m, table_item_params, fqn.c_str(), idx, depth+1) )
                     return false;
@@ -1434,10 +1434,9 @@ void ModuleManager::reset_stats(clear_counter_type_t type)
             lock_guard<mutex> lock(stats_mutex);
             mh->mod->reset_stats();
         }
-    
     }
     else
-    { 
+    {
         auto mod_hooks = get_all_modhooks();
         for ( auto* mh : mod_hooks )
         {

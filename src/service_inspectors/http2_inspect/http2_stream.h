@@ -39,6 +39,7 @@ public:
     uint32_t get_stream_id() const { return stream_id; }
     void eval_frame(const uint8_t* header_buffer, uint32_t header_len, const uint8_t* data_buffer,
         uint32_t data_len, HttpCommon::SourceId source_id);
+    void check_and_cleanup_completed();
     void clear_frame();
     const Field& get_buf(unsigned id);
     HttpFlowData* get_hi_flow_data() const { return hi_flow_data; }
@@ -57,6 +58,10 @@ public:
         { return end_stream_on_data_flush[source_id]; }
     void finish_msg_body(HttpCommon::SourceId source_id, bool expect_trailers,
         bool clear_partial_buffer);
+    void set_discard(HttpCommon::SourceId source_id)
+    { discard[source_id] = true; }
+    bool is_discard_set(HttpCommon::SourceId source_id)
+    { return discard[source_id]; }
 
 #ifdef REG_TEST
     void print_frame(FILE* output);
@@ -70,6 +75,7 @@ private:
     bool end_stream_on_data_flush[2] = { false, false };
     Http2Enums::StreamState state[2] =
         { Http2Enums::STREAM_EXPECT_HEADERS, Http2Enums::STREAM_EXPECT_HEADERS };
+    bool discard[2] = { false, false };
 };
 
 #endif

@@ -47,11 +47,11 @@ class HttpPatternMatchers;
 struct TunnelDest
 {
     snort::SfIp ip;
-    uint16_t port;
+    uint16_t port = 0;
     TunnelDest(const char* string_srcip, uint16_t tun_port)
     {
-        ip.set(string_srcip);
-        port = tun_port;
+        if ( ip.set(string_srcip) == SFIP_SUCCESS )
+            port = tun_port;
     }
 };
 
@@ -73,34 +73,14 @@ public:
     void update_url(AppidChangeBits& change_bits);
     void set_field(HttpFieldIds id, const std::string* str, AppidChangeBits& change_bits);
     void set_field(HttpFieldIds id, const uint8_t* str, int32_t len, AppidChangeBits& change_bits);
+    void set_req_body_field(HttpFieldIds id, const uint8_t* str, int32_t len,
+        AppidChangeBits& change_bits);
 
     const std::string* get_field(HttpFieldIds id) const
     { return meta_data[id]; }
 
     const char* get_cfield(HttpFieldIds id) const
     { return meta_data[id] != nullptr ? meta_data[id]->c_str() : nullptr; }
-
-    bool get_offset(int id, uint16_t& start, uint16_t& end) const
-    {
-        if ( REQ_AGENT_FID <= id and id < NUM_HTTP_FIELDS )
-        {
-            start = meta_offset[id].first;
-            end = meta_offset[id].second;
-            return true;
-        }
-        return false;
-    }
-
-    bool set_offset(int id, uint16_t start, uint16_t end)
-    {
-        if ( REQ_AGENT_FID <= id and id < NUM_HTTP_FIELDS )
-        {
-            meta_offset[id].first = start;
-            meta_offset[id].second = end;
-            return true;
-        }
-        return false;
-    }
 
     void set_is_webdav(bool webdav)
     { is_webdav = webdav; }
@@ -158,6 +138,14 @@ public:
     {
         return http2_stream_id;
     }
+    void set_rcvd_full_req_body(bool req_full_body)
+    {
+        rcvd_full_req_body = req_full_body;
+    }
+    bool get_rcvd_full_req_body()
+    {
+        return rcvd_full_req_body;
+    }
 
 protected:
 
@@ -179,7 +167,6 @@ protected:
     // set_field() functions in AppIdHttpSession. We do need set functions
     // for this array, as old pointers need to be deleted upon set().
     const std::string* meta_data[NUM_METADATA_FIELDS] = { };
-    pair_t meta_offset[NUM_HTTP_FIELDS];
 
     bool is_webdav = false;
     bool chp_finished = false;
@@ -199,6 +186,7 @@ protected:
 #endif
     uint32_t http2_stream_id = 0;
     bool is_payload_processed = false;
+    bool rcvd_full_req_body = false;
 };
 
 #endif

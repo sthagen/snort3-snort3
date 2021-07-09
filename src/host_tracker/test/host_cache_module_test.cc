@@ -26,9 +26,9 @@
 #include <cstdarg>
 #include <thread>
 
+#include "control/control.h"
 #include "host_tracker/host_cache_module.h"
 #include "host_tracker/host_cache.h"
-#include "main/request.h"
 #include "main/snort_config.h"
 #include "managers/module_manager.h"
 
@@ -45,9 +45,11 @@ static HostCacheModule module;
 #define LOG_MAX 128
 static char logged_message[LOG_MAX+1];
 
-static SharedRequest mock_request = std::make_shared<Request>();
-void Request::respond(const char*, bool, bool) { }
-SharedRequest get_current_request() { return mock_request; }
+static ControlConn ctrlcon(1, true);
+ControlConn::ControlConn(int, bool) {}
+ControlConn::~ControlConn() {}
+ControlConn* ControlConn::query_from_lua(const lua_State*) { return &ctrlcon; }
+bool ControlConn::respond(const char*, ...) { return true; }
 
 namespace snort
 {
@@ -72,14 +74,6 @@ time_t packet_time() { return 0; }
 bool Snort::is_reloading() { return false; }
 void SnortConfig::register_reload_resource_tuner(ReloadResourceTuner* rrt) { delete rrt; }
 } // end of namespace snort
-
-extern "C"
-{
-typedef ptrdiff_t lua_Integer;
-
-const char* luaL_optlstring(lua_State*, int, const char*, size_t*) { return nullptr; }
-lua_Integer luaL_optinteger(lua_State*, int, lua_Integer) { return 0; }
-}
 
 void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
 void show_stats(PegCount*, const PegInfo*, const IndexVec&, const char*, FILE*) { }

@@ -282,14 +282,14 @@ static RuleListNode* addNodeToOrderedList
     return ordered_list;
 }
 
-static bool parse_file(SnortConfig* sc, Shell* sh, bool is_fatal, bool is_root)
+static bool parse_file(SnortConfig* sc, Shell* sh, bool is_root)
 {
     const char* fname = sh->get_file();
 
     if ( !fname || !*fname )
         return false;
 
-    bool success = sh->configure(sc, is_fatal, is_root);
+    bool success = sh->configure(sc, is_root);
 
     return success;
 }
@@ -315,7 +315,7 @@ void parser_term(SnortConfig*)
     ruleIndexMap = nullptr;
 }
 
-SnortConfig* ParseSnortConf(const SnortConfig* cmd_line_conf, const char* fname, bool is_fatal)
+SnortConfig* ParseSnortConf(const SnortConfig* cmd_line_conf, const char* fname)
 {
     const SnortConfig* current_conf = SnortConfig::get_conf();
     SnortConfig* sc = new SnortConfig(current_conf->proto_ref);
@@ -365,7 +365,7 @@ SnortConfig* ParseSnortConf(const SnortConfig* cmd_line_conf, const char* fname,
         Shell::set_config_output(shell_output);
         set_policies(sc, sh);
 
-        if (!parse_file(sc, sh, is_fatal, (i == 0)))
+        if (!parse_file(sc, sh, (i == 0)))
         {
             parse_file_failed = true;
             break;
@@ -473,8 +473,66 @@ void ParseRules(SnortConfig* sc)
     }
 }
 
+static RuleTreeNode* find_rtn(
+    SnortConfig* sc, RuleTreeNode* rtn, PolicyId id)
+{
+    if ( sc->rtn_hash_table )
+    {
+        RuleTreeNodeKey key { rtn, id };
+        return (RuleTreeNode*)sc->rtn_hash_table->get_user_data(&key);
+    }
+
+    return nullptr;
+}
+
+static void reduce_rtns(SnortConfig* sc)
+{
+    for ( auto node = sc->otn_map->find_first(); node; node = sc->otn_map->find_next() )
+    {
+        OptTreeNode* otn = (OptTreeNode*)node->data;
+        if ( !otn )
+            continue;
+
+        for ( auto pid = 0; pid < otn->proto_node_num; ++pid )
+        {
+            auto act_rtn = getRtnFromOtn(otn, pid);
+            if ( !act_rtn )
+                continue;
+
+            auto ext_rtn = find_rtn(sc, act_rtn, pid);
+
+            if ( ext_rtn and ext_rtn != act_rtn )
+            {
+                addRtnToOtn(sc, otn, ext_rtn, pid);
+                parse_rule_dec_head_count();
+            }
+        }
+    }
+
+    for ( auto node = sc->otn_map->find_first(); node; node = sc->otn_map->find_next() )
+    {
+        OptTreeNode* otn = (OptTreeNode*)node->data;
+        if ( !otn )
+            continue;
+
+        for ( auto pid = 0; pid < otn->proto_node_num; ++pid )
+        {
+            auto rtn = getRtnFromOtn(otn, pid);
+            if ( !rtn )
+                continue;
+
+            if ( parse_rule_finish_ports(sc, rtn, otn) )
+                ParseError("%u:%u rule failed to finish a port list.",
+                           otn->sigInfo.gid, otn->sigInfo.sid);
+        }
+    }
+}
+
 void ParseRulesFinish(SnortConfig* sc)
 {
+    if ( !sc->dump_rule_info() )
+        reduce_rtns(sc);
+
     set_ips_policy(sc, 0);
 
     /* Compile/Finish and Print the PortList Tables */
@@ -793,4 +851,3 @@ void parser_append_includes(const char* d)
         parser_append_rules(s.c_str());
     }
 }
-

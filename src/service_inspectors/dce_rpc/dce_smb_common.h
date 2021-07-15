@@ -36,6 +36,9 @@
 #define DCE2_SMB_NAME "dce_smb"
 #define DCE2_SMB_HELP "dce over smb inspection"
 
+#define SMB_DEBUG(module_name, module_id, log_level, p, ...) \
+    trace_logf(log_level, module_name , module_id, p, __VA_ARGS__)
+
 #define DCE2_SMB_ID   0xff534d42  /* \xffSMB */
 #define DCE2_SMB2_ID  0xfe534d42  /* \xfeSMB */
 #define DCE2_SMB_ID_SIZE 4
@@ -267,12 +270,11 @@ class Dce2SmbFlowData : public snort::FlowData
 {
 public:
     Dce2SmbFlowData(Dce2SmbSessionData*);
-    Dce2SmbFlowData(dce2SmbProtoConf* cfg) : snort::FlowData(inspector_id)
+    Dce2SmbFlowData() : snort::FlowData(inspector_id)
     {
         dce2_smb_stats.concurrent_sessions++;
         if (dce2_smb_stats.max_concurrent_sessions < dce2_smb_stats.concurrent_sessions)
             dce2_smb_stats.max_concurrent_sessions = dce2_smb_stats.concurrent_sessions;
-        config = cfg;
         ssd = nullptr;
     }
 
@@ -288,19 +290,24 @@ public:
     { return ssd; }
 
     Dce2SmbSessionData* upgrade(const snort::Packet*);
+    void update_smb_session_data(Dce2SmbSessionData* ssd_v)
+    { 
+        if (ssd) delete ssd;
+        ssd = ssd_v;
+    }
     void handle_retransmit(snort::Packet*) override;
-    void handle_expected(snort::Packet*) override;
 
 public:
     static unsigned inspector_id;
 
 private:
     Dce2SmbSessionData* ssd;
-    dce2SmbProtoConf* config;
 };
 
-Dce2SmbFlowData* create_expected_smb_flow_data(const snort::Packet*, dce2SmbProtoConf*);
+Dce2SmbFlowData* create_expected_smb_flow_data(const snort::Packet*);
 Dce2SmbSessionData* create_new_smb_session(const snort::Packet*, dce2SmbProtoConf*);
+Dce2SmbSessionData* create_smb_session_data(Dce2SmbFlowData*, const snort::Packet*,
+    dce2SmbProtoConf*);
 DCE2_SsnData* get_dce2_session_data(snort::Flow*);
 snort::FileContext* get_smb_file_context(const snort::Packet*);
 snort::FileContext* get_smb_file_context(snort::Flow*, uint64_t, uint64_t, bool);

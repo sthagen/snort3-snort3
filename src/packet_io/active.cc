@@ -166,10 +166,13 @@ void Active::kill_session(Packet* p, EncodeFlags flags)
         break;
 
     default:
-        if ( packet_force_dropped() )
-            send_unreach(p, UnreachResponse::FWD);
-        else
-            send_unreach(p, UnreachResponse::PORT);
+        if (is_unreachable_candidate(p))
+        {
+            if ( packet_force_dropped() )
+                send_unreach(p, UnreachResponse::FWD);
+            else
+                send_unreach(p, UnreachResponse::PORT);
+        }
         break;
     }
 }
@@ -495,20 +498,8 @@ bool Active::is_reset_candidate(const Packet* p)
 
 bool Active::is_unreachable_candidate(const Packet* p)
 {
-    // FIXIT-L allow unr to tcp/udp/icmp4/icmp6 only or for all
-    switch ( p->type() )
-    {
-    case PktType::TCP:
-    case PktType::UDP:
+    if ( p->type() == PktType::TCP || p->type() == PktType::UDP)
         return true;
-
-    case PktType::ICMP:
-        // FIXIT-L return false for icmp unreachables
-        return true;
-
-    default:
-        break;
-    }
 
     return false;
 }

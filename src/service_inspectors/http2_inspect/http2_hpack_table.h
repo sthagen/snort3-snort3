@@ -40,13 +40,10 @@ struct HpackTableEntry
 class HpackIndexTable
 {
 public:
-    HpackIndexTable(Http2FlowData* flow_data, HttpCommon::SourceId src_id) :
-        dynamic_table(flow_data), session_data(flow_data), source_id(src_id)
-        { }
+    HpackIndexTable(Http2FlowData* flow_data) : dynamic_table(flow_data) { }
     const HpackTableEntry* lookup(uint64_t index) const;
     bool add_index(const Field& name, const Field& value);
-    bool hpack_table_size_update(const uint32_t size);
-    void settings_table_size_update(const uint32_t size);
+    HpackDynamicTable& get_dynamic_table() { return dynamic_table; }
 
     const static uint8_t STATIC_MAX_INDEX = 61;
     const static uint8_t PSEUDO_HEADER_MAX_STATIC_INDEX = 14;
@@ -54,8 +51,5 @@ public:
 private:
     const static HpackTableEntry static_table[STATIC_MAX_INDEX + 1];
     HpackDynamicTable dynamic_table;
-    Http2FlowData* session_data;
-    HttpCommon::SourceId source_id;
-    bool encoder_set_max_size = false;
 };
 #endif

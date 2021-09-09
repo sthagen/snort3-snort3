@@ -24,31 +24,37 @@
 #include "js_normalizer.h"
 
 using namespace snort;
+using namespace std;
 
-JSNormalizer::JSNormalizer()
-    : depth(-1),
-      rem_bytes(-1),
-      unlim(true),
+JSNormalizer::JSNormalizer(JSIdentifierCtxBase& js_ident_ctx, size_t norm_depth,
+    uint8_t max_template_nesting, int tmp_cap_size)
+    : depth(norm_depth),
+      rem_bytes(norm_depth),
+      unlim(norm_depth == static_cast<size_t>(-1)),
       src_next(nullptr),
       dst_next(nullptr),
-      tokenizer(in, out)
+      tmp_buf(nullptr),
+      tmp_buf_size(0),
+      in(&in_buf),
+      out(&out_buf),
+      tokenizer(in, out, js_ident_ctx, max_template_nesting, tmp_buf, tmp_buf_size, tmp_cap_size)
 {
 }
 
-void JSNormalizer::set_depth(size_t new_depth)
+JSNormalizer::~JSNormalizer()
 {
-    if (depth == new_depth)
-        return;
-
-    depth = new_depth;
-    rem_bytes = depth;
-    unlim = depth == (size_t)-1;
+    delete[] tmp_buf;
+    tmp_buf = nullptr;
+    tmp_buf_size = 0;
 }
 
 JSTokenizer::JSRet JSNormalizer::normalize(const char* src, size_t src_len, char* dst, size_t dst_len)
 {
     if (rem_bytes == 0 && !unlim)
     {
+        debug_log(5, http_trace, TRACE_JS_PROC, nullptr,
+            "depth limit reached\n");
+
         src_next = src + src_len;
         dst_next = dst;
         return JSTokenizer::EOS;
@@ -56,19 +62,25 @@ JSTokenizer::JSRet JSNormalizer::normalize(const char* src, size_t src_len, char
 
     size_t len = unlim ? src_len :
         src_len < rem_bytes ? src_len : rem_bytes;
-    in.rdbuf()->pubsetbuf(const_cast<char*>(src), len);
-    out.rdbuf()->pubsetbuf(dst, dst_len);
 
-    JSTokenizer::JSRet ret = (JSTokenizer::JSRet)tokenizer.yylex();
+    debug_logf(4, http_trace, TRACE_JS_DUMP, nullptr,
+        "tmp buffer[%zu]: %.*s\n", tmp_buf_size, static_cast<int>(tmp_buf_size), tmp_buf);
+
+    in_buf.pubsetbuf(tmp_buf, tmp_buf_size, const_cast<char*>(src), len);
+    out_buf.pubsetbuf(dst, dst_len);
+
+    JSTokenizer::JSRet ret = static_cast<JSTokenizer::JSRet>(tokenizer.yylex());
     in.clear();
     out.clear();
-    size_t r_bytes = in.tellg();
+    size_t r_bytes = in_buf.glued() ? static_cast<size_t>(in.tellg()) : 0;
     size_t w_bytes = out.tellp();
 
     if (!unlim)
         rem_bytes -= r_bytes;
     src_next = src + r_bytes;
-    dst_next = dst + w_bytes;
+
+    // avoid heap overflow if number of written bytes bigger than accepted dst_len
+    dst_next = (w_bytes <= dst_len) ? dst + w_bytes : dst + dst_len;
 
     return rem_bytes ? ret : JSTokenizer::EOS;
 }

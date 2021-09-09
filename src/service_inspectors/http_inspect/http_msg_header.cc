@@ -40,6 +40,7 @@
 #include "http_inspect.h"
 #include "http_msg_request.h"
 #include "http_msg_body.h"
+#include "http_normalizers.h"
 
 using namespace snort;
 using namespace HttpCommon;
@@ -149,6 +150,16 @@ void HttpMsgHeader::gen_events()
     if (source_id == SRC_CLIENT)
         get_header_value_norm(HEAD_HOST);
 
+    // Host header value too long
+    if ((params->maximum_host_length != -1) && (source_id == SRC_CLIENT))
+    {
+        if (get_all_header_values_raw(HEAD_HOST).length() > params->maximum_host_length)
+        {
+            add_infraction(INF_LONG_HOST_VALUE);
+            create_event(EVENT_LONG_HOSTNAME);
+        }
+    }
+
     // Content-Transfer-Encoding is a MIME header not sanctioned by HTTP. Which may not prevent
     // some clients from recognizing it and applying a decoding that Snort does not expect.
     if (get_header_count(HEAD_CONTENT_TRANSFER_ENCODING) > 0)
@@ -187,6 +198,14 @@ void HttpMsgHeader::gen_events()
         }
         while (consumed != -1);
     }
+
+    // Check for an empty value in Accept-Encoding (two consecutive commas)
+    if (has_consecutive_commas(get_header_value_norm(HEAD_ACCEPT_ENCODING)))
+    {
+        add_infraction(INF_ACCEPT_ENCODING_CONSECUTIVE_COMMAS);
+        create_event(EVENT_ACCEPT_ENCODING_CONSECUTIVE_COMMAS);
+    }
+
 }
 
 void HttpMsgHeader::update_flow()
@@ -681,8 +700,6 @@ void HttpMsgHeader::print_section(FILE* output)
         HttpApi::classic_buffer_names[HTTP_BUFFER_RAW_COOKIE-1]);
     get_classic_buffer(HTTP_BUFFER_RAW_HEADER, 0, 0).print(output,
         HttpApi::classic_buffer_names[HTTP_BUFFER_RAW_HEADER-1]);
-    get_classic_buffer(HTTP_BUFFER_RAW_HEADER_COMPLETE, 0, 0).print(output,
-        HttpApi::classic_buffer_names[HTTP_BUFFER_RAW_HEADER_COMPLETE-1]);
     HttpMsgSection::print_section_wrapup(output);
 }
 #endif

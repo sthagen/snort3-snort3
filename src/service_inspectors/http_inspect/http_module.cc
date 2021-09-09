@@ -24,6 +24,7 @@
 #include "http_module.h"
 
 #include "log/messages.h"
+#include "trace/trace.h"
 
 #include "http_enum.h"
 #include "http_js_norm.h"
@@ -55,6 +56,12 @@ const Parameter HttpModule::http_params[] =
     { "unzip", Parameter::PT_BOOL, nullptr, "true",
       "decompress gzip and deflate message bodies" },
 
+    { "maximum_host_length", Parameter::PT_INT, "-1:max53", "-1",
+      "maximum allowed length for Host header value (-1 no limit)" },
+
+    { "maximum_chunk_length", Parameter::PT_INT, "0:4294967295", "4294967295",
+      "maximum allowed length for a message body chunk" },
+
     { "normalize_utf", Parameter::PT_BOOL, nullptr, "true",
       "normalize charset utf encodings in response bodies" },
 
@@ -74,8 +81,17 @@ const Parameter HttpModule::http_params[] =
       "use legacy normalizer to normalize JavaScript in response bodies" },
 
     { "js_normalization_depth", Parameter::PT_INT, "-1:max53", "0",
-      "number of input JavaScript bytes to normalize with enhanced normalizer "
-      "(-1 max allowed value) (experimental)" },
+      "enable enhanced normalizer (0 is disabled); "
+      "number of input JavaScript bytes to normalize (-1 unlimited) "
+      "(experimental)" },
+
+    // range of accepted identifier names is (a0:z9999), so the max is 26 * 10000 = 260000
+    { "js_norm_identifier_depth", Parameter::PT_INT, "0:260000", "260000",
+      "max number of unique JavaScript identifiers to normalize" },
+
+    { "js_norm_max_tmpl_nest", Parameter::PT_INT, "0:255", "32",
+      "maximum depth of template literal nesting that enhanced javascript normalizer "
+      "will process (experimental)" },
 
     { "max_javascript_whitespaces", Parameter::PT_INT, "1:65535", "200",
       "maximum consecutive whitespaces allowed within the JavaScript obfuscated data" },
@@ -124,7 +140,7 @@ const Parameter HttpModule::http_params[] =
       "specifies the xff type headers to parse and consider in the same order "
       "of preference as defined" },
 
-    { "request_body_app_detection", Parameter::PT_BOOL, nullptr, "false",
+    { "request_body_app_detection", Parameter::PT_BOOL, nullptr, "true",
       "make HTTP/2 request message bodies available for application detection "
           "(detection requires AppId)" },
 
@@ -158,6 +174,25 @@ ProfileStats* HttpModule::get_profile() const
 
 THREAD_LOCAL PegCount HttpModule::peg_counts[PEG_COUNT_MAX] = { };
 
+THREAD_LOCAL const Trace* http_trace = nullptr;
+
+static const TraceOption http_trace_options[] =
+{
+    { "js_proc",  TRACE_JS_PROC,  "enable JavaScript processing logging" },
+    { "js_dump",  TRACE_JS_DUMP,  "enable JavaScript data logging" },
+    { nullptr, 0, nullptr }
+};
+
+void HttpModule::set_trace(const Trace* trace) const
+{
+    http_trace = trace;
+}
+
+const TraceOption* HttpModule::get_trace_options() const
+{
+    return http_trace_options;
+}
+
 bool HttpModule::begin(const char*, int, SnortConfig*)
 {
     delete params;
@@ -183,6 +218,14 @@ bool HttpModule::set(const char*, Value& val, SnortConfig*)
     {
         params->normalize_utf = val.get_bool();
     }
+    else if (val.is("maximum_host_length"))
+    {
+        params->maximum_host_length = val.get_int64();
+    }
+    else if (val.is("maximum_chunk_length"))
+    {
+        params->maximum_chunk_length = val.get_int64();
+    }
     else if (val.is("decompress_pdf"))
     {
         params->decompress_pdf = val.get_bool();
@@ -206,12 +249,20 @@ bool HttpModule::set(const char*, Value& val, SnortConfig*)
             params->js_norm_param.is_javascript_normalization
             or params->js_norm_param.normalize_javascript;
     }
+    else if (val.is("js_norm_identifier_depth"))
+    {
+        params->js_norm_param.js_identifier_depth = val.get_int32();
+    }
     else if (val.is("js_normalization_depth"))
     {
         int64_t v = val.get_int64();
         params->js_norm_param.js_normalization_depth = v;
         params->js_norm_param.is_javascript_normalization =
             params->js_norm_param.is_javascript_normalization or (v != 0);
+    }
+    else if (val.is("js_norm_max_tmpl_nest"))
+    {
+        params->js_norm_param.max_template_nesting = val.get_uint8();
     }
     else if (val.is("max_javascript_whitespaces"))
     {
@@ -400,7 +451,9 @@ bool HttpModule::end(const char*, int, SnortConfig*)
         ParseError("Cannot use normalize_javascript and js_normalization_depth together.");
 
     if ( params->js_norm_param.is_javascript_normalization )
-        params->js_norm_param.js_norm = new HttpJsNorm(params->uri_param, params->js_norm_param.js_normalization_depth);
+        params->js_norm_param.js_norm = new HttpJsNorm(params->uri_param,
+        params->js_norm_param.js_normalization_depth, params->js_norm_param.js_identifier_depth,
+        params->js_norm_param.max_template_nesting);
 
     params->script_detection_handle = script_detection_handle;
 

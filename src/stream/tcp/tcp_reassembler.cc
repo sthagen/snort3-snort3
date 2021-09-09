@@ -152,6 +152,12 @@ void TcpReassembler::queue_reassembly_segment(
     trs.sos.seg_bytes_total += tsn->i_len;
     trs.sos.total_segs_queued++;
     tcpStats.segs_queued++;
+
+    if ( trs.sos.seg_count > tcpStats.max_segs )
+        tcpStats.max_segs = trs.sos.seg_count;
+
+    if ( trs.sos.seg_bytes_total > tcpStats.max_bytes )
+        tcpStats.max_bytes = trs.sos.seg_bytes_total;
 }
 
 bool TcpReassembler::is_segment_fasttrack(
@@ -1193,6 +1199,12 @@ void TcpReassembler::insert_segment_in_seglist(
 
     if ( trs.sos.keep_segment )
     {
+        if ( !trs.sos.left and trs.sos.right and
+            paf_initialized(&trs.paf_state) and trs.paf_state.pos > tsd.get_seq() )
+        {
+            return;
+        }
+
         /* Adjust slide so that is correct relative to orig seq */
         trs.sos.slide = trs.sos.seq - tsd.get_seq();
         // FIXIT-L for some reason length - slide - trunc_len is sometimes negative

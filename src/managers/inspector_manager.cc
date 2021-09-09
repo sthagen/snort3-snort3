@@ -1036,13 +1036,13 @@ bool InspectorManager::configure(SnortConfig* sc, bool cloned)
         if ( cloned and idx )
             break;
 
-        set_inspection_policy(sc, idx);
+        ::set_inspection_policy(sc, idx);
         InspectionPolicy* p = sc->policy_map->get_inspection_policy(idx);
         p->configure();
         ok = ::configure(sc, p->framework_policy, cloned) && ok;
     }
 
-    set_inspection_policy(sc);
+    ::set_inspection_policy(sc);
     SearchTool::set_conf(nullptr);
 
     return ok;
@@ -1175,7 +1175,7 @@ void InspectorManager::full_inspection(Packet* p)
 {
     Flow* flow = p->flow;
 
-    if ( flow->service and flow->clouseau and !p->is_cooked() )
+    if ( flow->service and flow->clouseau and (!(p->is_cooked()) or p->is_defrag()) )
         bumble(p);
 
     // For reassembled PDUs, a null data buffer signals no detection. Detection can be required

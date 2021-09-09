@@ -21,8 +21,25 @@
 #define JS_TOKENIZER_H
 
 #include <sstream>
+#include <stack>
+#include <vector>
 
 #include "log/messages.h"
+#include "main/snort_debug.h"
+#include "service_inspectors/http_inspect/http_enum.h"
+
+extern THREAD_LOCAL const snort::Trace* http_trace;
+
+// The longest pattern has 9 characters " < / s c r i p t > ",
+// 8 of them can reside in 1st chunk
+// Each character in the identifier forms its own group (pattern matching case),
+// i.e. in the current implementation IDENTIFIER has " . " rule.
+#define JSTOKENIZER_MAX_STATES 8
+
+// To hold potentially long identifiers
+#define JSTOKENIZER_BUF_MAX_SIZE 256
+
+class JSIdentifierCtxBase;
 
 class JSTokenizer : public yyFlexLexer
 {
@@ -46,10 +63,15 @@ public:
         SCRIPT_CONTINUE,
         OPENING_TAG,
         CLOSING_TAG,
-        BAD_TOKEN
+        BAD_TOKEN,
+        IDENTIFIER_OVERFLOW,
+        TEMPLATE_NESTING_OVERFLOW,
+        MAX
     };
 
-    JSTokenizer(std::istream& in, std::ostream& out);
+    JSTokenizer(std::istream& in, std::ostream& out, JSIdentifierCtxBase& ident_ctx,
+        uint8_t max_template_nesting, char*& buf, size_t& buf_size,
+        int cap_size = JSTOKENIZER_BUF_MAX_SIZE);
     ~JSTokenizer() override;
 
     // returns JSRet
@@ -65,14 +87,35 @@ private:
     JSRet eval_eof();
     JSRet do_spacing(JSToken cur_token);
     JSRet do_operator_spacing(JSToken cur_token);
+    JSRet do_identifier_substitution(const char* lexeme);
     bool unescape(const char* lexeme);
+    void process_punctuator();
+    void process_closing_bracket();
+    JSRet process_subst_open();
 
-private:
+    void states_push();
+    void states_apply();
+    void states_correct(int);
+
     void* cur_buffer;
     void* tmp_buffer = nullptr;
     std::stringstream tmp;
-
+    uint8_t max_template_nesting;
+    std::stack<uint16_t, std::vector<uint16_t>> bracket_depth;
     JSToken token = UNDEFINED;
+    JSIdentifierCtxBase& ident_ctx;
+
+    struct
+    {
+        JSToken token = UNDEFINED;          // the token before
+        int length = 0;                     // current token length
+        int sc = 0;                         // current Starting Condition
+    } states[JSTOKENIZER_MAX_STATES];
+    int sp = 0;                             // points to the top of states
+
+    char*& tmp_buf;
+    size_t& tmp_buf_size;
+    const int tmp_cap_size;
 };
 
 #endif // JS_TOKENIZER_H

@@ -25,26 +25,48 @@
 
 #include <cstring>
 
+#include "utils/js_identifier_ctx.h"
 #include "utils/js_normalizer.h"
+
+// Mock functions
 
 namespace snort
 {
-// Mock for JSTokenizer
 [[noreturn]] void FatalError(const char*, ...)
 { exit(EXIT_FAILURE); }
+void trace_vprintf(const char*, TraceLevel, const char*, const Packet*, const char*, va_list) {}
+uint8_t TraceApi::get_constraints_generation() { return 0; }
+void TraceApi::filter(const Packet&) {}
 }
+
+THREAD_LOCAL const snort::Trace* http_trace = nullptr;
+
+class JSIdentifierCtxTest : public JSIdentifierCtxBase
+{
+public:
+    JSIdentifierCtxTest() = default;
+
+    const char* substitute(const char* identifier) override
+    { return identifier; }
+    void reset() override {}
+    size_t size() const override { return 0; }
+};
+
+// Test cases
 
 using namespace snort;
 
 #define DEPTH 65535
+#define MAX_TEMPLATE_NESTNIG 4
+#define DST_SIZE 512
 
-#define NORMALIZE(src, expected)                                    \
-    char dst[sizeof(expected)];                                     \
-    JSNormalizer norm;                                              \
-    norm.set_depth(DEPTH);                                          \
-    auto ret = norm.normalize(src, sizeof(src), dst, sizeof(dst));  \
-    const char* ptr = norm.get_src_next();                          \
-    int act_len = norm.get_dst_next() - dst;                        \
+#define NORMALIZE(src, expected)                                   \
+    char dst[sizeof(expected)];                                    \
+    JSIdentifierCtxTest ident_ctx;                                 \
+    JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTNIG);     \
+    auto ret = norm.normalize(src, sizeof(src), dst, sizeof(dst)); \
+    const char* ptr = norm.get_src_next();                         \
+    int act_len = norm.get_dst_next() - dst;
 
 #define VALIDATE(src, expected)                 \
     CHECK(ret == JSTokenizer::SCRIPT_CONTINUE); \
@@ -52,20 +74,135 @@ using namespace snort;
     CHECK(act_len == sizeof(expected) - 1);     \
     CHECK(!memcmp(dst, expected, act_len));
 
-#define VALIDATE_FAIL(src, expected, ret_code, ptr_offset)  \
-    CHECK(ret == ret_code);                                 \
-    CHECK((ptr - src) == ptr_offset);                       \
-    CHECK(act_len == sizeof(expected) - 1);                 \
+#define VALIDATE_FAIL(src, expected, ret_code, ptr_offset) \
+    CHECK(ret == ret_code);                                \
+    CHECK((ptr - src) == ptr_offset);                      \
+    CHECK(act_len == sizeof(expected) - 1);                \
     CHECK(!memcmp(dst, expected, act_len));
 
-#define NORMALIZE_L(src, src_len, dst, dst_len, depth, ret, ptr, len)   \
+#define NORMALIZE_L(src, src_len, dst, dst_len, depth, ret, ptr, len) \
+    {                                                                 \
+        JSIdentifierCtxTest ident_ctx;                                \
+        JSNormalizer norm(ident_ctx, depth, MAX_TEMPLATE_NESTNIG);    \
+        ret = norm.normalize(src, src_len, dst, dst_len);             \
+        ptr = norm.get_src_next();                                    \
+        len = norm.get_dst_next() - dst;                              \
+    }
+
+#define DO(src, slen, dst, dlen)                            \
+    {                                                       \
+        auto ret = norm.normalize(src, slen, dst, dlen);    \
+        CHECK(ret == JSTokenizer::SCRIPT_CONTINUE);         \
+        auto nsrc = norm.get_src_next();                    \
+        auto ndst = norm.get_dst_next();                    \
+        REQUIRE(nsrc - src == slen);                        \
+        REQUIRE(ndst - dst == dlen);                        \
+    }
+
+#define TRY(src, slen, dst, dlen, rexp)                     \
+    {                                                       \
+        auto ret = norm.normalize(src, slen, dst, dlen);    \
+        CHECK(ret == rexp);                                 \
+        auto ndst = norm.get_dst_next();                    \
+        REQUIRE(ndst - dst == dlen);                        \
+    }
+
+#define CLOSE()                                                         \
     {                                                                   \
-        JSNormalizer norm;                                              \
-        norm.set_depth(depth);                                          \
-        ret = norm.normalize(src, src_len, dst, dst_len);               \
-        ptr = norm.get_src_next();                                      \
-        len = norm.get_dst_next() - dst;                                \
-    }                                                                   \
+        const char end[] = "</script>";                                 \
+        char dst[DST_SIZE];                                             \
+        auto ret = norm.normalize(end, sizeof(end) - 1, dst, sizeof(dst) - 1); \
+        CHECK(ret == JSTokenizer::SCRIPT_ENDED);                        \
+    }
+
+#define NORMALIZE_2(src1, src2, exp1, exp2)                         \
+    {                                                               \
+        char dst1[sizeof(exp1)];                                    \
+        char dst2[sizeof(exp2)];                                    \
+                                                                    \
+        JSIdentifierCtxTest ident_ctx;                              \
+        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTNIG);  \
+                                                                    \
+        DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
+        CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
+                                                                    \
+        DO(src2, sizeof(src2) - 1, dst2, sizeof(dst2) - 1);         \
+        CHECK(!memcmp(exp2, dst2, sizeof(exp2) - 1));               \
+                                                                    \
+        CLOSE();                                                    \
+    }
+
+#define NORMALIZE_3(src1, src2, src3, exp1, exp2, exp3)             \
+    {                                                               \
+        char dst1[sizeof(exp1)];                                    \
+        char dst2[sizeof(exp2)];                                    \
+        char dst3[sizeof(exp3)];                                    \
+                                                                    \
+        JSIdentifierCtxTest ident_ctx;                              \
+        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTNIG);  \
+                                                                    \
+        DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
+        CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
+                                                                    \
+        DO(src2, sizeof(src2) - 1, dst2, sizeof(dst2) - 1);         \
+        CHECK(!memcmp(exp2, dst2, sizeof(exp2) - 1));               \
+                                                                    \
+        DO(src3, sizeof(src3) - 1, dst3, sizeof(dst3) - 1);         \
+        CHECK(!memcmp(exp3, dst3, sizeof(exp3) - 1));               \
+                                                                    \
+        CLOSE();                                                    \
+    }
+
+#define NORM_BAD_2(src1, src2, exp1, exp2, code)                    \
+    {                                                               \
+        char dst1[sizeof(exp1)];                                    \
+        char dst2[sizeof(exp2)];                                    \
+                                                                    \
+        JSIdentifierCtxTest ident_ctx;                              \
+        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTNIG);  \
+                                                                    \
+        DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
+        CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
+                                                                    \
+        TRY(src2, sizeof(src2) - 1, dst2, sizeof(dst2) - 1, code);  \
+        CHECK(!memcmp(exp2, dst2, sizeof(exp2) - 1));               \
+    }
+
+#define NORM_BAD_3(src1, src2, src3, exp1, exp2, exp3, code)        \
+    {                                                               \
+        char dst1[sizeof(exp1)];                                    \
+        char dst2[sizeof(exp2)];                                    \
+        char dst3[sizeof(exp3)];                                    \
+                                                                    \
+        JSIdentifierCtxTest ident_ctx;                              \
+        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTNIG);  \
+                                                                    \
+        DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
+        CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
+                                                                    \
+        DO(src2, sizeof(src2) - 1, dst2, sizeof(dst2) - 1);         \
+        CHECK(!memcmp(exp2, dst2, sizeof(exp2) - 1));               \
+                                                                    \
+        TRY(src3, sizeof(src3) - 1, dst3, sizeof(dst3) - 1, code);  \
+        CHECK(!memcmp(exp3, dst3, sizeof(exp3) - 1));               \
+    }
+
+#define NORM_LIMITED(limit, src1, src2, exp1, exp2)                     \
+    {                                                                   \
+        char dst1[sizeof(exp1)];                                        \
+        char dst2[sizeof(exp2)];                                        \
+                                                                        \
+        JSIdentifierCtxTest ident_ctx;                                  \
+        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTNIG, limit); \
+                                                                        \
+        DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);             \
+        CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));                   \
+                                                                        \
+        DO(src2, sizeof(src2) - 1, dst2, sizeof(dst2) - 1);             \
+        CHECK(!memcmp(exp2, dst2, sizeof(exp2) - 1));                   \
+                                                                        \
+        CLOSE();                                                        \
+    }
 
 // ClamAV test cases
 static const char clamav_buf0[] =
@@ -310,13 +447,13 @@ static const char all_patterns_buf4[] =
     "/regex/g undefined null true false 2 23 2.3 2.23 .2 .02 4. +2 -2 "
     "+3.3 -3.3 +23 -32 2.3E45 3.E34 -2.3E45 -3.E34 +2.3E45 +3.E34 0x1234 0XFFFF Infinity "
     "\xE2\x88\x9E NaN \"\" \"double string\" \"d\" '' 'single string' 's' x=/regex/gs "
-    "x=2/2/1";
+    "x=2/2/1 `\ntemplate\n`";
 
 static const char all_patterns_expected4[] =
     "/regex/g undefined null true false 2 23 2.3 2.23 .2 .02 4.+2-2"
     "+3.3-3.3+23-32 2.3E45 3.E34-2.3E45-3.E34+2.3E45+3.E34 0x1234 0XFFFF Infinity "
     "\xE2\x88\x9E NaN \"\" \"double string\" \"d\" '' 'single string' 's' x=/regex/gs "
-    "x=2/2/1";
+    "x=2/2/1 `\ntemplate\n`";
 
 static const char all_patterns_buf5[] =
     "$2abc _2abc abc $__$ 肖晗 XÆA12 \\u0041abc \\u00FBdef \\u1234ghi ab\xE2\x80\xA8ww "
@@ -325,6 +462,13 @@ static const char all_patterns_buf5[] =
 static const char all_patterns_expected5[] =
     "$2abc _2abc abc $__$ 肖晗 XÆA12 \u0041abc \u00FBdef \u1234ghi ab ww "
     "ab ww ab ww ab ∞ ww 2 abc";
+
+static const char all_patterns_buf6[] =
+    "tag` template\n   ${ a   +   b }   template`";
+
+static const char all_patterns_expected6[] =
+    "tag ` template\n   ${a+b}   template`";
+
 
 TEST_CASE("all patterns", "[JSNormalizer]")
 {
@@ -410,6 +554,11 @@ TEST_CASE("all patterns", "[JSNormalizer]")
     {
         NORMALIZE(all_patterns_buf5, all_patterns_expected5);
         VALIDATE(all_patterns_buf5, all_patterns_expected5);
+    }
+    SECTION("template literals")
+    {
+        NORMALIZE(all_patterns_buf6, all_patterns_expected6);
+        VALIDATE(all_patterns_buf6, all_patterns_expected6);
     }
 }
 
@@ -718,6 +867,19 @@ static const char syntax_cases_buf21[] =
 static const char syntax_cases_expected21[] =
     "var invalid_str='abc";
 
+static const char syntax_cases_buf22[] =
+    "tag`template\n \\\\\\${   }   \\\\${   a  + ` template ${ 1 + c  }`  }`";
+
+static const char syntax_cases_expected22[] =
+    "tag `template\n \\\\\\${   }   \\\\${a+` template ${1+c}`}`";
+
+static const char syntax_cases_buf23[] =
+    "`${`${`${`${`${}`}`}`}`}`}";
+
+static const char syntax_cases_expected23[] =
+    "`${`${`${`${`";
+
+
 TEST_CASE("syntax cases", "[JSNormalizer]")
 {
     SECTION("variables")
@@ -795,6 +957,11 @@ TEST_CASE("syntax cases", "[JSNormalizer]")
         NORMALIZE(syntax_cases_buf14, syntax_cases_expected14);
         VALIDATE(syntax_cases_buf14, syntax_cases_expected14);
     }
+    SECTION("template literals")
+    {
+        NORMALIZE(syntax_cases_buf22, syntax_cases_expected22);
+        VALIDATE(syntax_cases_buf22, syntax_cases_expected22);
+    }
 }
 
 TEST_CASE("bad tokens", "[JSNormalizer]")
@@ -836,6 +1003,16 @@ TEST_CASE("bad tokens", "[JSNormalizer]")
     }
 }
 
+TEST_CASE("template literal overflow", "[JSNormalizer]")
+{
+    SECTION("exceeding template literal limit")
+    {
+        NORMALIZE(syntax_cases_buf23, syntax_cases_expected23);
+        VALIDATE_FAIL(syntax_cases_buf23, syntax_cases_expected23,
+            JSTokenizer::TEMPLATE_NESTING_OVERFLOW, 15);
+    }
+}
+
 TEST_CASE("endings", "[JSNormalizer]")
 {
     SECTION("script closing tag is present", "[JSNormalizer]")
@@ -869,9 +1046,8 @@ TEST_CASE("endings", "[JSNormalizer]")
         const char* ptr;
         int ret;
 
-        JSNormalizer norm;
-
-        norm.set_depth(7);
+        JSIdentifierCtxTest ident_ctx;
+        JSNormalizer norm(ident_ctx, 7, MAX_TEMPLATE_NESTNIG);
         ret = norm.normalize(src, sizeof(src), dst, sizeof(dst));
         ptr = norm.get_src_next();
         act_len = norm.get_dst_next() - dst;
@@ -902,7 +1078,7 @@ TEST_CASE("endings", "[JSNormalizer]")
 
         CHECK(ret == JSTokenizer::SCRIPT_CONTINUE);
         CHECK(ptr == src + sizeof(src));
-        CHECK(act_len == 12); // size of normalized src
+        CHECK(act_len == 7); // size of normalized src
         CHECK(!memcmp(dst, expected, sizeof(dst)));
     }
 }
@@ -1237,5 +1413,460 @@ TEST_CASE("nested script tags", "[JSNormalizer]")
     {
         NORMALIZE(unexpected_tag_buf24, unexpected_tag_expected24);
         VALIDATE_FAIL(unexpected_tag_buf24, unexpected_tag_expected24, JSTokenizer::OPENING_TAG, 39);
+    }
+}
+
+TEST_CASE("split between tokens", "[JSNormalizer]")
+{
+    SECTION("operator string")
+    {
+        const char dat1[] = "var s = ";
+        const char dat2[] = "'string';";
+        const char exp1[] = "var s=";
+        const char exp2[] = "var s='string';";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("operator number")
+    {
+        const char dat1[] = "a = 5 +";
+        const char dat2[] = "b + c;";
+        const char exp1[] = "a=5+";
+        const char exp2[] = "a=5+b+c;";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("comment function")
+    {
+        const char dat1[] = "// no comments\n";
+        const char dat2[] = "foo(bar, baz);";
+        const char exp1[] = "";
+        const char exp2[] = "foo(bar,baz);";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("operator identifier")
+    {
+        const char dat1[] = "var ";
+        const char dat2[] = "a = ";
+        const char dat3[] = "b  ;";
+        const char exp1[] = "var";
+        const char exp2[] = "var a=";
+        const char exp3[] = "var a=b;";
+
+        NORMALIZE_3(dat1, dat2, dat3, exp1, exp2, exp3);
+    }
+}
+
+TEST_CASE("split in comments", "[JSNormalizer]")
+{
+    SECTION("/ /")
+    {
+        const char dat1[] = "/";
+        const char dat2[] = "/comment\n";
+        const char exp1[] = "/";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("/ / msg")
+    {
+        const char dat1[] = "//";
+        const char dat2[] = "comment\n";
+        const char exp1[] = "";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("/ / LF")
+    {
+        const char dat1[] = "//comment";
+        const char dat2[] = "\n";
+        const char exp1[] = "";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+
+    SECTION("/ *")
+    {
+        const char dat1[] = "/";
+        const char dat2[] = "* comment */";
+        const char exp1[] = "/";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("/ * msg")
+    {
+        const char dat1[] = "/* t";
+        const char dat2[] = "ext */";
+        const char exp1[] = "";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("* /")
+    {
+        const char dat1[] = "/* comment *";
+        const char dat2[] = "/";
+        const char exp1[] = "";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("/ * msg * /")
+    {
+        const char dat1[] = "/";
+        const char dat2[] = "* comment *";
+        const char dat3[] = "/";
+        const char exp1[] = "/";
+        const char exp2[] = "";
+        const char exp3[] = "";
+
+        NORMALIZE_3(dat1, dat2, dat3, exp1, exp2, exp3);
+    }
+
+    SECTION("< !--")
+    {
+        const char dat1[] = "<";
+        const char dat2[] = "!-- comment\n";
+        const char exp1[] = "<";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("<! --")
+    {
+        const char dat1[] = "<!";
+        const char dat2[] = "-- comment\n";
+        const char exp1[] = "<!";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("<!- -")
+    {
+        const char dat1[] = "<!-";
+        const char dat2[] = "- comment\n";
+        const char exp1[] = "<!-";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("<!-- msg")
+    {
+        const char dat1[] = "<!--";
+        const char dat2[] = "comment\n";
+        const char exp1[] = "";
+        const char exp2[] = "";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("<! -- msg")
+    {
+        const char dat1[] = "<";
+        const char dat2[] = "!-";
+        const char dat3[] = "-comment\n";
+        const char exp1[] = "<";
+        const char exp2[] = "<!-";
+        const char exp3[] = "";
+
+        NORMALIZE_3(dat1, dat2, dat3, exp1, exp2, exp3);
+    }
+}
+
+TEST_CASE("split in opening tag", "[JSNormalizer]")
+{
+    SECTION("< script")
+    {
+        const char dat1[] = "<";
+        const char dat2[] = "script";
+        const char exp1[] = "<";
+        const char exp2[] = "";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::OPENING_TAG);
+    }
+    SECTION("str='<s cript'")
+    {
+        const char dat1[] = "var str ='<s";
+        const char dat2[] = "cript';";
+        const char exp1[] = "var str='<s";
+        const char exp2[] = "var str='";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::OPENING_TAG);
+    }
+    SECTION("str='<scrip t'")
+    {
+        const char dat1[] = "var str ='<scrip";
+        const char dat2[] = "t';";
+        const char exp1[] = "var str='<scrip";
+        const char exp2[] = "='";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::OPENING_TAG);
+    }
+    SECTION("< scr ipt")
+    {
+        const char dat1[] = "<";
+        const char dat2[] = "scr";
+        const char dat3[] = "ipt";
+        const char exp1[] = "<";
+        const char exp2[] = "<scr";
+        const char exp3[] = "";
+
+        NORM_BAD_3(dat1, dat2, dat3, exp1, exp2, exp3, JSTokenizer::OPENING_TAG);
+    }
+    SECTION("str='<sc rip t'")
+    {
+        const char dat1[] = "var str =\"<sc";
+        const char dat2[] = "rip";
+        const char dat3[] = "t\";";
+        const char exp1[] = "var str=\"<sc";
+        const char exp2[] = " str=\"<scrip";
+        const char exp3[] = "=\"";
+
+        NORM_BAD_3(dat1, dat2, dat3, exp1, exp2, exp3, JSTokenizer::OPENING_TAG);
+    }
+}
+
+TEST_CASE("split in closing tag", "[JSNormalizer]")
+{
+    SECTION("< /script>")
+    {
+        const char dat1[] = "<";
+        const char dat2[] = "/script>";
+        const char exp1[] = "<";
+        const char exp2[] = "";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::SCRIPT_ENDED);
+    }
+    SECTION("</script >")
+    {
+        const char dat1[] = "</script";
+        const char dat2[] = ">";
+        const char exp1[] = "</script";
+        const char exp2[] = "";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::SCRIPT_ENDED);
+    }
+    SECTION("str='</ script>'")
+    {
+        const char dat1[] = "var str ='</";
+        const char dat2[] = "script>';";
+        const char exp1[] = "var str='</";
+        const char exp2[] = "var str='";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::CLOSING_TAG);
+    }
+    SECTION("str='</scrip t>'")
+    {
+        const char dat1[] = "var str ='</scrip";
+        const char dat2[] = "t>';";
+        const char exp1[] = "var str='</scrip";
+        const char exp2[] = "'";
+
+        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::CLOSING_TAG);
+    }
+    SECTION("</ scr ipt>")
+    {
+        const char dat1[] = "</";
+        const char dat2[] = "scr";
+        const char dat3[] = "ipt>";
+        const char exp1[] = "</";
+        const char exp2[] = "</scr";
+        const char exp3[] = "";
+
+        NORM_BAD_3(dat1, dat2, dat3, exp1, exp2, exp3, JSTokenizer::SCRIPT_ENDED);
+    }
+    SECTION("str='</sc rip t>'")
+    {
+        const char dat1[] = "var str =\"</sc";
+        const char dat2[] = "rip";
+        const char dat3[] = "t>\";";
+        const char exp1[] = "var str=\"</sc";
+        const char exp2[] = " str=\"</scrip";
+        const char exp3[] = "\"";
+
+        NORM_BAD_3(dat1, dat2, dat3, exp1, exp2, exp3, JSTokenizer::CLOSING_TAG);
+    }
+}
+
+TEST_CASE("split in string literal", "[JSNormalizer]")
+{
+    SECTION("\\ LF")
+    {
+        const char dat1[] = "var str =\"any\\";
+        const char dat2[] = "\none\";";
+        const char exp1[] = "var str=\"any\\";
+        const char exp2[] = " str=\"anyone\";";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("\\ CR")
+    {
+        const char dat1[] = "var str =\"any\\";
+        const char dat2[] = "\rone\";";
+        const char exp1[] = "var str=\"any\\";
+        const char exp2[] = " str=\"anyone\";";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("\\CR LF")
+    {
+        const char dat1[] = "var str =\"any\\\r";
+        const char dat2[] = "\none\";";
+        const char exp1[] = "var str=\"any";
+        const char exp2[] = " str=\"anyone\";";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("\\ CRLF")
+    {
+        const char dat1[] = "var str =\"any\\";
+        const char dat2[] = "\r\none\";";
+        const char exp1[] = "var str=\"any\\";
+        const char exp2[] = " str=\"anyone\";";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("\\ \"")
+    {
+        const char dat1[] = "var str =\"any\\";
+        const char dat2[] = "\"one\";";
+        const char exp1[] = "var str=\"any\\";
+        const char exp2[] = " str=\"any\\\"one\";";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("\\ \'")
+    {
+        const char dat1[] = "var str =\"any\\";
+        const char dat2[] = "\'one\";";
+        const char exp1[] = "var str=\"any\\";
+        const char exp2[] = " str=\"any\\\'one\";";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("\\ u1234tx")
+    {
+        const char dat1[] = "var str =\"any\\";
+        const char dat2[] = "u1234tx\";";
+        const char exp1[] = "var str=\"any\\";
+        const char exp2[] = " str=\"any\\u1234tx\";";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("\\u 1234tx")
+    {
+        const char dat1[] = "var str =\"any\\u";
+        const char dat2[] = "1234tx\";";
+        const char exp1[] = "var str=\"any\\u";
+        const char exp2[] = "=\"any\\u1234tx\";";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+}
+
+TEST_CASE("split in identifier", "[JSNormalizer]")
+{
+    SECTION("abc def")
+    {
+        const char dat1[] = "var abc";
+        const char dat2[] = "def = 5";
+        const char exp1[] = "var abc";
+        const char exp2[] = "var abcdef=5";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("abc def")
+    {
+        const char dat1[] = "var abc";
+        const char dat2[] = "def = 5";
+        const char exp1[] = "var abc";
+        const char exp2[] = "var abcdef=5";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("long identifier")
+    {
+        const char dat1[] = "var res = something + long_id_starts_here";
+        const char dat2[] = "_long_id_ends_here;";
+        const char exp1[] = "var res=something+long_id_starts_here";
+        const char exp2[] = "=something+long_id_starts_here_long_id_ends_here;";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+}
+
+TEST_CASE("split in keyword", "[JSNormalizer]")
+{
+    SECTION("finally")
+    {
+        const char dat1[] = "\nfin";
+        const char dat2[] = "ally;";
+        const char exp1[] = "fin";
+        const char exp2[] = "finally;";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("in")
+    {
+        const char dat1[] = "i";
+        const char dat2[] = "n";
+        const char exp1[] = "i";
+        const char exp2[] = "in";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+    }
+    SECTION("instanceof")
+    {
+        const char dat1[] = "in";
+        const char dat2[] = "stance";
+        const char dat3[] = "of";
+        const char exp1[] = "in";
+        const char exp2[] = "instance";
+        const char exp3[] = "instanceof";
+
+        NORMALIZE_3(dat1, dat2, dat3, exp1, exp2, exp3);
+    }
+}
+
+TEST_CASE("memcap", "[JSNormalizer]")
+{
+    SECTION("3 tokens")
+    {
+        const char dat1[] = "var abc=in";
+        const char dat2[] = "put;";
+        const char exp1[] = "var abc=in";
+        const char exp2[] = " abc=input;";
+
+        NORM_LIMITED(6, dat1, dat2, exp1, exp2);
+    }
+    SECTION("2 tokens and a half")
+    {
+        const char dat1[] = "var abc=in";
+        const char dat2[] = "put;";
+        const char exp1[] = "var abc=in";
+        const char exp2[] = " c=input;";
+
+        NORM_LIMITED(4, dat1, dat2, exp1, exp2);
+    }
+    SECTION("1 token")
+    {
+        const char dat1[] = "var abc=in";
+        const char dat2[] = "put;";
+        const char exp1[] = "var abc=in";
+        const char exp2[] = "input;";
+
+        NORM_LIMITED(2, dat1, dat2, exp1, exp2);
+    }
+    SECTION("a half")
+    {
+        const char dat1[] = "var abc=extract";
+        const char dat2[] = "// just a comment\n";
+        const char exp1[] = "var abc=extract";
+        const char exp2[] = "tract";
+
+        NORM_LIMITED(5, dat1, dat2, exp1, exp2);
     }
 }

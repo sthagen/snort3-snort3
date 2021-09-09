@@ -34,6 +34,7 @@
 #include "stream/stream.h"
 
 #include "dns_module.h"
+#include "dns_splitter.h"
 
 using namespace snort;
 
@@ -965,10 +966,6 @@ static void snort_dns(Packet* p)
 
         if ( !Stream::is_stream_sequenced(p->flow, SSN_DIR_FROM_CLIENT) )
             return;
-
-        // If we're waiting on stream reassembly, don't process this packet.
-        if ( p->packet_flags & PKT_STREAM_INSERT )
-            return;
     }
 
     // Get the direction of the packet.
@@ -1012,6 +1009,7 @@ public:
     Dns(DnsModule*);
 
     void eval(Packet*) override;
+    StreamSplitter* get_splitter(bool) override;
 };
 
 Dns::Dns(DnsModule*)
@@ -1025,6 +1023,11 @@ void Dns::eval(Packet* p)
 
     ++dnsstats.packets;
     snort_dns(p);
+}
+
+StreamSplitter* Dns::get_splitter(bool c2s)
+{
+    return new DnsSplitter(c2s);
 }
 
 //-------------------------------------------------------------------------

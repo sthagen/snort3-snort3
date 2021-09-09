@@ -8,7 +8,7 @@ Snort 3 Upgrade Manual
 The Snort Team
 
 Revision History
-Revision 3.1.9.0 2021-07-28 06:22:15 EDT TST
+Revision 3.1.12.0 2021-09-08 07:41:38 EDT TST
 
 ---------------------------------------------------------------------
 
@@ -965,6 +965,7 @@ change -> rate_filter: 'sig_id' ==> 'sid'
 change -> reputation: 'shared_mem' ==> 'list_dir'
 change -> sfportscan: 'proto' ==> 'protos'
 change -> sfportscan: 'scan_type' ==> 'scan_types'
+change -> sip: 'max_requestName_len' ==> 'max_request_name_len'
 change -> sip: 'ports' ==> 'bindings'
 change -> smtp: 'ports' ==> 'bindings'
 change -> ssh: 'server_ports' ==> 'bindings'

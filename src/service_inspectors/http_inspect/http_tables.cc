@@ -197,119 +197,12 @@ const StrCode HttpMsgHeadShared::transfer_encoding_list[] =
     { 0,                     nullptr }
 };
 
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_BASIC
-    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_HOST
-    { EVENT_MULTIPLE_HOST_HDRS, INF_MULTIPLE_HOST_HDRS, false, nullptr, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CASE_INSENSITIVE
-    { EVENT__NONE, INF__NONE, false, norm_to_lower, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_NUMBER
-    { EVENT_REPEATED_HEADER, INF_REPEATED_HEADER, false, norm_remove_lws, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_TOKEN_LIST
-    { EVENT__NONE, INF__NONE, false, norm_remove_lws, norm_to_lower, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_METHOD_LIST
-    { EVENT__NONE, INF__NONE, false, norm_remove_lws, nullptr, nullptr };
-
-// FIXIT-L implement a date normalization function that converts the three legal formats into a
-// single standard format. For now we do nothing special for dates. This object is a placeholder
-// to keep track of which headers have date values.
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_DATE
-    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
-
-// FIXIT-M implement a URI normalization function, probably by extending existing URI capabilities
-// to cover relative formats
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_URI
-    { EVENT__NONE, INF__NONE, false, nullptr, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CONTENT_LENGTH
-    { EVENT_MULTIPLE_CONTLEN, INF_MULTIPLE_CONTLEN, true, norm_remove_lws, nullptr, nullptr };
-
-const HeaderNormalizer HttpMsgHeadShared::NORMALIZER_CHARSET
-    { EVENT__NONE, INF__NONE, false, norm_remove_quotes_lws, norm_to_lower, nullptr };
-
-const HeaderNormalizer* const HttpMsgHeadShared::header_norms[HEAD__MAX_VALUE + MAX_CUSTOM_HEADERS + 1] = {
-    &NORMALIZER_BASIC,      // 0
-    &NORMALIZER_BASIC,      // HEAD__OTHER
-    &NORMALIZER_TOKEN_LIST, // HEAD_CACHE_CONTROL
-    &NORMALIZER_TOKEN_LIST, // HEAD_CONNECTION
-    &NORMALIZER_DATE,       // HEAD_DATE
-    &NORMALIZER_TOKEN_LIST, // HEAD_PRAGMA
-    &NORMALIZER_TOKEN_LIST, // HEAD_TRAILER
-    &NORMALIZER_BASIC,      // HEAD_COOKIE
-    &NORMALIZER_BASIC,      // HEAD_SET_COOKIE
-    &NORMALIZER_TOKEN_LIST, // HEAD_TRANSFER_ENCODING
-    &NORMALIZER_TOKEN_LIST, // HEAD_UPGRADE
-    &NORMALIZER_BASIC,      // HEAD_VIA
-    &NORMALIZER_BASIC,      // HEAD_WARNING
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT_CHARSET
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT_ENCODING
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT_LANGUAGE
-    &NORMALIZER_BASIC,      // HEAD_AUTHORIZATION
-    &NORMALIZER_CASE_INSENSITIVE, // HEAD_EXPECT
-    &NORMALIZER_BASIC,      // HEAD_FROM
-    &NORMALIZER_HOST,       // HEAD_HOST
-    &NORMALIZER_BASIC,      // HEAD_IF_MATCH
-    &NORMALIZER_DATE,       // HEAD_IF_MODIFIED_SINCE
-    &NORMALIZER_BASIC,      // HEAD_IF_NONE_MATCH
-    &NORMALIZER_BASIC,      // HEAD_IF_RANGE
-    &NORMALIZER_DATE,       // HEAD_IF_UNMODIFIED_SINCE
-    &NORMALIZER_BASIC,      // HEAD_MAX_FORWARDS
-    &NORMALIZER_BASIC,      // HEAD_PROXY_AUTHORIZATION
-    &NORMALIZER_BASIC,      // HEAD_RANGE
-    &NORMALIZER_URI,        // HEAD_REFERER
-    &NORMALIZER_TOKEN_LIST, // HEAD_TE
-    &NORMALIZER_BASIC,      // HEAD_USER_AGENT
-    &NORMALIZER_TOKEN_LIST, // HEAD_ACCEPT_RANGES
-    &NORMALIZER_NUMBER,     // HEAD_AGE
-    &NORMALIZER_BASIC,      // HEAD_ETAG
-    &NORMALIZER_URI,        // HEAD_LOCATION
-    &NORMALIZER_BASIC,      // HEAD_PROXY_AUTHENTICATE
-    &NORMALIZER_BASIC,      // HEAD_RETRY_AFTER, may be date or number
-    &NORMALIZER_BASIC,      // HEAD_SERVER
-    &NORMALIZER_TOKEN_LIST, // HEAD_VARY
-    &NORMALIZER_BASIC,      // HEAD_WWW_AUTHENTICATE
-    &NORMALIZER_METHOD_LIST, // HEAD_ALLOW
-    &NORMALIZER_TOKEN_LIST, // HEAD_CONTENT_ENCODING
-    &NORMALIZER_TOKEN_LIST, // HEAD_CONTENT_LANGUAGE
-    &NORMALIZER_CONTENT_LENGTH, // HEAD_CONTENT_LENGTH
-    &NORMALIZER_URI,        // HEAD_CONTENT_LOCATION
-    &NORMALIZER_BASIC,      // HEAD_CONTENT_MD5
-    &NORMALIZER_BASIC,      // HEAD_CONTENT_RANGE
-    &NORMALIZER_CHARSET,    // HEAD_CONTENT_TYPE
-    &NORMALIZER_DATE,       // HEAD_EXPIRES
-    &NORMALIZER_DATE,       // HEAD_LAST_MODIFIED
-    &NORMALIZER_BASIC,      // HEAD_X_FORWARDED_FOR
-    &NORMALIZER_BASIC,      // HEAD_TRUE_CLIENT_IP
-    &NORMALIZER_BASIC,      // HEAD_X_WORKING_WITH
-    &NORMALIZER_TOKEN_LIST, // HEAD_CONTENT_TRANSFER_ENCODING
-    &NORMALIZER_BASIC,      // HEAD_MIME_VERSION
-    &NORMALIZER_BASIC,      // HEAD_PROXY_AGENT
-    &NORMALIZER_BASIC,      // HEAD_CONTENT_DISPOSITION
-    &NORMALIZER_TOKEN_LIST, // HEAD_HTTP2_SETTINGS
-    &NORMALIZER_BASIC,      // HEAD__MAX_VALUE
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-    &NORMALIZER_BASIC,      // HEAD_CUSTOM_XFF_HEADER
-};
-
 const RuleMap HttpModule::http_events[] =
 {
     { EVENT_ASCII,                      "ascii encoding" },
     { EVENT_DOUBLE_DECODE,              "double decoding attack" },
     { EVENT_U_ENCODE,                   "u encoding" },
     { EVENT_BARE_BYTE,                  "bare byte unicode encoding" },
-    // { EVENT_OBSOLETE_BASE_36,           "obsolete event--deleted" },
     { EVENT_UTF_8,                      "UTF-8 encoding" },
     { EVENT_CODE_POINT_IN_URI,          "unicode map code point encoding in URI" },
     { EVENT_MULTI_SLASH,                "multi_slash encoding" },
@@ -320,34 +213,22 @@ const RuleMap HttpModule::http_events[] =
     { EVENT_LF_WITHOUT_CR,              "HTTP header line terminated by LF without a CR" },
     { EVENT_NON_RFC_CHAR,               "non-RFC defined char" },
     { EVENT_OVERSIZE_DIR,               "oversize request-uri directory" },
-    // { EVENT_LARGE_CHUNK,                "oversize chunk encoding" },
-    // { EVENT_PROXY_USE,                  "unauthorized proxy use detected" },
+    { EVENT_LARGE_CHUNK,                "oversize chunk encoding" },
     { EVENT_WEBROOT_DIR,                "webroot directory traversal" },
     { EVENT_LONG_HDR,                   "long header" },
     { EVENT_MAX_HEADERS,                "max header fields" },
     { EVENT_MULTIPLE_CONTLEN,           "multiple content length" },
-    // { EVENT_OBSOLETE_CHUNK_SIZE_MISMATCH, "obsolete event--deleted" },
-    // { EVENT_INVALID_TRUEIP,             "invalid IP in true-client-IP/XFF header" },
     { EVENT_MULTIPLE_HOST_HDRS,         "Host header field appears more than once or has multiple "
                                         "values" },
-    // { EVENT_LONG_HOSTNAME,              "hostname exceeds 255 characters" },
-    // { EVENT_EXCEEDS_SPACES,             "too much whitespace in header (not implemented yet)" },
-    // { EVENT_CONSECUTIVE_SMALL_CHUNKS,   "client consecutive small chunk sizes" },
+    { EVENT_LONG_HOSTNAME,              "Host header value is too long" },
     { EVENT_UNBOUNDED_POST,             "POST or PUT w/o content-length or chunks" },
-    // { EVENT_MULTIPLE_TRUEIP_IN_SESSION, "multiple true ips in a session" },
-    // { EVENT_BOTH_TRUEIP_XFF_HDRS,       "both true-client-IP and XFF hdrs present" },
     { EVENT_UNKNOWN_METHOD,             "unknown method" },
     { EVENT_SIMPLE_REQUEST,             "simple request" },
     { EVENT_UNESCAPED_SPACE_URI,        "unescaped space in HTTP URI" },
     { EVENT_PIPELINE_MAX,               "too many pipelined requests" },
-    // { EVENT_OBSOLETE_ANOM_SERVER,       "obsolete event--deleted" },
     { EVENT_INVALID_STATCODE,           "invalid status code in HTTP response" },
-    // { EVENT_UNUSED_1,                   "unused event number--should not appear" },
     { EVENT_UTF_NORM_FAIL,              "HTTP response has UTF charset that failed to normalize" },
     { EVENT_UTF7,                       "HTTP response has UTF-7 charset" },
-    // { EVENT_DECOMPR_FAILED,             "HTTP response gzip decompression failed" },
-    // { EVENT_CONSECUTIVE_SMALL_CHUNKS_S, "server consecutive small chunk sizes" },
-    // { EVENT_UNUSED_2,                   "unused event number--should not appear" },
     { EVENT_JS_OBFUSCATION_EXCD,        "javascript obfuscation levels exceeds 1" },
     { EVENT_JS_EXCESS_WS,               "javascript whitespaces exceeds max allowed" },
     { EVENT_MIXED_ENCODINGS,            "multiple encodings within javascript obfuscated data" },
@@ -432,6 +313,10 @@ const RuleMap HttpModule::http_events[] =
     { EVENT_JS_CLOSING_TAG,             "unexpected script closing tag in JavaScript" },
     { EVENT_JS_CODE_IN_EXTERNAL,        "JavaScript code under the external script tags" },
     { EVENT_JS_SHORTENED_TAG,           "script opening tag in a short form" },
+    { EVENT_JS_IDENTIFIER_OVERFLOW,     "max number of unique JavaScript identifiers reached" },
+    { EVENT_JS_TMPL_NEST_OVFLOW,        "JavaScript template literal nesting is over capacity" },
+    { EVENT_ACCEPT_ENCODING_CONSECUTIVE_COMMAS, "Consecutive commas in HTTP Accept-Encoding "
+                                        "header" },
     { 0, nullptr }
 };
 
@@ -471,6 +356,9 @@ const PegInfo HttpModule::peg_names[PEG_COUNT_MAX+1] =
     { CountType::SUM, "js_inline_scripts", "total number of inline JavaScripts processed" },
     { CountType::SUM, "js_external_scripts", "total number of external JavaScripts processed" },
     { CountType::SUM, "js_bytes", "total number of JavaScript bytes processed" },
+    { CountType::SUM, "js_identifiers", "total number of unique JavaScript identifiers processed" },
+    { CountType::SUM, "js_identifier_overflows", "total number of unique JavaScript identifier "
+        "limit overflows" },
     { CountType::END, nullptr, nullptr }
 };
 

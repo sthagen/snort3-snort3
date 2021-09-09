@@ -299,9 +299,9 @@ ExpectCache::~ExpectCache()
 
 /**Either expect or expect future session.
  *
- * Preprocessors may add sessions to be expected altogether or to be associated
- * with some data. For example, FTP preprocessor may add data channel that
- * should be expected. Alternatively, FTP preprocessor may add session with
+ * Inspectors may add sessions to be expected altogether or to be associated
+ * with some data. For example, FTP inspector may add data channel that
+ * should be expected. Alternatively, FTP inspector may add session with
  * snort protocol ID FTP-DATA.
  *
  * It is assumed that only one of cliPort or srvPort should be known (!0). This
@@ -310,14 +310,15 @@ ExpectCache::~ExpectCache()
  * therefore acceptable design optimization.
  *
  * Also, snort_protocol_id is assumed to be consistent between different
- * preprocessors.  Each session can be assigned only one snort protocol ID.
+ * inspectors.  Each session can be assigned only one snort protocol ID.
  * When new snort_protocol_id mismatches existing snort_protocol_id, new
  * snort_protocol_id and associated data is not stored.
  *
  */
 int ExpectCache::add_flow(const Packet *ctrlPkt, PktType type, IpProtocol ip_proto,
     const SfIp* cliIP, uint16_t cliPort, const SfIp* srvIP, uint16_t srvPort, char direction,
-    FlowData* fd, SnortProtocolId snort_protocol_id, bool swap_app_direction, bool expect_multi)
+    FlowData* fd, SnortProtocolId snort_protocol_id, bool swap_app_direction, bool expect_multi,
+    bool bidirectional)
 {
     /* Just pull the VLAN ID, MPLS ID, and Address Space ID from the
         control packet until we have a use case for not doing so. */
@@ -395,6 +396,10 @@ int ExpectCache::add_flow(const Packet *ctrlPkt, PktType type, IpProtocol ip_pro
             unsigned flag = 0;
             if (expect_multi)
                 flag |= DAQ_EFLOW_ALLOW_MULTIPLE;
+
+            if (bidirectional)
+                flag |= DAQ_EFLOW_BIDIRECTIONAL;
+
             ctrlPkt->daq_instance->add_expected(ctrlPkt, cliIP, cliPort, srvIP, srvPort,
                     ip_proto, 1000, flag);
         }

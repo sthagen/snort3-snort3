@@ -25,8 +25,8 @@
 #include "http_common.h"
 #include "http_enum.h"
 #include "http_field.h"
-#include "http_header_normalizer.h"
 #include "http_msg_section.h"
+#include "http_normalized_header.h"
 #include "http_str_to_code.h"
 
 //-------------------------------------------------------------------------
@@ -38,11 +38,11 @@ class HttpMsgHeadShared : public HttpMsgSection
 public:
     void analyze() override;
 
-    const Field& get_classic_raw_header();
     const Field& get_classic_raw_cookie();
     const Field& get_classic_norm_header();
     const Field& get_classic_norm_cookie();
     const Field& get_header_value_raw(HttpEnums::HeaderId header_id) const;
+    const Field& get_all_header_values_raw(HttpEnums::HeaderId header_id);
     const Field& get_header_value_norm(HttpEnums::HeaderId header_id);
     int get_header_count(HttpEnums::HeaderId header_id) const;
 
@@ -77,22 +77,6 @@ protected:
 private:
     static const int MAX = HttpEnums::HEAD__MAX_VALUE + HttpEnums::MAX_CUSTOM_HEADERS;
 
-    // Header normalization strategies. There should be one defined for every different way we can
-    // process a header field value.
-    static const HeaderNormalizer NORMALIZER_BASIC;
-    static const HeaderNormalizer NORMALIZER_HOST;
-    static const HeaderNormalizer NORMALIZER_CASE_INSENSITIVE;
-    static const HeaderNormalizer NORMALIZER_NUMBER;
-    static const HeaderNormalizer NORMALIZER_TOKEN_LIST;
-    static const HeaderNormalizer NORMALIZER_METHOD_LIST;
-    static const HeaderNormalizer NORMALIZER_DATE;
-    static const HeaderNormalizer NORMALIZER_URI;
-    static const HeaderNormalizer NORMALIZER_CONTENT_LENGTH;
-    static const HeaderNormalizer NORMALIZER_CHARSET;
-
-    // Master table of known header fields and their normalization strategies.
-    static const HeaderNormalizer* const header_norms[];
-
     // All of these are indexed by the relative position of the header field in the message
     static const int MAX_HEADERS = 200;  // I'm an arbitrary number. FIXIT-RC
     static const int MAX_HEADER_LENGTH = 4096; // Based on max cookie size of some browsers
@@ -102,6 +86,7 @@ private:
     void parse_header_lines();
     void create_norm_head_list();
     void derive_header_name_id(int index);
+    const Field& get_classic_raw_header();
 
     Field classic_raw_header;    // raw headers with cookies spliced out
     Field classic_norm_header;   // URI normalization applied
@@ -111,16 +96,6 @@ private:
     HttpEnums::HeaderId* header_name_id = nullptr;
     Field* header_value = nullptr;
 
-    struct NormalizedHeader
-    {
-        NormalizedHeader(NormalizedHeader* next_, int32_t count_, HttpEnums::HeaderId id_) :
-            next(next_), count(count_), id(id_) {}
-
-        Field norm;
-        NormalizedHeader* next;
-        int32_t count;
-        const HttpEnums::HeaderId id;
-    };
     NormalizedHeader* get_header_node(HttpEnums::HeaderId k) const;
     NormalizedHeader* norm_heads = nullptr;
 

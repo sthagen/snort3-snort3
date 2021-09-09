@@ -126,6 +126,7 @@ int SipUdpClientDetector::validate(AppIdDiscoveryArgs& args)
     return APPID_INPROCESS;
 }
 
+#ifndef SIP_UNIT_TEST
 SipTcpClientDetector::SipTcpClientDetector(ClientDiscovery* cdm)
 {
     handler = cdm;
@@ -180,7 +181,7 @@ void SipServiceDetector::createRtpFlow(AppIdSession& asd, const Packet* pkt, con
 {
     AppIdSession* fp = AppIdSession::create_future_session(
         pkt, cliIp, cliPort, srvIp, srvPort, protocol,
-        asd.config.snort_proto_ids[PROTO_INDEX_SIP]);
+        asd.config.snort_proto_ids[PROTO_INDEX_SIP], false, true);
 
     if ( fp )
     {
@@ -199,7 +200,7 @@ void SipServiceDetector::createRtpFlow(AppIdSession& asd, const Packet* pkt, con
 
     AppIdSession* fp2 = AppIdSession::create_future_session(
         pkt, cliIp, cliPort + 1, srvIp, srvPort + 1, protocol,
-        asd.config.snort_proto_ids[PROTO_INDEX_SIP]);
+        asd.config.snort_proto_ids[PROTO_INDEX_SIP], false, true);
 
     if ( fp2 )
     {
@@ -234,8 +235,6 @@ void SipServiceDetector::addFutureRtpFlows(SipEvent& event, AppIdSession& asd)
     {
         createRtpFlow(asd, event.get_packet(), media_a->get_address(), media_a->get_port(),
             media_b->get_address(), media_b->get_port(), IpProtocol::UDP);
-        createRtpFlow(asd, event.get_packet(), media_b->get_address(), media_b->get_port(),
-            media_a->get_address(), media_b->get_port(), IpProtocol::UDP);
 
         media_a = session_a->next_media_data();
         media_b = session_b->next_media_data();
@@ -308,6 +307,7 @@ int SipServiceDetector::validate(AppIdDiscoveryArgs& args)
 }
 
 SipUdpClientDetector* SipEventHandler::client = nullptr;
+#endif
 SipServiceDetector* SipEventHandler::service = nullptr;
 
 void SipEventHandler::handle(DataEvent& event, Flow* flow)
@@ -330,7 +330,7 @@ void SipEventHandler::handle(DataEvent& event, Flow* flow)
         IpProtocol protocol = p->is_tcp() ? IpProtocol::TCP : IpProtocol::UDP;
         AppidSessionDirection direction = p->is_from_client() ? APP_ID_FROM_INITIATOR : APP_ID_FROM_RESPONDER;
         asd = AppIdSession::allocate_session(p, protocol, direction, inspector,
-            inspector.get_ctxt().get_odp_ctxt());
+            *pkt_thread_odp_ctxt);
     }
     if (!asd->get_session_flags(APPID_SESSION_DISCOVER_APP | APPID_SESSION_SPECIAL_MONITORED))
         return;
@@ -400,6 +400,7 @@ success:
         client->add_user(asd, fd->user_name.c_str(), APP_ID_SIP, true, change_bits);
 }
 
+#ifndef SIP_UNIT_TEST
 void SipEventHandler::service_handler(SipEvent& sip_event, AppIdSession& asd,
     AppidChangeBits& change_bits)
 {
@@ -449,4 +450,5 @@ void SipEventHandler::service_handler(SipEvent& sip_event, AppIdSession& asd,
         }
     }
 }
+#endif
 

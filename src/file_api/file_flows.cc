@@ -198,7 +198,6 @@ FileContext* FileFlows::find_main_file_context(FilePosition pos, FileDirection d
     }
 
     context = new FileContext;
-    context->set_processing_flow(flow);
     main_context = context;
     context->check_policy(flow, dir, file_policy);
 
@@ -255,8 +254,6 @@ FileContext* FileFlows::get_file_context(
         else
         {
             context = new FileContext;
-            context->set_processing_flow(flow);
-
             partially_processed_contexts[multi_file_processing_id] = context;
             FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
                 "get_file_context:creating new context\n"); 
@@ -431,7 +428,7 @@ bool FileFlows::file_process(Packet* p, const uint8_t* file_data, int data_size,
  *    false: ignore this file
  */
 bool FileFlows::set_file_name(const uint8_t* fname, uint32_t name_size, uint64_t file_id,
-    uint64_t multi_file_processing_id)
+    uint64_t multi_file_processing_id, const uint8_t* url, uint32_t url_size)
 {
     FileContext* context;
     if (file_id)
@@ -440,6 +437,9 @@ bool FileFlows::set_file_name(const uint8_t* fname, uint32_t name_size, uint64_t
         context = get_current_file_context();
     if ( !context )
         return false;
+
+    if ( !context->is_url_set() )
+        context->set_url((const char*)url, url_size);
 
     if ( !context->is_file_name_set() )
     {

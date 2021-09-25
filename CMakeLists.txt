@@ -3,7 +3,7 @@ project (snort CXX C)
 
 set (VERSION_MAJOR 3)
 set (VERSION_MINOR 1)
-set (VERSION_PATCH 12)
+set (VERSION_PATCH 13)
 set (VERSION_SUBLEVEL 0)
 set (VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_SUBLEVEL}")
 
@@ -57,8 +57,11 @@ include_directories (${PROJECT_SOURCE_DIR})
 
 if (ENABLE_UNIT_TESTS)
     include(CTest)
-    add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND})
 endif (ENABLE_UNIT_TESTS)
+
+if (ENABLE_UNIT_TESTS OR ENABLE_BENCHMARK_TESTS)
+    add_custom_target (check COMMAND ${CMAKE_CTEST_COMMAND})
+endif (ENABLE_UNIT_TESTS OR ENABLE_BENCHMARK_TESTS)
 
 add_subdirectory (src)
 add_subdirectory (tools)

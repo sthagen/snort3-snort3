@@ -383,10 +383,15 @@ const StreamBuffer Http2StreamSplitter::implement_reassemble(Http2FlowData* sess
     unsigned total, unsigned offset, const uint8_t* data, unsigned len, uint32_t flags,
     HttpCommon::SourceId source_id)
 {
-    assert(offset+len <= total);
-    assert(total <= MAX_OCTETS);
 
     StreamBuffer frame_buf { nullptr, 0 };
+
+    if ( offset+len > total || total != session_data->bytes_scanned[source_id])
+    {
+         assert(false);
+         session_data->abort_flow[source_id] = true;
+         return frame_buf;
+    }
 
     if (session_data->frame_type[source_id] == FT_DATA)
     {
@@ -419,7 +424,7 @@ const StreamBuffer Http2StreamSplitter::implement_reassemble(Http2FlowData* sess
             // Skip frame header
             if (session_data->read_frame_header[source_id])
             {
-               
+
                 const uint32_t remaining_frame_header = FRAME_HEADER_LENGTH -
                      session_data->frame_header_offset[source_id];
                 const uint32_t octets_to_skip = remaining_frame_header > len - data_offset ?
@@ -527,6 +532,7 @@ const StreamBuffer Http2StreamSplitter::implement_reassemble(Http2FlowData* sess
             // but don't create pkt_data buffer
             frame_buf.data = (const uint8_t*)"";
         }
+        session_data->bytes_scanned[source_id] = 0;
     }
 
     return frame_buf;

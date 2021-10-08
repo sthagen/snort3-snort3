@@ -232,9 +232,9 @@ So, the following whitespace codes will be normalized:
  * Also including new-line and carriage-return line-break characters
 
 All JavaScript identifier names will be substituted to unified names with the
-following format: a0 -> z9999. So, the number of unique identifiers available
-is 260000 names per HTTP transaction. If Normalizer overruns the configured
-limit, built-in alert generated. Additionaly, there is a config option to
+following format: var_0000 -> var_ffff. So, the number of unique identifiers available
+is 65536 names per HTTP transaction. If Normalizer overruns the configured
+limit, built-in alert is generated. Additionally, there is a config option to
 specify the limit manually:
  * http_inspect.js_norm_identifier_depth.
 
@@ -427,12 +427,12 @@ Verbosity levels:
 5. Parser states (debug build only)
 6. Input stream states (debug build only)
 
-* trace.module.http_inspect.js_dump dumps script data from processing layers.
+* trace.module.http_inspect.js_dump dumps JavaScript data from processing layers.
 +
 Verbosity levels:
 +
-1. script_data buffer as it is being passed to detection (available in release build)
-2. Current normalized script (available in release build)
+1. js_data buffer as it is being passed to detection (available in release build)
+2. (no messages available currently)
 3. Payload passed to Normalizer (available in release build)
 4. Temporary buffer (debug build only)
 5. Matched token (debug build only)

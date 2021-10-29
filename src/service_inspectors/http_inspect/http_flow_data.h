@@ -170,6 +170,8 @@ private:
         HttpCommon::STAT_NOT_PRESENT };
     int64_t detect_depth_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
         HttpCommon::STAT_NOT_PRESENT };
+    int64_t js_norm_depth_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
+        HttpCommon::STAT_NOT_PRESENT };
     int32_t publish_depth_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
         HttpCommon::STAT_NOT_PRESENT };
     uint64_t expected_trans_num[2] = { 1, 1 };
@@ -218,7 +220,8 @@ private:
 
     void reset_js_ident_ctx();
     snort::JSNormalizer& acquire_js_ctx(int32_t ident_depth, size_t norm_depth,
-        uint8_t max_template_nesting);
+        uint8_t max_template_nesting, uint32_t max_scope_depth,
+        const std::unordered_set<std::string>& built_in_ident);
     void release_js_ctx();
 
     bool cutover_on_clear = false;

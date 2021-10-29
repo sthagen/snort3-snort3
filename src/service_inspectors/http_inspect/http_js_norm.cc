@@ -44,11 +44,15 @@ static const char* jsret_codes[] =
     "bad token",
     "identifier overflow",
     "template nesting overflow",
+    "scope nesting overflow",
+    "wrong closing symbol",
+    "ended in inner scope",
     "unknown"
 };
 
 static const char* ret2str(JSTokenizer::JSRet ret)
 {
+    assert(ret < JSTokenizer::JSRet::MAX);
     ret = ret < JSTokenizer::JSRet::MAX ? ret : JSTokenizer::JSRet::MAX;
     return jsret_codes[ret];
 }
@@ -76,11 +80,14 @@ static inline JSTokenizer::JSRet js_normalize(JSNormalizer& ctx, const char* con
 }
 
 HttpJsNorm::HttpJsNorm(const HttpParaList::UriParam& uri_param_, int64_t normalization_depth_,
-    int32_t identifier_depth_, uint8_t max_template_nesting_) :
+    int32_t identifier_depth_, uint8_t max_template_nesting_, uint32_t max_scope_depth_,
+    const std::unordered_set<std::string>& built_in_ident_) :
     uri_param(uri_param_),
     normalization_depth(normalization_depth_),
     identifier_depth(identifier_depth_),
     max_template_nesting(max_template_nesting_),
+    max_scope_depth(max_scope_depth_),
+    built_in_ident(built_in_ident_),
     mpse_otag(nullptr),
     mpse_attr(nullptr),
     mpse_type(nullptr)
@@ -128,8 +135,8 @@ void HttpJsNorm::configure()
     configure_once = true;
 }
 
-void HttpJsNorm::enhanced_external_normalize(const Field& input, Field& output,
-    HttpInfractions* infractions, HttpFlowData* ssn) const
+void HttpJsNorm::enhanced_external_normalize(const Field& input,
+    HttpInfractions* infractions, HttpFlowData* ssn, char*& out_buf, size_t& out_len) const
 {
     if (ssn->js_built_in_event)
         return;
@@ -150,7 +157,8 @@ void HttpJsNorm::enhanced_external_normalize(const Field& input, Field& output,
             "script continues\n");
 
 
-    auto& js_ctx = ssn->acquire_js_ctx(identifier_depth, normalization_depth, max_template_nesting);
+    auto& js_ctx = ssn->acquire_js_ctx(identifier_depth, normalization_depth, max_template_nesting,
+        max_scope_depth, built_in_ident);
 
     while (ptr < end)
     {
@@ -176,6 +184,8 @@ void HttpJsNorm::enhanced_external_normalize(const Field& input, Field& output,
             ssn->js_built_in_event = true;
             break;
         case JSTokenizer::BAD_TOKEN:
+        case JSTokenizer::WRONG_CLOSING_SYMBOL:
+        case JSTokenizer::ENDED_IN_INNER_SCOPE:
             *infractions += INF_JS_BAD_TOKEN;
             events->create_event(EVENT_JS_BAD_TOKEN);
             ssn->js_built_in_event = true;
@@ -187,8 +197,9 @@ void HttpJsNorm::enhanced_external_normalize(const Field& input, Field& output,
             ssn->js_built_in_event = true;
             break;
         case JSTokenizer::TEMPLATE_NESTING_OVERFLOW:
-            *infractions += INF_JS_TMPL_NEST_OVFLOW;
-            events->create_event(EVENT_JS_TMPL_NEST_OVFLOW);
+        case JSTokenizer::SCOPE_NESTING_OVERFLOW:
+            *infractions += INF_JS_SCOPE_NEST_OVFLOW;
+            events->create_event(EVENT_JS_SCOPE_NEST_OVFLOW);
             ssn->js_built_in_event = true;
             break;
         default:
@@ -201,20 +212,19 @@ void HttpJsNorm::enhanced_external_normalize(const Field& input, Field& output,
     }
 
     auto result = js_ctx.get_script();
-    auto script_ptr = result.first;
+    out_buf = result.first;
 
-    if (script_ptr)
+    if (out_buf)
     {
-        auto script_len = result.second;
-        output.set(script_len, reinterpret_cast<const uint8_t*>(script_ptr), true);
+        out_len = result.second;
 
         trace_logf(1, http_trace, TRACE_JS_DUMP, nullptr,
-            "js_data[%zu]: %.*s\n", script_len, static_cast<int>(script_len), script_ptr);
+            "js_data[%zu]: %.*s\n", out_len, static_cast<int>(out_len), out_buf);
     }
 }
 
-void HttpJsNorm::enhanced_inline_normalize(const Field& input, Field& output,
-    HttpInfractions* infractions, HttpFlowData* ssn) const
+void HttpJsNorm::enhanced_inline_normalize(const Field& input,
+    HttpInfractions* infractions, HttpFlowData* ssn, char*& out_buf, size_t& out_len) const
 {
     const char* ptr = (const char*)input.start();
     const char* const end = ptr + input.length();
@@ -270,7 +280,8 @@ void HttpJsNorm::enhanced_inline_normalize(const Field& input, Field& output,
                 HttpModule::increment_peg_counts(PEG_JS_INLINE);
         }
 
-        auto& js_ctx = ssn->acquire_js_ctx(identifier_depth, normalization_depth, max_template_nesting);
+        auto& js_ctx = ssn->acquire_js_ctx(identifier_depth, normalization_depth,
+            max_template_nesting, max_scope_depth, built_in_ident);
         auto output_size_before = js_ctx.peek_script_size();
 
         auto ret = js_normalize(js_ctx, end, ptr);
@@ -293,6 +304,8 @@ void HttpJsNorm::enhanced_inline_normalize(const Field& input, Field& output,
             events->create_event(EVENT_JS_CLOSING_TAG);
             break;
         case JSTokenizer::BAD_TOKEN:
+        case JSTokenizer::WRONG_CLOSING_SYMBOL:
+        case JSTokenizer::ENDED_IN_INNER_SCOPE:
             *infractions += INF_JS_BAD_TOKEN;
             events->create_event(EVENT_JS_BAD_TOKEN);
             break;
@@ -302,8 +315,9 @@ void HttpJsNorm::enhanced_inline_normalize(const Field& input, Field& output,
             events->create_event(EVENT_JS_IDENTIFIER_OVERFLOW);
             break;
         case JSTokenizer::TEMPLATE_NESTING_OVERFLOW:
-            *infractions += INF_JS_TMPL_NEST_OVFLOW;
-            events->create_event(EVENT_JS_TMPL_NEST_OVFLOW);
+        case JSTokenizer::SCOPE_NESTING_OVERFLOW:
+            *infractions += INF_JS_SCOPE_NEST_OVFLOW;
+            events->create_event(EVENT_JS_SCOPE_NEST_OVFLOW);
             break;
         default:
             assert(false);
@@ -324,15 +338,14 @@ void HttpJsNorm::enhanced_inline_normalize(const Field& input, Field& output,
 
     auto js_ctx = ssn->js_normalizer;
     auto result = js_ctx->get_script();
-    auto script_ptr = result.first;
+    out_buf = result.first;
 
-    if (script_ptr)
+    if (out_buf)
     {
-        auto script_len = result.second;
-        output.set(script_len, (const uint8_t*)script_ptr, true);
+        out_len = result.second;
 
         trace_logf(1, http_trace, TRACE_JS_DUMP, nullptr,
-            "js_data[%zu]: %.*s\n", script_len, static_cast<int>(script_len), script_ptr);
+            "js_data[%zu]: %.*s\n", out_len, static_cast<int>(out_len), out_buf);
     }
 
     if (!script_continue)

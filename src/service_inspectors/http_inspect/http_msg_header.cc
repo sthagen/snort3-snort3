@@ -449,6 +449,7 @@ void HttpMsgHeader::prepare_body()
     const int64_t& depth = (source_id == SRC_CLIENT) ? params->request_depth :
         params->response_depth;
     session_data->detect_depth_remaining[source_id] = (depth != -1) ? depth : INT64_MAX;
+    session_data->js_norm_depth_remaining[source_id] = session_data->detect_depth_remaining[source_id];
     if ((source_id == SRC_CLIENT) and params->publish_request_body and session_data->for_http2)
     {
         session_data->publish_octets[source_id] = 0;
@@ -665,7 +666,8 @@ void HttpMsgHeader::setup_file_decompression()
     session_data->fd_state->Modes =
         (params->decompress_pdf ? FILE_PDF_DEFL_BIT : 0) |
         (params->decompress_swf ? (FILE_SWF_ZLIB_BIT | FILE_SWF_LZMA_BIT) : 0) |
-        (params->decompress_zip ? FILE_ZIP_DEFL_BIT : 0);
+        (params->decompress_zip ? FILE_ZIP_DEFL_BIT : 0) |
+        (params->decompress_vba ? FILE_VBA_EXTR_BIT : 0);
     session_data->fd_state->Alert_Callback = HttpMsgBody::fd_event_callback;
     session_data->fd_state->Alert_Context = &session_data->fd_alert_context;
     session_data->fd_state->Compr_Depth = 0;

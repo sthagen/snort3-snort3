@@ -50,68 +50,11 @@
 
 #define EXEC(f) { auto r = (f); if (r) { BEGIN(regst); return r; } }
 #define EEOF(f) { auto r = (f); if (r) { if (r != SCRIPT_CONTINUE) BEGIN(regst); return r; } }
+constexpr bool JSTokenizer::insert_semicolon[ASI_GROUP_MAX][ASI_GROUP_MAX];
 %}
 
 /* The following grammar was created based on ECMAScript specification */
 /* source https://ecma-international.org/ecma-262/5.1/ */
-
-/* whitespaces */
-/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.2 */
-TAB            \x9
-VT             \xB
-FF             \xC
-SP             \x20
-NBSP           \xA0
-BOM            \xEF\xBB\xBF
-WHITESPACES    {TAB}|{VT}|{FF}|{SP}|{NBSP}|{BOM}
-
-/* single char escape sequences */
-/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.8.4 */
-NUL                      \x0
-BS                       \x8
-HT                       \x9
-CHAR_ESCAPE_SEQUENCES    {NUL}|{BS}|{HT}
-
-/* line terminators */
-/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.3 */
-LF                  \xA
-CR                  \xD
-LS                  \xE2\x80\xA8
-PS                  \xE2\x80\xA9
-LINE_TERMINATORS    {LF}|{CR}|{LS}|{PS}
-
-/* comments */
-/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.4 */
-LINE_COMMENT_START   "//"
-LINE_COMMENT_END1    [^<\xA\xD]*\xA
-LINE_COMMENT_END2    [^<\xA\xD]*\xD
-LINE_COMMENT_END3    [^<\xA\xD]*"<"+(?i:script)
-LINE_COMMENT_END4    [^<\xA\xD]*"<"+(?i:\/script>)
-LINE_COMMENT_SKIP    [^<\xA\xD]*"<"?
-BLOCK_COMMENT_START  "/*"
-BLOCK_COMMENT_END1   [^<*]*"*"+"/"
-BLOCK_COMMENT_END2   [^<*]*"<"+(?i:script)
-BLOCK_COMMENT_END3   [^<*]*"<"+(?i:\/script>)
-BLOCK_COMMENT_SKIP   [^<*]*[<*]?
-
-/* directives */
-/* according to https://ecma-international.org/ecma-262/5.1/#sec-14.1 */
-USE_STRICT_DIRECTIVE    "\"use strict\""|"\'use strict\'"
-USE_STRICT_DIRECTIVE_SC "\"use strict\"";*|"\'use strict\'";*
-
-/* keywords */
-/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.6.1.1 */
-KEYWORD    break|case|debugger|in|import|protected|do|else|function|try|implements|static|instanceof|new|this|class|let|typeof|var|with|enum|private|catch|continue|default|extends|public|finally|for|if|super|yield|return|switch|throw|const|interface|void|while|delete|export|package
-
-/* punctuators */
-/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.7 */
-CLOSING_BRACES             ")"|"]"
-OPEN_BRACKET               "{"
-CLOSE_BRACKET              "}"
-PUNCTUATOR                 "("|"["|">="|"=="|"!="|"==="|"!=="|"."|";"|","|"<"|">"|"<="|"<<"|">>"|">>>"|"&"|"|"|"^"|"!"|"&&"|"||"|"?"|":"|"="|"+="|"-="|"*="|"%="|"<<="|">>="|">>>="|"&="|"|="|"^="|"~"
-OPERATOR                   "+"|"-"|"*"|"++"|"--"|"%"
-DIV_OPERATOR               "/"
-DIV_ASSIGNMENT_OPERATOR    "/="
 
 /* Unicode letter ranges (categories Lu, Ll, Lt, Lm, Lo and Nl) */
 /* generated with unicode_range_generator.l */
@@ -878,6 +821,78 @@ UNICODE_ZWJ     \xE2\x80\x8D
 /* according to https://ecma-international.org/ecma-262/5.1/#sec-7.8.4 (escape sequence) */
 UNICODE_ESCAPE_SEQUENCE    \\u[0-9a-fA-F]{4}
 
+/* whitespaces */
+/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.2 */
+TAB            \x9
+VT             \xB
+FF             \xC
+SP             \x20
+NBSP           \xA0
+BOM            \xEF\xBB\xBF
+WHITESPACES    {TAB}|{VT}|{FF}|{SP}|{NBSP}|{BOM}
+
+/* single char escape sequences */
+/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.8.4 */
+NUL                      \x0
+BS                       \x8
+HT                       \x9
+CHAR_ESCAPE_SEQUENCES    {NUL}|{BS}|{HT}
+
+/* line terminators */
+/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.3 */
+LF                  \xA
+CR                  \xD
+LS                  \xE2\x80\xA8
+PS                  \xE2\x80\xA9
+LINE_TERMINATORS    {LF}|{CR}|{LS}|{PS}
+
+/* comments */
+/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.4 */
+LINE_COMMENT_START   "//"
+LINE_COMMENT_END1    [^<\xA\xD]*\xA
+LINE_COMMENT_END2    [^<\xA\xD]*\xD
+LINE_COMMENT_END3    [^<\xA\xD]*"<"+(?i:script)
+LINE_COMMENT_END4    [^<\xA\xD]*"<"+(?i:\/script>)
+LINE_COMMENT_SKIP    [^<\xA\xD]*"<"?
+BLOCK_COMMENT_START  "/*"
+BLOCK_COMMENT_END1   [^<*\xA\xD]*"*"+"/"
+BLOCK_COMMENT_END2   [^<*\xA\xD]*"<"+(?i:script)
+BLOCK_COMMENT_END3   [^<*\xA\xD]*"<"+(?i:\/script>)
+BLOCK_COMMENT_LINE1  [^<*\xA\xD]*\xA
+BLOCK_COMMENT_LINE2  [^<*\xA\xD]*\xD
+BLOCK_COMMENT_SKIP   [^<*\xA\xD]*[<*]?
+
+/* directives */
+/* according to https://ecma-international.org/ecma-262/5.1/#sec-14.1 */
+USE_STRICT_DIRECTIVE    "\"use strict\""|"\'use strict\'"
+USE_STRICT_DIRECTIVE_SC "\"use strict\"";*|"\'use strict\'";*
+
+/* keywords */
+/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.6.1.1 */
+/* keywords that can appear at the begining or the end of Statement*/
+KEYWORD_BA break|continue|debugger|return
+/* keywords that can appear at the beginning of Statement*/
+KEYWORD_B  delete|do|for|function|if|new|switch|throw|try|typeof|var|void|while|with
+/* keywords that can not appear at the beginning or the end of Statement*/
+KEYWORD_OTHER    case|catch|class|const|default|else|enum|export|extends|finally|implements|import|in|instanceof|interface|let|package|private|protected|public|static|super|yield
+
+/* punctuators */
+/* according to https://ecma-international.org/ecma-262/5.1/#sec-7.7 */
+OPEN_BRACE                 "{"
+CLOSE_BRACE                "}"
+OPEN_PARENTHESIS           "("
+CLOSE_PARENTHESIS          ")"
+OPEN_BRACKET               "["
+CLOSE_BRACKET              "]"
+DOT_ACCESSOR               "."
+PUNCTUATOR_PREFIX          "~"|"!"
+PUNCTUATOR                 ">="|"=="|"!="|"==="|"!=="|";"|","|"<"|">"|"<="|"<<"|">>"|">>>"|"&"|"|"|"^"|"&&"|"||"|"?"|":"|"="|"+="|"-="|"*="|"%="|"<<="|">>="|">>>="|"&="|"|="|"^="
+OPERATOR_PREFIX            "+"|"-"
+OPERATOR_INCR_DECR         "--"|"++"
+OPERATOR                   "*"|"%"
+DIV_OPERATOR               "/"
+DIV_ASSIGNMENT_OPERATOR    "/="
+
 /* identifiers */
 /* according to https://ecma-international.org/ecma-262/5.1/#sec-7.6 */
 IDENTIFIER_START    [_$]|({UNICODE_LETTER})|{UNICODE_ESCAPE_SEQUENCE}
@@ -887,6 +902,7 @@ IDENTIFIER          ({IDENTIFIER_START}{IDENTIFIER_PART})*
 /* literals */
 /* according to https://ecma-international.org/ecma-262/5.1/#sec-7.8 */
 LITERAL_NULL                  null
+LITERAL_THIS                  this
 LITERAL_BOOLEAN               true|false
 LITERAL_DECIMAL               [.]?[0-9]+[\.]?[0-9]*[eE]?[0-9]*
 LITERAL_HEX_INTEGER           0x[0-9a-fA-F]*|0X[0-9a-fA-F]*
@@ -910,7 +926,7 @@ LITERAL_REGEX_SKIP            \\\/
 LITERAL_UNDEFINED             undefined
 LITERAL_INFINITY              Infinity|\xE2\x88\x9E
 LITERAL_NAN                   NaN
-LITERAL                       {LITERAL_NULL}|{LITERAL_BOOLEAN}|{LITERAL_DECIMAL}|{LITERAL_HEX_INTEGER}|{LITERAL_UNDEFINED}|{LITERAL_INFINITY}|{LITERAL_NAN}
+LITERAL                       {LITERAL_NULL}|{LITERAL_THIS}|{LITERAL_BOOLEAN}|{LITERAL_DECIMAL}|{LITERAL_HEX_INTEGER}|{LITERAL_UNDEFINED}|{LITERAL_INFINITY}|{LITERAL_NAN}
 
 HTML_COMMENT_OPEN         "<"+"!--"
 HTML_TAG_SCRIPT_OPEN      "<"+(?i:script)
@@ -949,15 +965,15 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 %%
 {WHITESPACES}                       { }
 {CHAR_ESCAPE_SEQUENCES}             { }
-{LINE_TERMINATORS}                  { BEGIN(regst); }
+{LINE_TERMINATORS}                  { BEGIN(regst); newline_found = true; }
 
 <INITIAL,regex,dqstr,regst,sqstr,divop>{HTML_TAG_SCRIPT_OPEN} { BEGIN(regst); return OPENING_TAG; }
-{HTML_TAG_SCRIPT_CLOSE}             { BEGIN(regst); return SCRIPT_ENDED; }
+{HTML_TAG_SCRIPT_CLOSE}             { BEGIN(regst); if (!global_scope()) return ENDED_IN_INNER_SCOPE; else return SCRIPT_ENDED; }
 
        {HTML_COMMENT_OPEN}          { BEGIN(lcomm); }
        {LINE_COMMENT_START}         { BEGIN(lcomm); }
-<lcomm>{LINE_COMMENT_END1}          { BEGIN(regst); }
-<lcomm>{LINE_COMMENT_END2}          { BEGIN(regst); }
+<lcomm>{LINE_COMMENT_END1}          { BEGIN(regst); newline_found = true; }
+<lcomm>{LINE_COMMENT_END2}          { BEGIN(regst); newline_found = true; }
 <lcomm>{LINE_COMMENT_END3}          { BEGIN(regst); return OPENING_TAG; }
 <lcomm>{LINE_COMMENT_END4}          { BEGIN(regst); return CLOSING_TAG; }
 <lcomm>{LINE_COMMENT_SKIP}          { }
@@ -967,10 +983,12 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <bcomm>{BLOCK_COMMENT_END1}         { BEGIN(regst); }
 <bcomm>{BLOCK_COMMENT_END2}         { BEGIN(regst); return OPENING_TAG; }
 <bcomm>{BLOCK_COMMENT_END3}         { BEGIN(regst); return CLOSING_TAG; }
+<bcomm>{BLOCK_COMMENT_LINE1}        |
+<bcomm>{BLOCK_COMMENT_LINE2}        { newline_found = true;}
 <bcomm>{BLOCK_COMMENT_SKIP}         { }
 <bcomm><<EOF>>                      { states_apply(); return SCRIPT_CONTINUE; }
 
-       {LITERAL_DQ_STRING_START}    { EXEC(do_spacing(LITERAL)) ECHO; BEGIN(dqstr); }
+       {LITERAL_DQ_STRING_START}    { do_semicolon_insertion(ASI_GROUP_7); EXEC(do_spacing(LITERAL)) ECHO; BEGIN(dqstr); set_ident_norm(true); }
 <dqstr>{LITERAL_DQ_STRING_END}      { ECHO; BEGIN(divop); }
 <dqstr>{HTML_TAG_SCRIPT_CLOSE}      { BEGIN(regst); return CLOSING_TAG; }
 <dqstr>\\{CR}{LF}                   { }
@@ -981,7 +999,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <dqstr>{LITERAL_DQ_STRING_TEXT}     { ECHO; }
 <dqstr><<EOF>>                      { states_apply(); return SCRIPT_CONTINUE; }
 
-       {LITERAL_SQ_STRING_START}    { EXEC(do_spacing(LITERAL)) ECHO; BEGIN(sqstr); }
+       {LITERAL_SQ_STRING_START}    { do_semicolon_insertion(ASI_GROUP_7); EXEC(do_spacing(LITERAL)) ECHO; BEGIN(sqstr); set_ident_norm(true); }
 <sqstr>{LITERAL_SQ_STRING_END}      { ECHO; BEGIN(divop); }
 <sqstr>{HTML_TAG_SCRIPT_CLOSE}      { BEGIN(regst); return CLOSING_TAG; }
 <sqstr>\\{CR}{LF}                   { }
@@ -992,10 +1010,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <sqstr>{LITERAL_SQ_STRING_TEXT}     { ECHO; }
 <sqstr><<EOF>>                      { states_apply(); return SCRIPT_CONTINUE; }
 
-{OPEN_BRACKET}                      { if (!bracket_depth.empty()) bracket_depth.top()++; process_punctuator(); }
-{CLOSE_BRACKET}                     { process_closing_bracket(); }
-
-       {LITERAL_TEMPLATE_START}                  { EXEC(do_spacing(LITERAL)) ECHO; BEGIN(tmpll); }
+       {LITERAL_TEMPLATE_START}                  { do_semicolon_insertion(ASI_GROUP_7); EXEC(do_spacing(LITERAL)) ECHO; BEGIN(tmpll); set_ident_norm(true); }
 <tmpll>(\\\\)*{LITERAL_TEMPLATE_END}             { ECHO; BEGIN(divop); }
 <tmpll>(\\\\)*{LITERAL_TEMPLATE_SUBST_START}     { EXEC(process_subst_open()) }
 <tmpll>{HTML_TAG_SCRIPT_CLOSE}                   { BEGIN(regst); return CLOSING_TAG; }
@@ -1004,7 +1019,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <tmpll>{LITERAL_TEMPLATE_OTHER}                  { ECHO; }
 <tmpll><<EOF>>                                   { return SCRIPT_CONTINUE; }
 
-<regst>{LITERAL_REGEX_START}        { EXEC(do_spacing(LITERAL)) yyout << '/'; states_correct(1); yyless(1); BEGIN(regex); }
+<regst>{LITERAL_REGEX_START}        { do_semicolon_insertion(ASI_GROUP_7); EXEC(do_spacing(LITERAL)) yyout << '/'; states_correct(1); yyless(1); BEGIN(regex); set_ident_norm(true); }
 <regex>{LITERAL_REGEX_END}          { ECHO; BEGIN(divop); }
 <regex>{HTML_TAG_SCRIPT_CLOSE}      { BEGIN(regst); return CLOSING_TAG; }
 <regex>{LITERAL_REGEX_SKIP}         { ECHO; }
@@ -1015,19 +1030,33 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <regex><<EOF>>                      { states_apply(); return SCRIPT_CONTINUE; }
 
 <divop>{DIV_OPERATOR}               |
-<divop>{DIV_ASSIGNMENT_OPERATOR}    { ECHO; token = PUNCTUATOR; BEGIN(INITIAL); }
+<divop>{DIV_ASSIGNMENT_OPERATOR}    { previous_group = ASI_OTHER; ECHO; token = PUNCTUATOR; BEGIN(INITIAL); set_ident_norm(true); }
 
-{CLOSING_BRACES}                    { ECHO; token = PUNCTUATOR; BEGIN(divop); }
-{PUNCTUATOR}                        { process_punctuator(); }
+{OPEN_BRACE}                        { do_semicolon_insertion(ASI_GROUP_1); EXEC(scope_push(BRACES)) if (!brace_depth.empty()) brace_depth.top()++; process_punctuator(); }
+{CLOSE_BRACE}                       { do_semicolon_insertion(ASI_GROUP_2); EXEC(scope_pop(BRACES)) process_closing_brace(); set_ident_norm(true); }
+{OPEN_PARENTHESIS}                  { do_semicolon_insertion(ASI_GROUP_3); EXEC(scope_push(PARENTHESES)) if (token == IDENTIFIER || token == CLOSING_BRACKET || token == KEYWORD) set_func_call(true); process_punctuator(); }
+{CLOSE_PARENTHESIS}                 { do_semicolon_insertion(ASI_GROUP_5); bool f_call = func_call(); bool id_norm = ident_norm(); EXEC(scope_pop(PARENTHESES)) if (!f_call) set_ident_norm(id_norm); ECHO; token = PUNCTUATOR; BEGIN(divop); }
+{OPEN_BRACKET}                      { do_semicolon_insertion(ASI_GROUP_3); do_semicolon_insertion(ASI_GROUP_4); EXEC(scope_push(BRACKETS)) process_punctuator(); }
+{CLOSE_BRACKET}                     { do_semicolon_insertion(ASI_GROUP_4); EXEC(scope_pop(BRACKETS)) ECHO; token = CLOSING_BRACKET; BEGIN(divop); }
 
-{USE_STRICT_DIRECTIVE}              { EXEC(do_spacing(DIRECTIVE)) ECHO; BEGIN(INITIAL); yyout << ';'; }
-{USE_STRICT_DIRECTIVE_SC}           { EXEC(do_spacing(DIRECTIVE)) ECHO; BEGIN(INITIAL); }
-{KEYWORD}                           { EXEC(do_spacing(KEYWORD)) ECHO; BEGIN(regst); }
-{OPERATOR}                          { EXEC(do_operator_spacing(OPERATOR)) ECHO; BEGIN(divop); }
-{LITERAL}                           { EXEC(do_spacing(LITERAL)) ECHO; BEGIN(divop); }
-{IDENTIFIER}                        { if (unescape(YYText())) { EXEC(do_spacing(IDENTIFIER)) EXEC(do_identifier_substitution(YYText())) } BEGIN(divop); }
+{PUNCTUATOR_PREFIX}                 { do_semicolon_insertion(ASI_GROUP_10); process_punctuator(); set_ident_norm(true); }
+{DOT_ACCESSOR}                      { previous_group = ASI_OTHER; ECHO; token = DOT; BEGIN(regst); }
+{PUNCTUATOR}                        { previous_group = ASI_OTHER; process_punctuator(); set_ident_norm(true); }
 
-.|{ALL_UNICODE}                     { ECHO; token = UNDEFINED; BEGIN(INITIAL); }
+{USE_STRICT_DIRECTIVE}              { previous_group = ASI_OTHER; EXEC(do_spacing(DIRECTIVE)) ECHO; BEGIN(INITIAL); yyout << ';'; set_ident_norm(true); }
+{USE_STRICT_DIRECTIVE_SC}           { previous_group = ASI_OTHER; EXEC(do_spacing(DIRECTIVE)) ECHO; BEGIN(INITIAL); set_ident_norm(true); }
+
+{KEYWORD_B}                         { do_semicolon_insertion(ASI_GROUP_10); if (token != DOT) set_ident_norm(true); EXEC(do_spacing(KEYWORD)) ECHO; BEGIN(regst); }
+{KEYWORD_BA}                        { do_semicolon_insertion(ASI_GROUP_9); if (token != DOT) set_ident_norm(true); EXEC(do_spacing(KEYWORD)) ECHO; BEGIN(regst); }
+{KEYWORD_OTHER}                     { previous_group = ASI_OTHER; if (token != DOT) set_ident_norm(true); EXEC(do_spacing(KEYWORD)) ECHO; BEGIN(regst); }
+
+{OPERATOR_PREFIX}                   { do_semicolon_insertion(ASI_GROUP_6); EXEC(do_operator_spacing(OPERATOR)) ECHO; BEGIN(divop); set_ident_norm(true); }
+{OPERATOR_INCR_DECR}                { do_semicolon_insertion(ASI_GROUP_8); EXEC(do_operator_spacing(OPERATOR)) ECHO; BEGIN(divop); set_ident_norm(true); }
+{OPERATOR}                          { previous_group = ASI_OTHER; EXEC(do_operator_spacing(OPERATOR)) ECHO; BEGIN(divop); set_ident_norm(true); }
+{LITERAL}                           { do_semicolon_insertion(ASI_GROUP_7); EXEC(do_spacing(LITERAL)) ECHO; BEGIN(divop); set_ident_norm(true); }
+{IDENTIFIER}                        { do_semicolon_insertion(ASI_GROUP_7); if (unescape(YYText())) { bool id_part = (token == DOT); EXEC(do_spacing(IDENTIFIER)) EXEC(do_identifier_substitution(YYText(), id_part)) } BEGIN(divop); }
+
+.|{ALL_UNICODE}                     { previous_group = ASI_OTHER; ECHO; token = UNDEFINED; BEGIN(INITIAL); set_ident_norm(true); }
 <<EOF>>                             { EEOF(eval_eof()) }
 
 %%
@@ -1110,14 +1139,16 @@ static std::string unescape_unicode(const char* lexeme)
 
 JSTokenizer::JSTokenizer(std::istream& in, std::ostream& out,
     JSIdentifierCtxBase& mapper, uint8_t max_template_nesting,
-    char*& buf, size_t& buf_size, int cap_size)
+    uint32_t max_scope_depth, char*& buf, size_t& buf_size, int cap_size)
     : yyFlexLexer(in, out),
       max_template_nesting(max_template_nesting),
       ident_ctx(mapper),
       tmp_buf(buf),
       tmp_buf_size(buf_size),
-      tmp_cap_size(cap_size)
+      tmp_cap_size(cap_size),
+      max_scope_depth(max_scope_depth)
 {
+    scope_push(GLOBAL);
     BEGIN(regst);
 }
 
@@ -1160,7 +1191,6 @@ JSTokenizer::JSRet JSTokenizer::eval_eof()
 
     // Normal termination
     states_apply();
-
     return SCRIPT_CONTINUE;
 }
 
@@ -1171,6 +1201,8 @@ JSTokenizer::JSRet JSTokenizer::do_spacing(JSToken cur_token)
     case PUNCTUATOR:
     case OPERATOR:
     case DIRECTIVE:
+    case DOT:
+    case CLOSING_BRACKET:
     case UNDEFINED:
         token = cur_token;
         return EOS;
@@ -1197,6 +1229,8 @@ JSTokenizer::JSRet JSTokenizer::do_operator_spacing(JSToken cur_token)
     case PUNCTUATOR:
     case LITERAL:
     case DIRECTIVE:
+    case DOT:
+    case CLOSING_BRACKET:
     case UNDEFINED:
         token = cur_token;
         return EOS;
@@ -1212,23 +1246,54 @@ JSTokenizer::JSRet JSTokenizer::do_operator_spacing(JSToken cur_token)
     return BAD_TOKEN;
 }
 
-JSTokenizer::JSRet JSTokenizer::do_identifier_substitution(const char* lexeme)
+JSTokenizer::JSRet JSTokenizer::do_identifier_substitution(const char* lexeme, bool id_part)
 {
+    if (!ident_norm() && id_part)
+    {
+        yyout << lexeme;
+        return EOS;
+    }
+    else
+        set_ident_norm(true);
+
+    if (ident_ctx.built_in(lexeme) && !id_part)
+    {
+        set_ident_norm(false);
+        return do_identifier_substitution(lexeme, true);
+    }
+
     const char* ident = ident_ctx.substitute(lexeme);
 
-    if (ident)
+    if (!ident)
     {
         debug_logf(6, http_trace, TRACE_JS_DUMP, nullptr,
-            "'%s' => '%s'\n", lexeme, ident);
+            "'%s' => IDENTIFIER_OVERFLOW\n", lexeme);
 
-        yyout << ident;
-        return EOS;
+        return IDENTIFIER_OVERFLOW;
     }
 
     debug_logf(6, http_trace, TRACE_JS_DUMP, nullptr,
-        "'%s' => IDENTIFIER_OVERFLOW\n", lexeme);
+        "'%s' => '%s'\n", lexeme, ident);
 
-    return IDENTIFIER_OVERFLOW;
+    yyout << ident;
+    return EOS;
+}
+
+void JSTokenizer::do_semicolon_insertion(ASIGroup current)
+{
+    assert(current >= 0 and current < ASI_GROUP_MAX);
+    if (newline_found)
+    {
+        newline_found = false;
+        if (insert_semicolon[previous_group][current])
+        {
+            yyout << ';';
+            previous_group = ASI_OTHER;
+            token = PUNCTUATOR;
+            return;
+        }
+    }
+    previous_group = current;
 }
 
 bool JSTokenizer::unescape(const char* lexeme)
@@ -1239,7 +1304,6 @@ bool JSTokenizer::unescape(const char* lexeme)
         switch_to_temporal(unescaped_lex);
         return false;
     }
-
     return true;
 }
 
@@ -1250,15 +1314,15 @@ void JSTokenizer::process_punctuator()
     BEGIN(regst);
 }
 
-void JSTokenizer::process_closing_bracket()
+void JSTokenizer::process_closing_brace()
 {
-    if (!bracket_depth.empty())
+    if (!brace_depth.empty())
     {
-        if (bracket_depth.top())
-            bracket_depth.top()--;
+        if (brace_depth.top())
+            brace_depth.top()--;
         else
         {
-            bracket_depth.pop();
+            brace_depth.pop();
             ECHO;
             BEGIN(tmpll);
             return;
@@ -1269,13 +1333,13 @@ void JSTokenizer::process_closing_bracket()
 
 JSTokenizer::JSRet JSTokenizer::process_subst_open()
 {
-    if (bracket_depth.size() >= max_template_nesting)
+    if (brace_depth.size() >= max_template_nesting)
         return TEMPLATE_NESTING_OVERFLOW;
-    bracket_depth.push(0);
+    brace_depth.push(0);
     token = PUNCTUATOR;
     ECHO;
     BEGIN(divop);
-    return EOS;
+    return scope_push(BRACES);
 }
 
 void JSTokenizer::states_push()
@@ -1328,4 +1392,78 @@ void JSTokenizer::states_apply()
     delete[] tmp_buf;
     tmp_buf = buf;
     tmp_buf_size = tail_size;
+
+    // Reverse traversal over buffer to adjust scope stack before the next PDU buffer starts
+    bool is_tmpl = false;
+    const char* c = tmp_buf + tmp_buf_size;
+    const char* const s = tmp_buf;
+    while (c-- > s)
+    {
+        switch (*c)
+        {
+        case '{': scope_pop(BRACES); if (is_tmpl) brace_depth.pop(); break;
+        case '}': scope_push(BRACES); if (is_tmpl) brace_depth.push(0); break;
+        case '(': scope_pop(PARENTHESES); break;
+        case ')':
+        {
+            bool id_norm = ident_norm();
+            scope_push(PARENTHESES);
+            if (!id_norm)
+                set_func_call(true);
+            break;
+        }
+        case '[': scope_pop(BRACKETS); break;
+        case ']': scope_push(BRACKETS); break;
+        case '`': is_tmpl = !is_tmpl; break;
+        }
+    }
+}
+
+JSTokenizer::JSRet JSTokenizer::scope_push(ScopeType t)
+{
+    if (scope_stack.size() > max_scope_depth)
+        return SCOPE_NESTING_OVERFLOW;
+
+    scope_stack.emplace(t);
+    return EOS;
+}
+
+JSTokenizer::JSRet JSTokenizer::scope_pop(ScopeType t)
+{
+    if (t != scope_cur().type)
+        return WRONG_CLOSING_SYMBOL;
+
+    scope_stack.pop();
+    return EOS;
+}
+
+JSTokenizer::Scope& JSTokenizer::scope_cur()
+{
+    assert(!scope_stack.empty());
+    return scope_stack.top();
+}
+
+bool JSTokenizer::global_scope()
+{
+    return scope_cur().type == GLOBAL;
+}
+
+void JSTokenizer::set_ident_norm(bool f)
+{
+    scope_cur().ident_norm = f;
+}
+
+bool JSTokenizer::ident_norm()
+{
+    return scope_cur().ident_norm;
+}
+
+void JSTokenizer::set_func_call(bool f)
+{
+    scope_cur().func_call = f;
+}
+
+bool JSTokenizer::func_call()
+{
+    return scope_cur().func_call;
 }

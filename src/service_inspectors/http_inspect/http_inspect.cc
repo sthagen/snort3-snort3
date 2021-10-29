@@ -133,8 +133,7 @@ HttpInspect::HttpInspect(const HttpParaList* params_) :
 
 bool HttpInspect::configure(SnortConfig* )
 {
-    if ( params->js_norm_param.js_norm )
-        params->js_norm_param.js_norm->configure();
+    params->js_norm_param.js_norm->configure();
 
     return true;
 }
@@ -147,6 +146,10 @@ void HttpInspect::show(const SnortConfig*) const
     auto bad_chars = GetBadChars(params->uri_param.bad_characters);
     auto xff_headers = GetXFFHeaders(params->xff_headers);
 
+    std::string js_built_in_ident;
+    for (auto s : params->js_norm_param.built_in_ident)
+        js_built_in_ident += s + " ";
+
     ConfigLogger::log_limit("request_depth", params->request_depth, -1LL);
     ConfigLogger::log_limit("response_depth", params->response_depth, -1LL);
     ConfigLogger::log_flag("unzip", params->unzip);
@@ -154,15 +157,17 @@ void HttpInspect::show(const SnortConfig*) const
     ConfigLogger::log_flag("decompress_pdf", params->decompress_pdf);
     ConfigLogger::log_flag("decompress_swf", params->decompress_swf);
     ConfigLogger::log_flag("decompress_zip", params->decompress_zip);
+    ConfigLogger::log_flag("decompress_vba", params->decompress_vba);
     ConfigLogger::log_flag("script_detection", params->script_detection);
     ConfigLogger::log_flag("normalize_javascript", params->js_norm_param.normalize_javascript);
     ConfigLogger::log_value("max_javascript_whitespaces",
         params->js_norm_param.max_javascript_whitespaces);
-    ConfigLogger::log_value("js_normalization_depth",
-        params->js_norm_param.js_normalization_depth);
+    ConfigLogger::log_value("js_normalization_depth", params->js_norm_param.js_normalization_depth);
     ConfigLogger::log_value("js_norm_identifier_depth", params->js_norm_param.js_identifier_depth);
-    ConfigLogger::log_value("js_norm_max_tmpl_nest",
-        params->js_norm_param.max_template_nesting);
+    ConfigLogger::log_value("js_norm_max_tmpl_nest", params->js_norm_param.max_template_nesting);
+    ConfigLogger::log_value("js_norm_max_scope_depth", params->js_norm_param.max_scope_depth);
+    if (!js_built_in_ident.empty())
+        ConfigLogger::log_list("js_norm_built_in_ident", js_built_in_ident.c_str());
     ConfigLogger::log_value("bad_characters", bad_chars.c_str());
     ConfigLogger::log_value("ignore_unreserved", unreserved_chars.c_str());
     ConfigLogger::log_flag("percent_u", params->uri_param.percent_u);
@@ -242,6 +247,12 @@ bool HttpInspect::get_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffe
     case InspectionBuffer::IBT_COOKIE:
         return get_buf(HTTP_BUFFER_COOKIE, p , b);
 
+    case InspectionBuffer::IBT_VBA:
+        return get_buf(BUFFER_VBA_DATA, p, b);
+
+    case InspectionBuffer::IBT_JS_DATA:
+        return get_buf(BUFFER_JS_DATA, p, b);
+
     default:
         return false;
     }
@@ -296,6 +307,8 @@ bool HttpInspect::get_fp_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBu
             return false;
         break;
     case InspectionBuffer::IBT_BODY:
+    case InspectionBuffer::IBT_VBA:
+    case InspectionBuffer::IBT_JS_DATA:
         if ((get_latest_is(p) != IS_FIRST_BODY) && (get_latest_is(p) != IS_BODY))
             return false;
         break;
@@ -451,15 +464,23 @@ void HttpInspect::eval(Packet* p)
     const SourceId source_id = p->is_from_client() ? SRC_CLIENT : SRC_SERVER;
 
     HttpFlowData* session_data = http_get_flow_data(p->flow);
+    if (session_data == nullptr)
+    {
+        assert(false);
+        return;
+    }
 
     if (!session_data->for_http2)
         HttpModule::increment_peg_counts(PEG_TOTAL_BYTES, p->dsize);
 
-    // FIXIT-E Workaround for unexpected eval() calls. Convert to asserts when possible.
+    // FIXIT-M Workaround for unexpected eval() calls. Convert to asserts when possible.
     if ((session_data->section_type[source_id] == SEC__NOT_COMPUTE) ||
         (session_data->type_expected[source_id] == SEC_ABORT)       ||
         (session_data->octets_reassembled[source_id] != p->dsize))
     {
+        // assert(session_data->type_expected[source_id] != SEC_ABORT);
+        // assert(session_data->section_type[source_id] != SEC__NOT_COMPUTE);
+        // assert(session_data->octets_reassembled[source_id] == p->dsize);
         session_data->type_expected[source_id] = SEC_ABORT;
         return;
     }
@@ -596,8 +617,11 @@ void HttpInspect::clear(Packet* p)
 
     HttpFlowData* const session_data = http_get_flow_data(p->flow);
 
-    if ( session_data == nullptr )
+    if (session_data == nullptr)
+    {
+        // assert(false); // FIXIT-M something wrong with H2I Push Promise triggers this.
         return;
+    }
 
     Http2FlowData* h2i_flow_data = nullptr;
     if (Http2FlowData::inspector_id != 0)
@@ -615,18 +639,19 @@ void HttpInspect::clear(Packet* p)
     else
         current_section = HttpContextData::clear_snapshot(p->context);
 
-    // FIXIT-M This test is necessary because sometimes we get extra clears
-    // Convert to assert when that gets fixed.
     if ( current_section == nullptr )
+    {
+        // assert(false); // FIXIT-M this happens a lot
         return;
+    }
 
     current_section->clear();
     HttpTransaction* current_transaction = current_section->get_transaction();
 
     const SourceId source_id = current_section->get_source_id();
 
-    //FIXIT-M This check may not apply to the transaction attached to the packet
-    //in case of offload.
+    // FIXIT-M This check may not apply to the transaction attached to the packet
+    // in case of offload.
     if (session_data->detection_status[source_id] == DET_DEACTIVATING)
     {
         if (source_id == SRC_CLIENT)

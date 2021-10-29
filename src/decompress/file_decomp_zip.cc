@@ -120,6 +120,12 @@ fd_status_t File_Decomp_End_ZIP(fd_session_t* SessionPtr)
     if ( SessionPtr->ZIP->State == ZIP_STATE_INFLATE )
         Inflate_End(SessionPtr);
 
+    if (SessionPtr->ZIP->file_name)
+    {
+        delete[] SessionPtr->ZIP->file_name;
+        SessionPtr->ZIP->file_name = nullptr;
+    }
+
     if ( SessionPtr->ZIP->header_searcher )
     {
         delete SessionPtr->ZIP->header_searcher;
@@ -168,6 +174,12 @@ fd_status_t File_Decomp_ZIP(fd_session_t* SessionPtr)
                 parser->compressed_size = 0;
                 parser->filename_length = 0;
                 parser->extra_length = 0;
+
+                if (parser->file_name)
+                {
+                    delete[] parser->file_name;
+                    parser->file_name = nullptr;
+                }
 
                 // reset decompression progress
                 parser->progress = 0;
@@ -266,7 +278,7 @@ fd_status_t File_Decomp_ZIP(fd_session_t* SessionPtr)
             byte = *SessionPtr->Next_In;
             parser->filename_length |= byte << (parser->Index * 8);
             break;
-        // extra length
+        //extra length
         case ZIP_STATE_EXTRALEN:
             // check if we are done with the extra length
             if ( parser->Index == parser->Length )
@@ -274,15 +286,51 @@ fd_status_t File_Decomp_ZIP(fd_session_t* SessionPtr)
                 // read the extra length, reset the index
                 parser->Index = 0;
 
-                // skip the filename and extra fields
+                // read the filename next
+                if (parser->file_name == nullptr and parser->filename_length > 0)
+                    parser->file_name = new char[parser->filename_length + 1];
+
+                parser->State = ZIP_STATE_FILENAME;
+                parser->Length = parser->filename_length;
+                continue;
+            }
+            // read the extra length
+            byte = *SessionPtr->Next_In;
+            parser->extra_length |= byte << (parser->Index * 8);
+            break;
+
+        // filename
+        case ZIP_STATE_FILENAME:
+            // check if we are done with filename
+            if ( parser->Index == parser->Length )
+            {
+                // read the extra length, reset the index
+                parser->Index = 0;
+                if (parser->file_name)
+                {
+                    parser->file_name[parser->filename_length] = '\0';
+                }
+
+                //skip the extra fields
                 parser->State = ZIP_STATE_SKIP;
-                parser->Length = parser->filename_length + parser->extra_length;
+                parser->Length = parser->extra_length;
 
                 if ( (SessionPtr->Avail_Out > 0) && (parser->method == 8) )
                 {
                     // we have available output space and
                     // the compression type is deflate (8),
                     // land on the compressed stream, init zlib
+                    //If the filename ends with vbaProject.bin, then
+                    //the file has vbaMacros.
+
+                    if (( parser->filename_length >= MACRO_BINNAME_LEN )and (parser->file_name)and (strcmp(
+                        parser->file_name + parser->filename_length - MACRO_BINNAME_LEN,
+                        macro_binname)==0))
+                    {
+                        parser->Next = ZIP_STATE_OLE_FILE;
+                        parser->Next_Length = 0;
+                        continue;
+                    }
                     parser->Next = ZIP_STATE_INFLATE_INIT;
                     parser->Next_Length = 0;
                     continue;
@@ -305,10 +353,16 @@ fd_status_t File_Decomp_ZIP(fd_session_t* SessionPtr)
                 parser->Next_Length = 4;
                 continue;
             }
-            // read the extra length
-            byte = *SessionPtr->Next_In;
-            parser->extra_length |= byte << (parser->Index * 8);
+
+            //read the filename
+            if (parser->file_name && parser->Index < parser->filename_length)
+                parser->file_name[parser->Index] = (char)*SessionPtr->Next_In;
             break;
+
+        case ZIP_STATE_OLE_FILE:
+            if (SessionPtr->vba_analysis)
+                SessionPtr->ole_data_ptr = SessionPtr->Next_Out;
+        //fallthrough
         // initialize zlib inflate
         case ZIP_STATE_INFLATE_INIT:
             parser->State = ZIP_STATE_INFLATE;
@@ -316,7 +370,7 @@ fd_status_t File_Decomp_ZIP(fd_session_t* SessionPtr)
             if ( Inflate_Init(SessionPtr) == File_Decomp_Error )
                 return File_Decomp_Error;
 
-            // fallthrough
+        // fallthrough
         // perform zlib inflate
         case ZIP_STATE_INFLATE:
         {
@@ -330,6 +384,9 @@ fd_status_t File_Decomp_ZIP(fd_session_t* SessionPtr)
                 // close the inflate stream
                 return File_Decomp_Error;
             }
+
+            if (SessionPtr->ole_data_ptr)
+                SessionPtr->ole_data_len = SessionPtr->Next_Out - SessionPtr->ole_data_ptr;
 
             if ( status == File_Decomp_BlockOut )
             {
@@ -435,7 +492,7 @@ fd_status_t File_Decomp_ZIP(fd_session_t* SessionPtr)
                     parser->Index += SessionPtr->Avail_In;
 
                     uint32_t min = SessionPtr->Avail_In < SessionPtr->Avail_Out ?
-                                   SessionPtr->Avail_In : SessionPtr->Avail_Out;
+                        SessionPtr->Avail_In : SessionPtr->Avail_Out;
 
                     // copy what we can
                     Move_N(SessionPtr, min);
@@ -495,3 +552,4 @@ fd_status_t File_Decomp_ZIP(fd_session_t* SessionPtr)
 
     return File_Decomp_BlockIn;
 }
+

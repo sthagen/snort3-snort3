@@ -85,9 +85,6 @@ public:
     void set_h2_body_state(HttpCommon::SourceId source_id, HttpEnums::H2BodyState state)
     { h2_body_state[source_id] = state; }
 
-    void reset_partial_flush(HttpCommon::SourceId source_id)
-    { partial_flush[source_id] = false; }
-
     uint32_t get_h2_stream_id() const;
 
 private:
@@ -170,9 +167,9 @@ private:
         HttpCommon::STAT_NOT_PRESENT };
     int64_t detect_depth_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
         HttpCommon::STAT_NOT_PRESENT };
-    int64_t js_norm_depth_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
-        HttpCommon::STAT_NOT_PRESENT };
     int32_t publish_depth_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
+        HttpCommon::STAT_NOT_PRESENT };
+    int32_t file_decomp_buffer_size_remaining[2] = { HttpCommon::STAT_NOT_PRESENT,
         HttpCommon::STAT_NOT_PRESENT };
     uint64_t expected_trans_num[2] = { 1, 1 };
 
@@ -185,8 +182,6 @@ private:
     uint8_t* partial_detect_buffer[2] = { nullptr, nullptr };
     uint32_t partial_detect_length[2] = { 0, 0 };
     uint32_t partial_js_detect_length[2] = { 0, 0 };
-    uint8_t* js_detect_buffer[2] = { nullptr, nullptr };
-    uint32_t js_detect_length[2] = { 0, 0 };
     int32_t status_code_num = HttpCommon::STAT_NOT_PRESENT;
     HttpEnums::VersionId version_id[2] = { HttpEnums::VERS__NOT_PRESENT,
                                             HttpEnums::VERS__NOT_PRESENT };
@@ -198,6 +193,9 @@ private:
     HttpTransaction** pipeline = nullptr;
     int16_t pipeline_front = 0;
     int16_t pipeline_back = 0;
+    uint32_t pdu_idx = 0;
+    uint32_t js_pdu_idx = 0;
+    bool js_data_lost_once = false;
     bool pipeline_overflow = false;
     bool pipeline_underflow = false;
 
@@ -216,13 +214,16 @@ private:
     // *** HttpJsNorm
     JSIdentifierCtxBase* js_ident_ctx = nullptr;
     snort::JSNormalizer* js_normalizer = nullptr;
+    bool js_continue = false;
     bool js_built_in_event = false;
 
+    void reset_js_pdu_idx();
     void reset_js_ident_ctx();
     snort::JSNormalizer& acquire_js_ctx(int32_t ident_depth, size_t norm_depth,
         uint8_t max_template_nesting, uint32_t max_scope_depth,
         const std::unordered_set<std::string>& built_in_ident);
     void release_js_ctx();
+    bool is_pdu_missed();
 
     bool cutover_on_clear = false;
     bool ssl_search_abandoned = false;

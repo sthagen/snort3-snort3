@@ -65,16 +65,7 @@ Http2PushPromiseFrame::Http2PushPromiseFrame(const uint8_t* header_buffer,
 
     hpack_headers_offset += PROMISED_ID_LENGTH;
 
-    // Decode headers
-    if (!hpack_decoder->decode_headers((data.start() + hpack_headers_offset), data.length() -
-        hpack_headers_offset, start_line_generator, false))
-    {
-        if (!(*session_data->infractions[source_id] & INF_TRUNCATED_HEADER_LINE))
-        {
-            session_data->abort_flow[source_id] = true;
-            session_data->events[source_id]->create_event(EVENT_MISFORMATTED_HTTP2);
-        }
-    }
+    decode_headers(start_line_generator, false);
 }
 
 bool Http2PushPromiseFrame::valid_sequence(Http2Enums::StreamState)
@@ -158,6 +149,17 @@ uint32_t Http2PushPromiseFrame::get_promised_stream_id(Http2EventGen* const even
 
 uint8_t Http2PushPromiseFrame::get_flags_mask() const
 { return (FLAG_END_HEADERS|FLAG_PADDED); }
+
+bool Http2PushPromiseFrame::in_error_state() const
+{
+    // valid_sequence failures set error on source_id side.
+    // Header processing errors set error on client side.
+    // If client side was already in error state, valid_sequence
+    // would have failed.
+    return stream->get_state(SRC_CLIENT) == STREAM_ERROR ||
+        stream->get_state(source_id) == STREAM_ERROR;
+}
+
 
 #ifdef REG_TEST
 void Http2PushPromiseFrame::print_frame(FILE* output)

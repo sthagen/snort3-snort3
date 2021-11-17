@@ -45,28 +45,13 @@ Http2HeadersFrameTrailer::Http2HeadersFrameTrailer(const uint8_t* header_buffer,
     Http2HeadersFrame(header_buffer, header_len, data_buffer, data_len, session_data_, source_id_,
         stream_)
 {
-    if (!process_frame)
-        return;
-
     if (!(get_flags() & FLAG_END_STREAM))
     {
         // Trailers without END_STREAM flag set.
         *session_data->infractions[source_id] += INF_TRAILERS_NOT_END;
         session_data->events[source_id]->create_event(EVENT_TRAILERS_NOT_END);
     }
-
-    // Decode trailers
-    const uint32_t encoded_headers_length = (data.length() > hpack_headers_offset) ?
-        data.length() - hpack_headers_offset : 0;
-    if (!hpack_decoder->decode_headers((data.start() + hpack_headers_offset),
-        encoded_headers_length, nullptr, true))
-    {
-        if (!(*session_data->infractions[source_id] & INF_TRUNCATED_HEADER_LINE))
-        {
-            session_data->abort_flow[source_id] = true;
-            session_data->events[source_id]->create_event(EVENT_MISFORMATTED_HTTP2);
-        }
-    }
+    decode_headers(nullptr, true);
 }
 
 bool Http2HeadersFrameTrailer::valid_sequence(Http2Enums::StreamState state)
@@ -83,18 +68,16 @@ bool Http2HeadersFrameTrailer::valid_sequence(Http2Enums::StreamState state)
 
 void Http2HeadersFrameTrailer::analyze_http1()
 {
-    if (!process_frame)
-        return;
-
     HttpFlowData* const http_flow = stream->get_hi_flow_data();
     assert(http_flow);
 
+    const bool valid_headers = http1_header.length() > 0;
     if (http_flow->get_type_expected(source_id) != HttpEnums::SEC_TRAILER)
     {
         // http_inspect is not yet expecting trailers. Flush empty buffer through scan, reassemble,
         // and eval to prepare http_inspect for trailers.
         assert(http_flow->get_type_expected(source_id) == HttpEnums::SEC_BODY_H2);
-        stream->finish_msg_body(source_id, true, true); // calls http_inspect scan()
+        stream->finish_msg_body(source_id, valid_headers, true); // calls http_inspect scan()
 
         unsigned copied;
         const StreamBuffer stream_buf =
@@ -110,7 +93,7 @@ void Http2HeadersFrameTrailer::analyze_http1()
             dummy_pkt.dsize = stream_buf.length;
             dummy_pkt.data = stream_buf.data;
             session_data->hi->eval(&dummy_pkt);
-            assert (http_flow->get_type_expected(source_id) == HttpEnums::SEC_TRAILER);
+            assert (!valid_headers || http_flow->get_type_expected(source_id) == HttpEnums::SEC_TRAILER);
             if (http_flow->get_type_expected(source_id) == HttpEnums::SEC_ABORT)
             {
                 stream->set_state(source_id, STREAM_ERROR);
@@ -118,6 +101,12 @@ void Http2HeadersFrameTrailer::analyze_http1()
             }
             session_data->hi->clear(&dummy_pkt);
         }
+    }
+
+    if (!valid_headers)
+    {
+        stream->set_state(source_id, STREAM_ERROR);
+        return;
     }
 
     process_decoded_headers(http_flow, source_id);

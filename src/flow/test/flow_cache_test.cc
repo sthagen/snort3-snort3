@@ -1,4 +1,4 @@
-
+//--------------------------------------------------------------------------
 // Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,7 +30,6 @@
 #include "main/snort_config.h"
 #include "main/snort_debug.h"
 #include "managers/inspector_manager.h"
-#include "memory/memory_cap.h"
 #include "packet_io/active.h"
 #include "packet_tracer/packet_tracer.h"
 #include "protocols/icmp4.h"
@@ -67,6 +66,7 @@ void PacketTracer::unpause() { }
 void Active::set_drop_reason(char const*) { }
 Packet::Packet(bool) { }
 Packet::~Packet() = default;
+uint32_t Packet::get_flow_geneve_vni() const { return 0; }
 Flow::Flow() { memset(this, 0, sizeof(*this)); }
 Flow::~Flow() = default;
 DetectionEngine::DetectionEngine() = default;
@@ -98,12 +98,6 @@ SfIpRet SfIp::set(void const*, int) { return SFIP_SUCCESS; }
 void snort::trace_vprintf(const char*, TraceLevel, const char*, const Packet*, const char*, va_list) {}
 uint8_t snort::TraceApi::get_constraints_generation() { return 0; }
 void snort::TraceApi::filter(const Packet&) {}
-namespace memory
-{
-void MemoryCap::update_allocations(size_t) { }
-void MemoryCap::update_deallocations(size_t) { }
-bool MemoryCap::over_threshold() { return true; }
-}
 
 namespace snort
 {

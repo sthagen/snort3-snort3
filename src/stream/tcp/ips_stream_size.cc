@@ -64,18 +64,12 @@ private:
 
 uint32_t SizeOption::hash() const
 {
-    uint32_t a = ssod.op;
-    uint32_t b = ssod.min;
-    uint32_t c = ssod.max;
-
-    mix(a,b,c);
-
-    a = direction;
-    b += IpsOption::hash();
+    uint32_t a = ssod.hash();
+    uint32_t b = direction;
+    uint32_t c = IpsOption::hash();
 
     mix(a,b,c);
     finalize(a,b,c);
-
     return c;
 }
 
@@ -206,9 +200,6 @@ bool SizeModule::set(const char*, Value& v, SnortConfig*)
 
     else if ( v.is("~direction") )
         direction = v.get_uint8();
-
-    else
-        return false;
 
     return true;
 }

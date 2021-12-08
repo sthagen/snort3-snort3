@@ -50,7 +50,7 @@ static ScratchAllocator* scratcher = nullptr;
 
 static unsigned s_parse_errors = 0;
 
-SnortConfig::SnortConfig(const SnortConfig* const)
+SnortConfig::SnortConfig(const SnortConfig* const, const char*)
 {
     state = &s_state;
     num_slots = 1;
@@ -257,6 +257,7 @@ TEST(hyper_search_test_group, not_found4)
 
 int main(int argc, char** argv)
 {
+    MemoryLeakWarningPlugin::turnOffNewDeleteOverloads();
     return CommandLineTestRunner::RunAllTests(argc, argv);
 }
 

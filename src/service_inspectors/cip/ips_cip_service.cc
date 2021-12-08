@@ -62,13 +62,11 @@ private:
 
 uint32_t CipServiceOption::hash() const
 {
-    uint32_t a = cip_serv.op;
-    uint32_t b = cip_serv.min;
-    uint32_t c = cip_serv.max;
+    uint32_t a = cip_serv.hash();
+    uint32_t b = IpsOption::hash();
+    uint32_t c = 0;
 
     mix(a, b, c);
-    a += IpsOption::hash();
-
     finalize(a,b,c);
     return c;
 }
@@ -153,9 +151,7 @@ bool CipServiceModule::begin(const char*, int, SnortConfig*)
 
 bool CipServiceModule::set(const char*, Value& v, SnortConfig*)
 {
-    if ( !v.is("~range") )
-        return false;
-
+    assert(v.is("~range"));
     return cip_serv.validate(v.get_string(), RANGE);
 }
 

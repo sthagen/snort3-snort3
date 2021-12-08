@@ -1,4 +1,3 @@
-
 //--------------------------------------------------------------------------
 // Copyright (C) 2021 Cisco and/or its affiliates. All rights reserved.
 //
@@ -18,6 +17,10 @@
 //--------------------------------------------------------------------------
 // ips_vba_data.cc author Amarnath Nayak <amarnaya@cisco.com>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "ips_vba_data.h"
 
 #include "framework/module.h"
@@ -25,6 +28,9 @@
 using namespace snort;
 
 THREAD_LOCAL const Trace* vba_data_trace = nullptr;
+
+LiteralSearch::Handle* search_handle = nullptr;
+const LiteralSearch* searcher = nullptr;
 
 CursorActionType VbaDataOption::get_cursor_type() const
 { return CAT_SET_VBA; }
@@ -41,6 +47,32 @@ IpsOption::EvalStatus VbaDataOption::eval(Cursor& c, Packet* p)
     return MATCH;
 }
 
+bool VbaDataModule::end(const char*, int, SnortConfig*)
+{
+    if (!search_handle)
+        search_handle = LiteralSearch::setup();
+    
+    if (!searcher)
+        searcher = snort::LiteralSearch::instantiate(search_handle,
+            (const uint8_t*)"ATTRIBUT", 8, true);
+
+    return true;
+}
+
+VbaDataModule::~VbaDataModule()
+{
+    if (searcher)
+    {
+        delete searcher;
+        searcher = nullptr;
+    }
+
+    if (search_handle)
+    {
+        LiteralSearch::cleanup(search_handle);
+        search_handle = nullptr;
+    }
+}
 
 ProfileStats* VbaDataModule::get_profile() const
 { return &vbaDataPerfStats; }

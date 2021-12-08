@@ -80,13 +80,11 @@ private:
 
 uint32_t IcmpIdOption::hash() const
 {
-    uint32_t a = config.op;
-    uint32_t b = config.min;
-    uint32_t c = config.max;
+    uint32_t a = config.hash();
+    uint32_t b = IpsOption::hash();
+    uint32_t c = 0;
 
     mix(a,b,c);
-    a += IpsOption::hash();
-
     finalize(a,b,c);
     return c;
 }
@@ -162,9 +160,7 @@ bool IcmpIdModule::begin(const char*, int, SnortConfig*)
 
 bool IcmpIdModule::set(const char*, Value& v, SnortConfig*)
 {
-    if ( !v.is("~range") )
-        return false;
-
+    assert(v.is("~range"));
     return data.validate(v.get_string(), RANGE);
 }
 

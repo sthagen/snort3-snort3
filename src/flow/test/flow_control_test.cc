@@ -1,4 +1,4 @@
-
+//--------------------------------------------------------------------------
 // Copyright (C) 2019-2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -29,7 +29,6 @@
 #include "detection/detection_engine.h"
 #include "main/snort_config.h"
 #include "managers/inspector_manager.h"
-#include "memory/memory_cap.h"
 #include "packet_io/active.h"
 #include "packet_tracer/packet_tracer.h"
 #include "protocols/icmp4.h"
@@ -66,6 +65,7 @@ void PacketTracer::unpause() { }
 void Active::set_drop_reason(char const*) { }
 Packet::Packet(bool) { }
 Packet::~Packet() = default;
+uint32_t Packet::get_flow_geneve_vni() const { return 0; }
 FlowCache::FlowCache(const FlowCacheConfig& cfg) : config(cfg) { }
 FlowCache::~FlowCache() = default;
 Flow::Flow() = default;
@@ -98,11 +98,6 @@ ExpectCache::ExpectCache(uint32_t) { }
 bool ExpectCache::check(Packet*, Flow*) { return true; }
 bool ExpectCache::is_expected(Packet*) { return true; }
 Flow* HighAvailabilityManager::import(Packet&, FlowKey&) { return nullptr; }
-
-namespace memory
-{
-bool MemoryCap::over_threshold() { return true; }
-}
 
 namespace snort
 {

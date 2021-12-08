@@ -52,7 +52,6 @@ public:
     ~HttpFlowData() override;
     static unsigned inspector_id;
     static void init() { inspector_id = snort::FlowData::create_flow_data_id(); }
-    size_t size_of() override;
 
     friend class HttpBodyCutter;
     friend class HttpInspect;
@@ -220,7 +219,7 @@ private:
     void reset_js_pdu_idx();
     void reset_js_ident_ctx();
     snort::JSNormalizer& acquire_js_ctx(int32_t ident_depth, size_t norm_depth,
-        uint8_t max_template_nesting, uint32_t max_scope_depth,
+        uint8_t max_template_nesting, uint32_t max_bracket_depth, uint32_t max_scope_depth,
         const std::unordered_set<std::string>& built_in_ident);
     void release_js_ctx();
     bool is_pdu_missed();

@@ -62,13 +62,11 @@ private:
 
 uint32_t CipConnpathclassOption::hash() const
 {
-    uint32_t a = cip_cpc.op;
-    uint32_t b = cip_cpc.min;
-    uint32_t c = cip_cpc.max;
+    uint32_t a = cip_cpc.hash();
+    uint32_t b = IpsOption::hash();
+    uint32_t c = 0;
 
     mix(a, b, c);
-    a += IpsOption::hash();
-
     finalize(a,b,c);
     return c;
 }
@@ -149,9 +147,7 @@ bool CipConnpathclassModule::begin(const char*, int, SnortConfig*)
 
 bool CipConnpathclassModule::set(const char*, Value& v, SnortConfig*)
 {
-    if ( !v.is("~range") )
-        return false;
-
+    assert(v.is("~range"));
     return cip_cpc.validate(v.get_string(), RANGE);
 }
 

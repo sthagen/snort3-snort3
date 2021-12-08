@@ -62,13 +62,11 @@ private:
 
 uint32_t CipAttributeOption::hash() const
 {
-    uint32_t a = cip_attr.op;
-    uint32_t b = cip_attr.min;
-    uint32_t c = cip_attr.max;
+    uint32_t a = cip_attr.hash();
+    uint32_t b = IpsOption::hash();
+    uint32_t c = 0;
 
     mix(a, b, c);
-    a += IpsOption::hash();
-
     finalize(a,b,c);
     return c;
 }
@@ -149,9 +147,7 @@ bool CipAttributeModule::begin(const char*, int, SnortConfig*)
 
 bool CipAttributeModule::set(const char*, Value& v, SnortConfig*)
 {
-    if ( !v.is("~range") )
-        return false;
-
+    assert(v.is("~range"));
     return cip_attr.validate(v.get_string(), RANGE);
 }
 

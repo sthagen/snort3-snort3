@@ -57,13 +57,11 @@ private:
 
 uint32_t DsizeOption::hash() const
 {
-    uint32_t a = config.min;
-    uint32_t b = config.max;
-    uint32_t c = config.op;
+    uint32_t a = config.hash();
+    uint32_t b = IpsOption::hash();
+    uint32_t c = 0;
 
     mix(a,b,c);
-    a += IpsOption::hash();
-
     finalize(a,b,c);
     return c;
 }
@@ -136,9 +134,7 @@ bool DsizeModule::begin(const char*, int, SnortConfig*)
 
 bool DsizeModule::set(const char*, Value& v, SnortConfig*)
 {
-    if ( !v.is("~range") )
-        return false;
-
+    assert(v.is("~range"));
     return data.validate(v.get_string(), RANGE);
 }
 

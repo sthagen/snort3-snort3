@@ -18,6 +18,10 @@
 
 // file_oleheader.cc author Amarnath Nayak amarnaya@cisco.com
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "file_oleheader.h"
 
 unsigned char hdr_sig[8] = { 0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1 };
@@ -138,7 +142,7 @@ void OleHeader::set_minifat_cutoff(const uint8_t* buf)
     minifat_cutoff = (!byte_order_endian) ? LETOHL_UNALIGNED(buf) : BETOHL_UNALIGNED(buf);
 }
 
-int32_t OleHeader::get_minifat_cutoff()
+uint32_t OleHeader::get_minifat_cutoff()
 {
     return minifat_cutoff;
 }

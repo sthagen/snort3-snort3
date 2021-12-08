@@ -50,12 +50,8 @@ bool StreamFileModule::begin(const char*, int, SnortConfig*)
 
 bool StreamFileModule::set(const char*, Value& v, SnortConfig*)
 {
-    if ( v.is("upload") )
-        upload = v.get_bool();
-
-    else
-        return false;
-
+    assert(v.is("upload"));
+    upload = v.get_bool();
     return true;
 }
 

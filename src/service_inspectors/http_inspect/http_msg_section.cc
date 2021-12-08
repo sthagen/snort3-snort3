@@ -385,7 +385,7 @@ const Field& HttpMsgSection::get_classic_buffer(Cursor& c, const HttpBufferInfo&
     case BUFFER_VBA_DATA:
       {
         HttpMsgBody* msg_body = get_body();
-        if (session_data->fd_state and msg_body)
+        if (msg_body)
             return msg_body->get_decomp_vba_data(); 
         else
             return Field::FIELD_NULL;
@@ -402,6 +402,20 @@ const Field& HttpMsgSection::get_classic_buffer(Cursor& c, const HttpBufferInfo&
         assert(false);
         return Field::FIELD_NULL;
     }
+}
+
+int32_t HttpMsgSection::get_num_headers(const HttpBufferInfo& buf) const
+{
+    // buffer_side replaces source_id for buffers that support the request option
+    const SourceId buffer_side = (buf.form & FORM_REQUEST) ? SRC_CLIENT : source_id;
+
+    const HttpMsgHeadShared* const head = (buf.type == HTTP_RANGE_NUM_TRAILERS) ?
+        (HttpMsgHeadShared*)trailer[buffer_side]:
+        (HttpMsgHeadShared*)header[buffer_side] ;
+    if (head == nullptr)
+        return HttpCommon::STAT_NOT_COMPUTE;
+
+    return head->get_num_headers();
 }
 
 void HttpMsgSection::get_related_sections()

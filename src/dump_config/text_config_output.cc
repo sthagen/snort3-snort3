@@ -17,6 +17,10 @@
 //--------------------------------------------------------------------------
 // text_config_output.cc author Serhii Vlasiuk <svlasiuk@cisco.com>
 
+#ifdef HAVE_CONFIG_H
+#include "config.h"
+#endif
+
 #include "text_config_output.h"
 
 #include <iomanip>
@@ -45,7 +49,7 @@ static void dump_value(const BaseConfigNode* node, const std::string& config_nam
         break;
     }
     case Parameter::PT_INT:
-        std::cout << config_name << "=" << value->get_long() << std::endl;
+        std::cout << config_name << "=" << value->get_int64() << std::endl;
         break;
     case Parameter::PT_REAL:
         std::cout << config_name << "=" << value->get_real() << std::endl;

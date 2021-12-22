@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,36 +15,37 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+// buffer_data.h author Amarnath Nayak <amarnaya@cisco.com>
+#ifndef BUFFER_DATA_H
+#define BUFFER_DATA_H
 
-// ssh_patterns.h author Daniel McGarvey <danmcgar@cisco.com>
+#include <cstdint>
 
-#ifndef SSH_PATTERNS_H
-#define SSH_PATTERNS_H
+#include "main/snort_types.h"
 
-/*
- * SshPatternMatchers is a wrapper around an unordered_map
- * which maps strings to AppIds. SSH Client Patterns
- * are registered through a lua API, and these mappings
- * are used by AppId to identify clients.
- * An instance of the class is held by OdpContext.
- */
-
-#include <string>
-#include <unordered_map>
-
-#include "application_ids.h"
-
-typedef std::unordered_map<std::string, AppId> SshPatternTable;
-
-class SshPatternMatchers 
+namespace snort
+{
+class SO_PUBLIC BufferData
 {
 public:
-    void add_ssh_pattern(const std::string& pattern, AppId id);
-    bool has_pattern(const std::string& pattern) const;
-    bool empty() const;
-    AppId get_appid(const std::string& pattern) const;
-private:
-    SshPatternTable ssh_patterns;
-};
+    BufferData(int32_t length, const uint8_t* data_, bool own_the_buffer_);
+    BufferData() = default;
 
+    ~BufferData();
+
+    int32_t length() const;
+    const uint8_t* data_ptr() const;
+
+    void set(int32_t length, const uint8_t* data_, bool own_the_buffer_);
+
+    void reset();
+
+    static const BufferData buffer_null;
+
+private:
+    int32_t len = 0;
+    const uint8_t* data = nullptr;
+    bool own_the_buffer = false;
+};
+}
 #endif

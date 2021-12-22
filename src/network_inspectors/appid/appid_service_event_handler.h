@@ -16,35 +16,31 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-// ssh_patterns.h author Daniel McGarvey <danmcgar@cisco.com>
+// appid_service_event_handler.h author Shravan Rangaraju <shrarang@cisco.com>
 
-#ifndef SSH_PATTERNS_H
-#define SSH_PATTERNS_H
+#ifndef APPID_SERVICE_EVENT_HANDLER_H
+#define APPID_SERVICE_EVENT_HANDLER_H
 
-/*
- * SshPatternMatchers is a wrapper around an unordered_map
- * which maps strings to AppIds. SSH Client Patterns
- * are registered through a lua API, and these mappings
- * are used by AppId to identify clients.
- * An instance of the class is held by OdpContext.
- */
+#include "framework/data_bus.h"
 
-#include <string>
-#include <unordered_map>
+#include "appid_module.h"
 
-#include "application_ids.h"
+namespace snort
+{
+class Flow;
+}
 
-typedef std::unordered_map<std::string, AppId> SshPatternTable;
-
-class SshPatternMatchers 
+class AppIdServiceEventHandler : public snort::DataHandler
 {
 public:
-    void add_ssh_pattern(const std::string& pattern, AppId id);
-    bool has_pattern(const std::string& pattern) const;
-    bool empty() const;
-    AppId get_appid(const std::string& pattern) const;
+    AppIdServiceEventHandler(AppIdInspector& inspector) :
+        DataHandler(MOD_NAME), inspector(inspector)
+    { }
+
+    void handle(snort::DataEvent&, snort::Flow* flow) override;
+
 private:
-    SshPatternTable ssh_patterns;
+    AppIdInspector& inspector;
 };
 
 #endif

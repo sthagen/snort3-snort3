@@ -21,52 +21,15 @@
 #include "config.h"
 #endif
 
-#include "catch/catch.hpp"
-
 #include <cstring>
-#include <tuple>
+
+#include "catch/catch.hpp"
 
 #include "utils/js_identifier_ctx.h"
 #include "utils/js_normalizer.h"
-
-// Mock functions
-
-namespace snort
-{
-[[noreturn]] void FatalError(const char*, ...)
-{ exit(EXIT_FAILURE); }
-void trace_vprintf(const char*, TraceLevel, const char*, const Packet*, const char*, va_list) {}
-uint8_t TraceApi::get_constraints_generation() { return 0; }
-void TraceApi::filter(const Packet&) {}
-}
-
-THREAD_LOCAL const snort::Trace* http_trace = nullptr;
-
-class JSIdentifierCtxStub : public JSIdentifierCtxBase
-{
-public:
-    JSIdentifierCtxStub() = default;
-
-    const char* substitute(const char* identifier) override
-    { return identifier; }
-    bool built_in(const char*) const override
-    { return false; }
-    bool scope_push(JSProgramScopeType) override { return true; }
-    bool scope_pop(JSProgramScopeType) override { return true; }
-    void reset() override {}
-    size_t size() const override { return 0; }
-};
-
-// Test cases
+#include "utils/test/js_test_utils.h"
 
 using namespace snort;
-
-#define DEPTH 65535
-#define MAX_TEMPLATE_NESTING 4
-#define MAX_BRACKET_DEPTH 256
-#define MAX_SCOPE_DEPTH 256
-
-static const std::unordered_set<std::string> s_ident_built_in { "console", "eval", "document" };
 
 // Unit tests
 
@@ -76,7 +39,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
 
 #define NORMALIZE(src)                                             \
     JSIdentifierCtxStub ident_ctx;                                 \
-    JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+    JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
     auto ret = norm.normalize(src, sizeof(src));                   \
     const char* ptr = norm.get_src_next();                         \
     int act_len = norm.script_size();                              \
@@ -100,7 +63,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
 #define NORMALIZE_L(src, src_len, dst, dst_len, depth, ret, ptr, len) \
     {                                                                 \
         JSIdentifierCtxStub ident_ctx;                                \
-        JSNormalizer norm(ident_ctx, depth, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSNormalizer norm(ident_ctx, depth, max_template_nesting, max_bracket_depth); \
         ret = norm.normalize(src, src_len);                           \
         ptr = norm.get_src_next();                                    \
         len = norm.script_size();                                     \
@@ -143,8 +106,8 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
     {                                                               \
         char dst1[sizeof(exp1)];                                    \
                                                                     \
-        JSIdentifierCtx ident_ctx(DEPTH, MAX_SCOPE_DEPTH, s_ident_built_in); \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
@@ -157,8 +120,8 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         char dst1[sizeof(exp1)];                                    \
         char dst2[sizeof(exp2)];                                    \
                                                                     \
-        JSIdentifierCtx ident_ctx(DEPTH, MAX_SCOPE_DEPTH, s_ident_built_in); \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
@@ -174,7 +137,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         char dst1[sizeof(exp1)];                                    \
                                                                     \
         JSIdentifierCtxStub ident_ctx;                              \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
@@ -188,7 +151,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         char dst2[sizeof(exp2)];                                    \
                                                                     \
         JSIdentifierCtxStub ident_ctx;                              \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
@@ -206,7 +169,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         char dst3[sizeof(exp3)];                                    \
                                                                     \
         JSIdentifierCtxStub ident_ctx;                              \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
@@ -225,7 +188,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         char dst1[sizeof(exp1)];                                    \
                                                                     \
         JSIdentifierCtxStub ident_ctx;                              \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         TRY(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1, code);  \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
@@ -237,7 +200,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         char dst2[sizeof(exp2)];                                    \
                                                                     \
         JSIdentifierCtxStub ident_ctx;                              \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
@@ -253,7 +216,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         char dst3[sizeof(exp3)];                                    \
                                                                     \
         JSIdentifierCtxStub ident_ctx;                              \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
                                                                     \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);         \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));               \
@@ -271,7 +234,7 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         char dst2[sizeof(exp2)];                                        \
                                                                         \
         JSIdentifierCtxStub ident_ctx;                                  \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH, limit); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth, limit); \
                                                                         \
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);             \
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));                   \
@@ -282,134 +245,134 @@ static const std::unordered_set<std::string> s_ident_built_in { "console", "eval
         CLOSE();                                                        \
     }
 
-#define NORM_COMBINED_2(src1, src2, exp)                                              \
-    {                                                                                 \
-        JSIdentifierCtxStub ident_ctx;                                                \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
-                                                                                      \
-        auto ret = norm.normalize(src1, sizeof(src1) - 1);                            \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        ret = norm.normalize(src2, sizeof(src2) - 1);                                 \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        const char end[] = "</script>";                                               \
-        ret = norm.normalize(end, sizeof(end) - 1);                                   \
-        REQUIRE(ret == JSTokenizer::SCRIPT_ENDED);                                    \
-                                                                                      \
-        size_t act_len = norm.script_size();                                          \
-        REQUIRE(act_len == sizeof(exp) - 1);                                          \
-                                                                                      \
-        const char* dst = norm.get_script();                                          \
-        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                                    \
+#define NORM_COMBINED_2(src1, src2, exp)                                \
+    {                                                                   \
+        JSIdentifierCtxStub ident_ctx;                                  \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
+                                                                        \
+        auto ret = norm.normalize(src1, sizeof(src1) - 1);              \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        ret = norm.normalize(src2, sizeof(src2) - 1);                   \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        const char end[] = "</script>";                                 \
+        ret = norm.normalize(end, sizeof(end) - 1);                     \
+        REQUIRE(ret == JSTokenizer::SCRIPT_ENDED);                      \
+                                                                        \
+        size_t act_len = norm.script_size();                            \
+        REQUIRE(act_len == sizeof(exp) - 1);                            \
+                                                                        \
+        const char* dst = norm.get_script();                            \
+        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                      \
     }
 
-#define NORM_COMBINED_3(src1, src2, src3, exp)                                        \
-    {                                                                                 \
-        JSIdentifierCtxStub ident_ctx;                                                \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
-                                                                                      \
-        auto ret = norm.normalize(src1, sizeof(src1) - 1);                            \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        ret = norm.normalize(src2, sizeof(src2) - 1);                                 \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        ret = norm.normalize(src3, sizeof(src3) - 1);                                 \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        const char end[] = "</script>";                                               \
-        ret = norm.normalize(end, sizeof(end) - 1);                                   \
-        REQUIRE(ret == JSTokenizer::SCRIPT_ENDED);                                    \
-                                                                                      \
-        size_t act_len = norm.script_size();                                          \
-        REQUIRE(act_len == sizeof(exp) - 1);                                          \
-                                                                                      \
-        const char* dst = norm.get_script();                                          \
-        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                                    \
+#define NORM_COMBINED_3(src1, src2, src3, exp)                          \
+    {                                                                   \
+        JSIdentifierCtxStub ident_ctx;                                  \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
+                                                                        \
+        auto ret = norm.normalize(src1, sizeof(src1) - 1);              \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        ret = norm.normalize(src2, sizeof(src2) - 1);                   \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        ret = norm.normalize(src3, sizeof(src3) - 1);                   \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        const char end[] = "</script>";                                 \
+        ret = norm.normalize(end, sizeof(end) - 1);                     \
+        REQUIRE(ret == JSTokenizer::SCRIPT_ENDED);                      \
+                                                                        \
+        size_t act_len = norm.script_size();                            \
+        REQUIRE(act_len == sizeof(exp) - 1);                            \
+                                                                        \
+        const char* dst = norm.get_script();                            \
+        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                      \
     }
 
-#define NORM_COMBINED_BAD_2(src1, src2, exp, eret)                                    \
-    {                                                                                 \
-        JSIdentifierCtxStub ident_ctx;                                                \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
-                                                                                      \
-        auto ret = norm.normalize(src1, sizeof(src1) - 1);                            \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        ret = norm.normalize(src2, sizeof(src2) - 1);                                 \
-        REQUIRE(ret == eret);                                                         \
-                                                                                      \
-        size_t act_len = norm.script_size();                                          \
-        REQUIRE(act_len == sizeof(exp) - 1);                                          \
-                                                                                      \
-        const char* dst = norm.get_script();                                          \
-        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                                    \
+#define NORM_COMBINED_BAD_2(src1, src2, exp, eret)                      \
+    {                                                                   \
+        JSIdentifierCtxStub ident_ctx;                                  \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
+                                                                        \
+        auto ret = norm.normalize(src1, sizeof(src1) - 1);              \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        ret = norm.normalize(src2, sizeof(src2) - 1);                   \
+        REQUIRE(ret == eret);                                           \
+                                                                        \
+        size_t act_len = norm.script_size();                            \
+        REQUIRE(act_len == sizeof(exp) - 1);                            \
+                                                                        \
+        const char* dst = norm.get_script();                            \
+        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                      \
     }
 
-#define NORM_COMBINED_BAD_3(src1, src2, src3, exp, eret)                              \
-    {                                                                                 \
-        JSIdentifierCtxStub ident_ctx;                                                \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
-                                                                                      \
-        auto ret = norm.normalize(src1, sizeof(src1) - 1);                            \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        ret = norm.normalize(src2, sizeof(src2) - 1);                                 \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        ret = norm.normalize(src3, sizeof(src3) - 1);                                 \
-        REQUIRE(ret == eret);                                                         \
-                                                                                      \
-        size_t act_len = norm.script_size();                                          \
-        REQUIRE(act_len == sizeof(exp) - 1);                                          \
-                                                                                      \
-        const char* dst = norm.get_script();                                          \
-        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                                    \
+#define NORM_COMBINED_BAD_3(src1, src2, src3, exp, eret)                \
+    {                                                                   \
+        JSIdentifierCtxStub ident_ctx;                                  \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
+                                                                        \
+        auto ret = norm.normalize(src1, sizeof(src1) - 1);              \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        ret = norm.normalize(src2, sizeof(src2) - 1);                   \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        ret = norm.normalize(src3, sizeof(src3) - 1);                   \
+        REQUIRE(ret == eret);                                           \
+                                                                        \
+        size_t act_len = norm.script_size();                            \
+        REQUIRE(act_len == sizeof(exp) - 1);                            \
+                                                                        \
+        const char* dst = norm.get_script();                            \
+        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                      \
     }
 
-#define NORM_COMBINED_LIMITED_2(limit, src1, src2, exp)                                      \
-    {                                                                                        \
-        JSIdentifierCtxStub ident_ctx;                                                       \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH, limit); \
-                                                                                             \
-        auto ret = norm.normalize(src1, sizeof(src1) - 1);                                   \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                        \
-                                                                                             \
-        ret = norm.normalize(src2, sizeof(src2) - 1);                                        \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                        \
-                                                                                             \
-        const char end[] = "</script>";                                                      \
-        ret = norm.normalize(end, sizeof(end) - 1);                                          \
-        REQUIRE(ret == JSTokenizer::SCRIPT_ENDED);                                           \
-                                                                                             \
-        size_t act_len = norm.script_size();                                                 \
-        REQUIRE(act_len == sizeof(exp) - 1);                                                 \
-                                                                                             \
-        const char* dst = norm.get_script();                                                 \
-        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                                           \
+#define NORM_COMBINED_LIMITED_2(limit, src1, src2, exp)                 \
+    {                                                                   \
+        JSIdentifierCtxStub ident_ctx;                                  \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth, limit); \
+                                                                        \
+        auto ret = norm.normalize(src1, sizeof(src1) - 1);              \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        ret = norm.normalize(src2, sizeof(src2) - 1);                   \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        const char end[] = "</script>";                                 \
+        ret = norm.normalize(end, sizeof(end) - 1);                     \
+        REQUIRE(ret == JSTokenizer::SCRIPT_ENDED);                      \
+                                                                        \
+        size_t act_len = norm.script_size();                            \
+        REQUIRE(act_len == sizeof(exp) - 1);                            \
+                                                                        \
+        const char* dst = norm.get_script();                            \
+        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                      \
     }
 
-#define NORM_COMBINED_S_2(src1, src2, exp)                                            \
-    {                                                                                 \
-        JSIdentifierCtx ident_ctx(DEPTH, MAX_SCOPE_DEPTH, s_ident_built_in);          \
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH); \
-                                                                                      \
-        auto ret = norm.normalize(src1, sizeof(src1) - 1);                            \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        ret = norm.normalize(src2, sizeof(src2) - 1);                                 \
-        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                                 \
-                                                                                      \
-        const char end[] = "</script>";                                               \
-        ret = norm.normalize(end, sizeof(end) - 1);                                   \
-        REQUIRE(ret == JSTokenizer::SCRIPT_ENDED);                                    \
-                                                                                      \
-        size_t act_len = norm.script_size();                                          \
-        REQUIRE(act_len == sizeof(exp) - 1);                                          \
-                                                                                      \
-        const char* dst = norm.get_script();                                          \
-        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                                    \
+#define NORM_COMBINED_S_2(src1, src2, exp)                              \
+    {                                                                   \
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids); \
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth); \
+                                                                        \
+        auto ret = norm.normalize(src1, sizeof(src1) - 1);              \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        ret = norm.normalize(src2, sizeof(src2) - 1);                   \
+        REQUIRE(ret == JSTokenizer::SCRIPT_CONTINUE);                   \
+                                                                        \
+        const char end[] = "</script>";                                 \
+        ret = norm.normalize(end, sizeof(end) - 1);                     \
+        REQUIRE(ret == JSTokenizer::SCRIPT_ENDED);                      \
+                                                                        \
+        size_t act_len = norm.script_size();                            \
+        REQUIRE(act_len == sizeof(exp) - 1);                            \
+                                                                        \
+        const char* dst = norm.get_script();                            \
+        CHECK(!memcmp(exp, dst, sizeof(exp) - 1));                      \
     }
 
 // ClamAV test vectors from: https://github.com/Cisco-Talos/clamav/blob/main/unit_tests/check_jsnorm.c
@@ -712,11 +675,11 @@ TEST_CASE("all patterns", "[JSNormalizer]")
         const char *ptr0, *ptr1, *ptr2, *ptr3, *ptr4;
         int act_len0, act_len1, act_len2, act_len3, act_len4;
 
-        NORMALIZE_L(src0, sizeof(src0), dst0, sizeof(dst0), DEPTH, ret0, ptr0, act_len0);
-        NORMALIZE_L(src1, sizeof(src1), dst1, sizeof(dst1), DEPTH, ret1, ptr1, act_len1);
-        NORMALIZE_L(src2, sizeof(src2), dst2, sizeof(dst2), DEPTH, ret2, ptr2, act_len2);
-        NORMALIZE_L(src3, sizeof(src3), dst3, sizeof(dst3), DEPTH, ret3, ptr3, act_len3);
-        NORMALIZE_L(src4, sizeof(src4), dst4, sizeof(dst4), DEPTH, ret4, ptr4, act_len4);
+        NORMALIZE_L(src0, sizeof(src0), dst0, sizeof(dst0), norm_depth, ret0, ptr0, act_len0);
+        NORMALIZE_L(src1, sizeof(src1), dst1, sizeof(dst1), norm_depth, ret1, ptr1, act_len1);
+        NORMALIZE_L(src2, sizeof(src2), dst2, sizeof(dst2), norm_depth, ret2, ptr2, act_len2);
+        NORMALIZE_L(src3, sizeof(src3), dst3, sizeof(dst3), norm_depth, ret3, ptr3, act_len3);
+        NORMALIZE_L(src4, sizeof(src4), dst4, sizeof(dst4), norm_depth, ret4, ptr4, act_len4);
 
         CHECK(ret0 == JSTokenizer::SCRIPT_CONTINUE);
         CHECK((ptr0 - src0) == sizeof(src0));
@@ -1563,7 +1526,7 @@ TEST_CASE("endings", "[JSNormalizer]")
         const char* ptr;
         int ret;
 
-        NORMALIZE_L(src, sizeof(src), dst, sizeof(dst), DEPTH, ret, ptr, act_len);
+        NORMALIZE_L(src, sizeof(src), dst, sizeof(dst), norm_depth, ret, ptr, act_len);
 
         CHECK(ret == JSTokenizer::SCRIPT_ENDED);
         CHECK(act_len == sizeof(expected) - 1);
@@ -1579,7 +1542,7 @@ TEST_CASE("endings", "[JSNormalizer]")
         int ret;
 
         JSIdentifierCtxStub ident_ctx;
-        JSNormalizer norm(ident_ctx, 7, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
+        JSNormalizer norm(ident_ctx, 7, max_template_nesting, max_bracket_depth);
         ret = norm.normalize(src, sizeof(src));
         ptr = norm.get_src_next();
         int act_len1 = norm.script_size();
@@ -2454,8 +2417,8 @@ TEST_CASE("split and continuation combined", "[JSNormalizer]")
         char dst3[sizeof(exp3)];
         char dst4[sizeof(exp4)];
 
-        JSIdentifierCtx ident_ctx(DEPTH, MAX_SCOPE_DEPTH, s_ident_built_in);
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_SCOPE_DEPTH);
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids);
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth);
 
         DO(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1);
         CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));
@@ -2468,6 +2431,44 @@ TEST_CASE("split and continuation combined", "[JSNormalizer]")
 
         DO(src4, sizeof(src4) - 1, dst4, sizeof(dst4) - 1);
         CHECK(!memcmp(exp4, dst4, sizeof(exp4) - 1));
+
+        CLOSE();
+    }
+    SECTION("PDU 1 [cont] PDU 2 [cont] PDU 3 [end]")
+    {
+        const char src1[] = "<";
+        const char src2[] = "!-";
+        const char src3[] = "-comment\n";
+
+        const char exp1[] = "<";
+        const char exp2[] = "<!-";
+        const char exp3[] = "";
+
+        const char tmp_buf1[] = "<";
+        const char tmp_buf2[] = "<!-";
+        const char tmp_buf3[] = "<!--comment\n";
+
+        char dst1[sizeof(exp1)];
+        char dst2[sizeof(exp2)];
+        char dst3[sizeof(exp3)];
+
+        JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, s_ignored_ids);
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth);
+
+        TRY(src1, sizeof(src1) - 1, dst1, sizeof(dst1) - 1, JSTokenizer::SCRIPT_CONTINUE);
+        CHECK(!memcmp(exp1, dst1, sizeof(exp1) - 1));
+        REQUIRE(norm.get_tmp_buf_size() == sizeof(tmp_buf1) - 1);
+        CHECK(!memcmp(norm.get_tmp_buf(), tmp_buf1, sizeof(tmp_buf1) - 1));
+
+        TRY(src2, sizeof(src2) - 1, dst2, sizeof(dst2) - 1, JSTokenizer::SCRIPT_CONTINUE);
+        CHECK(!memcmp(exp2, dst2, sizeof(exp2) - 1));
+        REQUIRE(norm.get_tmp_buf_size() == sizeof(tmp_buf2) - 1);
+        CHECK(!memcmp(norm.get_tmp_buf(), tmp_buf2, sizeof(tmp_buf2) - 1));
+
+        TRY(src3, sizeof(src3) - 1, dst3, sizeof(dst3) - 1, JSTokenizer::SCRIPT_CONTINUE);
+        CHECK(!memcmp(exp3, dst3, sizeof(exp3) - 1));
+        REQUIRE(norm.get_tmp_buf_size() == sizeof(tmp_buf3) - 1);
+        CHECK(!memcmp(norm.get_tmp_buf(), tmp_buf3, sizeof(tmp_buf3) - 1));
 
         CLOSE();
     }
@@ -2779,7 +2780,7 @@ TEST_CASE("scope misc", "[JSNormalizer]")
         char* act = new char[exp_len];
 
         JSIdentifierCtxStub ident_ctx;
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth);
 
         DO(dat, dat_len, act, exp_len);
         CHECK(!memcmp(exp, act, exp_len));
@@ -2809,7 +2810,7 @@ TEST_CASE("scope misc", "[JSNormalizer]")
         char* act = new char[exp_len];
 
         JSIdentifierCtxStub ident_ctx;
-        JSNormalizer norm(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
+        JSNormalizer norm(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth);
 
         TRY(dat, dat_len, act, exp_len, JSTokenizer::BRACKET_NESTING_OVERFLOW);
         CHECK(!memcmp(exp, act, exp_len));
@@ -3029,9 +3030,9 @@ TEST_CASE("scope tail handling", "[JSNormalizer]")
     }
 }
 
-TEST_CASE("built-in identifiers syntax", "[JSNormalizer]")
+TEST_CASE("ignored identifiers", "[JSNormalizer]")
 {
-    // 'console' 'eval' 'document' are built-in identifiers
+    // 'console' 'eval' 'document' are in the ignore list
 
     SECTION("a standalone identifier")
     {
@@ -3112,9 +3113,9 @@ TEST_CASE("built-in identifiers syntax", "[JSNormalizer]")
     }
 }
 
-TEST_CASE("built-in chain tracking", "[JSNormalizer]")
+TEST_CASE("ignored identifier chain tracking", "[JSNormalizer]")
 {
-    // 'console' 'eval' 'document' are built-in identifiers
+    // 'console' 'eval' 'document' are in the ignore list
 
     SECTION("chain terminators")
     {
@@ -3319,9 +3320,9 @@ TEST_CASE("built-in chain tracking", "[JSNormalizer]")
     }
 }
 
-TEST_CASE("built-in scope tracking", "[JSNormalizer]")
+TEST_CASE("ignored identifier scope tracking", "[JSNormalizer]")
 {
-    // 'console' 'eval' 'document' are built-in identifiers
+    // 'console' 'eval' 'document' are in the ignore list
 
     SECTION("basic")
     {
@@ -3499,11 +3500,11 @@ TEST_CASE("built-in scope tracking", "[JSNormalizer]")
     }
 }
 
-TEST_CASE("built-in identifiers split", "[JSNormalizer]")
+TEST_CASE("ignored identifier split", "[JSNormalizer]")
 {
 
 #if JSTOKENIZER_MAX_STATES != 8
-#error "built-in identifiers split" tests are designed for 8 states depth
+#error "ignored identifier split" tests are designed for 8 states depth
 #endif
 
     SECTION("a standalone identifier")
@@ -3669,16 +3670,6 @@ TEST_CASE("built-in identifiers split", "[JSNormalizer]")
         NORMALIZE_T(dat5, dat6, exp7, exp8);
         NORM_COMBINED_S_2(dat5, dat6, exp9);
     }
-}
-
-static void test_scope(const char* context, std::list<JSProgramScopeType> stack)
-{
-    std::string buf(context);
-    buf += "</script>";
-    JSIdentifierCtx ident_ctx(DEPTH, MAX_SCOPE_DEPTH, s_ident_built_in);
-    JSNormalizer normalizer(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
-    normalizer.normalize(buf.c_str(), buf.size());
-    CHECK(ident_ctx.get_types() == stack);
 }
 
 TEST_CASE("Scope tracking - basic","[JSNormalizer]")
@@ -3973,24 +3964,6 @@ TEST_CASE("Scope tracking - closing","[JSNormalizer]")
         test_scope("function() { if (true)\nfor ( ; ; ) a = 2 }", {GLOBAL});
 }
 
-typedef std::tuple<const char*,const char*, std::list<JSProgramScopeType>> PduCase;
-static void test_normalization(std::list<PduCase> pdus)
-{
-    JSIdentifierCtx ident_ctx(DEPTH, MAX_SCOPE_DEPTH, s_ident_built_in);
-    JSNormalizer normalizer(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
-    for(auto pdu:pdus)
-    {
-        const char* source;
-        const char* expected;
-        std::list<JSProgramScopeType> stack;
-        std::tie(source,expected,stack) = pdu;
-        normalizer.normalize(source, strlen(source));
-        std::string result_buf(normalizer.get_script(), normalizer.script_size());
-        CHECK(ident_ctx.get_types() == stack);
-        CHECK(result_buf == expected);
-    }
-}
-
 TEST_CASE("Scope tracking - over multiple PDU","[JSNormalizer]")
 {
     // Every line represents a PDU. Each pdu has input buffer, expected script
@@ -4003,13 +3976,13 @@ TEST_CASE("Scope tracking - over multiple PDU","[JSNormalizer]")
             // will be "var_0000"
         });
 
-    SECTION("general - variable extension: builtin to identifier")
+    SECTION("general - variable extension: ignored identifier to a regular one")
         test_normalization({
             {"console", "console", {GLOBAL}},
             {"Writer", "var_0000", {GLOBAL}}
         });
 
-    SECTION("general - variable extension: identifier to builtin")
+    SECTION("general - variable extension: a regular identifier to ignored one")
         test_normalization({
             {"con", "var_0000", {GLOBAL}},
             {"sole", "console", {GLOBAL}}
@@ -4148,17 +4121,6 @@ TEST_CASE("Scope tracking - over multiple PDU","[JSNormalizer]")
         });
 }
 
-static void test_normalization_bad(const char* source, const char* expected,
-    JSTokenizer::JSRet eret)
-{
-    JSIdentifierCtx ident_ctx(DEPTH, MAX_SCOPE_DEPTH, s_ident_built_in);
-    JSNormalizer normalizer(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
-    auto ret = normalizer.normalize(source, strlen(source));
-    std::string result_buf(normalizer.get_script(), normalizer.script_size());
-    CHECK(eret == ret);
-    CHECK(result_buf == expected);
-}
-
 TEST_CASE("Scope tracking - error handling", "[JSNormalizer]")
 {
     SECTION("not identifier after var keyword")
@@ -4202,8 +4164,8 @@ TEST_CASE("Scope tracking - error handling", "[JSNormalizer]")
         const char exp[] = "function(){if";
         uint32_t scope_depth = 2;
 
-        JSIdentifierCtx ident_ctx(DEPTH, scope_depth, s_ident_built_in);
-        JSNormalizer normalizer(ident_ctx, DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
+        JSIdentifierCtx ident_ctx(norm_depth, scope_depth, s_ignored_ids);
+        JSNormalizer normalizer(ident_ctx, norm_depth, max_template_nesting, max_bracket_depth);
         auto ret = normalizer.normalize(src, strlen(src));
         std::string dst(normalizer.get_script(), normalizer.script_size());
 
@@ -4217,8 +4179,6 @@ TEST_CASE("Scope tracking - error handling", "[JSNormalizer]")
 // Benchmark tests
 
 #ifdef BENCHMARK_TEST
-
-#define UNLIM_DEPTH -1
 
 static constexpr const char* s_closing_tag = "</script>";
 
@@ -4254,7 +4214,7 @@ static JSTokenizer::JSRet norm_ret(JSNormalizer& normalizer, const std::string& 
 TEST_CASE("JS Normalizer, literals by 8 K", "[JSNormalizer]")
 {
     JSIdentifierCtxStub ident_ctx;
-    JSNormalizer normalizer(ident_ctx, UNLIM_DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
+    JSNormalizer normalizer(ident_ctx, unlim_depth, max_template_nesting, max_bracket_depth);
     char dst[DEPTH];
 
     constexpr size_t size = 1 << 13;
@@ -4294,7 +4254,7 @@ TEST_CASE("JS Normalizer, literals by 8 K", "[JSNormalizer]")
 TEST_CASE("JS Normalizer, literals by 64 K", "[JSNormalizer]")
 {
     JSIdentifierCtxStub ident_ctx;
-    JSNormalizer normalizer(ident_ctx, UNLIM_DEPTH, MAX_TEMPLATE_NESTING, MAX_SCOPE_DEPTH);
+    JSNormalizer normalizer(ident_ctx, unlim_depth, max_template_nesting, max_scope_depth);
     char dst[DEPTH];
 
     constexpr size_t size = 1 << 16;
@@ -4342,8 +4302,8 @@ TEST_CASE("JS Normalizer, id normalization", "[JSNormalizer]")
     input.append(s_closing_tag, strlen(s_closing_tag));
 
     JSIdentifierCtxStub ident_ctx_mock;
-    JSNormalizer normalizer_wo_ident(ident_ctx_mock, UNLIM_DEPTH,
-        MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
+    JSNormalizer normalizer_wo_ident(ident_ctx_mock, unlim_depth,
+        max_template_nesting, max_bracket_depth);
 
     REQUIRE(norm_ret(normalizer_wo_ident, input) == JSTokenizer::SCRIPT_ENDED);
     BENCHMARK("without substitution")
@@ -4353,8 +4313,8 @@ TEST_CASE("JS Normalizer, id normalization", "[JSNormalizer]")
     };
 
     const std::unordered_set<std::string> ids{};
-    JSIdentifierCtx ident_ctx(DEPTH, MAX_SCOPE_DEPTH, ids);
-    JSNormalizer normalizer_w_ident(ident_ctx, UNLIM_DEPTH, MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
+    JSIdentifierCtx ident_ctx(norm_depth, max_scope_depth, ids);
+    JSNormalizer normalizer_w_ident(ident_ctx, unlim_depth, max_template_nesting, max_bracket_depth);
 
     REQUIRE(norm_ret(normalizer_w_ident, input) == JSTokenizer::SCRIPT_ENDED);
     BENCHMARK("with substitution")
@@ -4364,15 +4324,15 @@ TEST_CASE("JS Normalizer, id normalization", "[JSNormalizer]")
     };
 
     const std::unordered_set<std::string> ids_n { "n" };
-    JSIdentifierCtx ident_ctx_ids_n(DEPTH, MAX_SCOPE_DEPTH, ids_n);
-    JSNormalizer normalizer_built_ins(ident_ctx_ids_n, UNLIM_DEPTH,
-        MAX_TEMPLATE_NESTING, MAX_BRACKET_DEPTH);
+    JSIdentifierCtx ident_ctx_ids_n(norm_depth, max_scope_depth, ids_n);
+    JSNormalizer normalizer_iids(ident_ctx_ids_n, unlim_depth,
+        max_template_nesting, max_bracket_depth);
 
-    REQUIRE(norm_ret(normalizer_built_ins, input) == JSTokenizer::SCRIPT_ENDED);
-    BENCHMARK("with built-ins")
+    REQUIRE(norm_ret(normalizer_iids, input) == JSTokenizer::SCRIPT_ENDED);
+    BENCHMARK("with ignored identifiers")
     {
-        normalizer_built_ins.rewind_output();
-        return normalizer_built_ins.normalize(input.c_str(), input.size());
+        normalizer_iids.rewind_output();
+        return normalizer_iids.normalize(input.c_str(), input.size());
     };
 }
 
@@ -4380,7 +4340,7 @@ TEST_CASE("JS Normalizer, scope tracking", "[JSNormalizer]")
 {
     constexpr uint32_t depth = 65535;
     JSIdentifierCtxStub ident_ctx;
-    JSNormalizer normalizer(ident_ctx, UNLIM_DEPTH, MAX_TEMPLATE_NESTING, depth);
+    JSNormalizer normalizer(ident_ctx, unlim_depth, max_template_nesting, depth);
 
     auto src_ws = make_input("", " ", "", depth);
     auto src_brace_rep = make_input_repeat("{}", depth);
@@ -4418,14 +4378,14 @@ TEST_CASE("JS Normalizer, scope tracking", "[JSNormalizer]")
 
 TEST_CASE("JS Normalizer, automatic semicolon", "[JSNormalizer]")
 {
-    auto w_semicolons = make_input("", "a;\n", "", DEPTH);
-    auto wo_semicolons = make_input("", "a \n", "", DEPTH);
+    auto w_semicolons = make_input("", "a;\n", "", depth);
+    auto wo_semicolons = make_input("", "a \n", "", depth);
     const char* src_w_semicolons = w_semicolons.c_str();
     const char* src_wo_semicolons = wo_semicolons.c_str();
     size_t src_len = w_semicolons.size();
 
     JSIdentifierCtxStub ident_ctx_mock;
-    JSNormalizer normalizer_wo_ident(ident_ctx_mock, UNLIM_DEPTH, MAX_TEMPLATE_NESTING, DEPTH);
+    JSNormalizer normalizer_wo_ident(ident_ctx_mock, unlim_depth, max_template_nesting, depth);
 
     REQUIRE(norm_ret(normalizer_wo_ident, w_semicolons) == JSTokenizer::SCRIPT_ENDED);
     BENCHMARK("without semicolon insertion")

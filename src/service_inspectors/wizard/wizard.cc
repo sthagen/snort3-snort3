@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -139,7 +139,7 @@ public:
     StreamSplitter* get_splitter(bool) override;
 
     inline bool finished(Wand& w)
-    { return !w.hex && !w.spell && w.curse_tracker.empty(); };
+    { return !w.hex && !w.spell && w.curse_tracker.empty(); }
     void reset(Wand&, bool tcp, bool c2s);
     bool cast_spell(Wand&, Flow*, const uint8_t*, unsigned, uint16_t&);
     bool spellbind(const MagicPage*&, Flow*, const uint8_t*, unsigned);

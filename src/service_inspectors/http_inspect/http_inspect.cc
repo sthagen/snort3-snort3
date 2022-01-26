@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -294,6 +294,16 @@ int32_t HttpInspect::http_get_num_headers(Packet* p,
         return STAT_NOT_COMPUTE;
 
     return current_section->get_num_headers(buffer_info);
+}
+
+VersionId HttpInspect::http_get_version_id(Packet* p) const
+{
+    const HttpMsgSection* const current_section = HttpContextData::get_snapshot(p);
+
+    if (current_section == nullptr)
+        return VERS__NOT_PRESENT;
+
+    return current_section->get_version_id();
 }
 
 bool HttpInspect::get_fp_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)

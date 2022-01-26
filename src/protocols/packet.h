@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -97,6 +97,7 @@ enum PseudoPacketType
 {
     PSEUDO_PKT_IP,
     PSEUDO_PKT_TCP,
+    PSEUDO_PKT_UDP_QUIC,
     PSEUDO_PKT_USER,
     PSEUDO_PKT_DCE_SEG,
     PSEUDO_PKT_DCE_FRAG,
@@ -229,6 +230,9 @@ struct SO_PUBLIC Packet
 
     bool has_udp_data() const
     { return (proto_bits & PROTO_BIT__UDP) and data and dsize; }
+
+    bool has_udp_quic_data() const
+    { return (pseudo_type == PSEUDO_PKT_UDP_QUIC) and data and dsize; }
 
     /* Get general, non-boolean information */
     PktType type() const

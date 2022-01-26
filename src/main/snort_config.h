@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -149,7 +149,6 @@ struct IpsActionsConfig;
 struct LatencyConfig;
 struct MemoryConfig;
 struct PayloadInjectorConfig;
-struct PHInstance;
 struct Plugins;
 struct PORT_RULE_MAP;
 struct RateFilterConfig;
@@ -163,7 +162,6 @@ struct ThresholdConfig;
 namespace snort
 {
 class GHash;
-class PolicySelector;
 class ProtocolReference;
 class ThreadConfig;
 class XHash;
@@ -393,10 +391,6 @@ public:
 
     PolicyMap* policy_map = nullptr;
     std::string tweaks;
-
-    PolicySelector* global_selector = nullptr;
-    PHInstance* flow_tracking = nullptr;
-    PHInstance* removed_flow_tracking = nullptr;
 
     uint16_t tunnel_mask = 0;
 

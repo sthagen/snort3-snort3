@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -26,7 +26,6 @@
 
 #include "file_config.h"
 #include "file_identifier.h"
-#include "file_policy.h"
 #include "main/snort_debug.h"
 #include "utils/util.h"
 //-------------------------------------------------------------------------
@@ -76,9 +75,7 @@ public:
 private:
     FileMagicRule rule;
     FileMagicData magic;
-    FileRule file_rule;
     FileConfig *fc = nullptr;
-    bool need_active = false;
 };
 
 enum FileSid

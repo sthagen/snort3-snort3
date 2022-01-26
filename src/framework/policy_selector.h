@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -79,7 +79,7 @@ public:
         if (ps)
             ps->get_api()->dtor(ps);
     }
-    const PolicySelectorApi* get_api()
+    const PolicySelectorApi* get_api() const
     { return api; }
     virtual bool select_default_policies(const _daq_pkt_hdr*, const SnortConfig*) = 0;
     virtual void show() const = 0;

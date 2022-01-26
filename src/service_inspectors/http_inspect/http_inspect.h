@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -50,6 +50,7 @@ public:
     const Field& http_get_buf(Cursor& c, snort::Packet* p,
         const HttpBufferInfo& buffer_info) const;
     int32_t http_get_num_headers(snort::Packet* p, const HttpBufferInfo& buffer_info) const;
+    HttpEnums::VersionId http_get_version_id(snort::Packet* p) const;
     bool get_fp_buf(snort::InspectionBuffer::Type ibt, snort::Packet* p,
         snort::InspectionBuffer& b) override;
     bool configure(snort::SnortConfig*) override;

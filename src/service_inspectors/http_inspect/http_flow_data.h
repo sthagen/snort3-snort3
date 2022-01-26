@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -85,9 +85,6 @@ public:
     { h2_body_state[source_id] = state; }
 
     uint32_t get_h2_stream_id() const;
-
-    HttpEnums::VersionId get_version_id(HttpCommon::SourceId source_id) const
-    { return version_id[source_id]; }
 
 private:
     // HTTP/2 handling

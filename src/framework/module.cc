@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -176,6 +176,7 @@ void Module::reset_stats()
 PegCount Module::get_global_count(const char* name) const
 {
     const PegInfo* infos = get_pegs();
+    assert(infos);
 
     for ( unsigned i = 0; infos[i].name; i++ )
     {

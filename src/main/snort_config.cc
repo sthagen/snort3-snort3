@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -275,8 +275,6 @@ SnortConfig::~SnortConfig()
     if ( plugins )
         delete plugins;
     delete payload_injector_config;
-    InspectorManager::free_flow_tracking(flow_tracking);
-    PolicySelector::free_policy_selector(global_selector);
     clear_reload_resource_tuner_list();
 
     trim_heap();

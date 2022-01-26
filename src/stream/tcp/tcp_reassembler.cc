@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -787,7 +787,7 @@ void TcpReassembler::flush_queued_segments(
     TcpReassemblerState& trs, Flow* flow, bool clear, Packet* p)
 {
     bool pending = clear and paf_initialized(&trs.paf_state)
-        and (!trs.tracker->get_splitter() || trs.tracker->get_splitter()->finish(flow) );
+        and trs.tracker->splitter_finish(flow);
 
     if ( pending and !(flow->ssn_state.ignore_direction & trs.ignore_dir) )
         final_flush(trs, p, trs.packet_dir);
@@ -1145,7 +1145,7 @@ int TcpReassembler::flush_on_ack_policy(TcpReassemblerState& trs, Packet* p)
                 break;
 
             if ( trs.paf_state.paf == StreamSplitter::ABORT )
-                trs.tracker->get_splitter()->finish(p->flow);
+                trs.tracker->splitter_finish(p->flow);
 
             // for consistency with other cases, should return total
             // but that breaks flushing pipelined pdus

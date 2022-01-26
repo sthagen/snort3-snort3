@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -23,7 +23,7 @@
 #include <map>
 #include <vector>
 
-#include "file_api.h"
+#include "file_api/file_api.h"
 
 namespace snort
 {
@@ -88,7 +88,6 @@ private:
     bool signature_enabled = false;
     bool capture_enabled = false;
     int64_t verdict_delay = 0;
-
 };
 
 #endif

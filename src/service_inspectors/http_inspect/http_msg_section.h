@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -81,6 +81,7 @@ public:
 
     uint64_t get_transaction_id() { return trans_num; }
     int32_t get_num_headers(const HttpBufferInfo& buf) const;
+    HttpEnums::VersionId get_version_id() const { return version_id; }
 
     HttpMsgSection* next = nullptr;
 

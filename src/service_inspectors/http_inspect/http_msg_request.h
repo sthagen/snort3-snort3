@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2021 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -39,9 +39,14 @@ public:
         HttpCommon::SourceId source_id_, bool buf_owner, snort::Flow* flow_,
         const HttpParaList* params_);
     ~HttpMsgRequest() override;
+    bool detection_required() const override
+        { return version_id == HttpEnums::VERS_0_9; }
+    HttpEnums::InspectSection get_inspection_section() const override
+        { return HttpEnums::IS_HEADER; }
     void gen_events() override;
     void update_flow() override;
     void publish() override;
+
     const Field& get_method() { return method; }
     const Field& get_uri();
     const Field& get_uri_norm_classic();

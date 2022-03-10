@@ -1299,6 +1299,17 @@ does not apply to HTTP/2 or HTTP/3 traffic.
 
 The HTTP message body is gzip encoded and the FEXTRA flag is set in the gzip header.
 
+119:279
+
+Detected nesting of unescape functions(unescape, decodeURI, decodeURIComponent) in JavaScript code. 
+Indicates that this code most likely has more than one level of obfuscation. This alert is raised
+by the enhanced JavaScript normalizer.
+
+119:280
+
+Detected more than one encoding within unescape function call arguments in JavaScript code.
+This alert is raised by the enhanced JavaScript normalizer.
+
 121:1
 
 Invalid flag set on HTTP/2 frame header
@@ -1828,8 +1839,7 @@ Received TCP data with no TCP flags set.
 
 129:12
 
-Consecutive TCP small segments exceed the configured threshold. The size required to be a small segment can
-be configured via stream_tcp.small_segments.maximum_size, and the maximum number of these small segments can be configured
+Consecutive (in the order of received packets, not the order of sequence numbers) TCP small segments exceed the configured threshold. The size required to be a small segment can be configured via stream_tcp.small_segments.maximum_size, and the maximum number of these small segments can be configured
 with int stream_tcp.small_segments.count.
 
 129:13

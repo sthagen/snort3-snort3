@@ -154,27 +154,32 @@ feature is on by default: normalize_utf = false will deactivate it.
 ===== decompress_pdf
 
 decompress_pdf = true will enable decompression of compressed portions of
-PDF files encountered in a response body. http_inspect will examine the
-response body for PDF files that are then parsed to locate PDF streams with
+PDF files encountered in a message body. http_inspect will examine the
+message body for PDF files that are then parsed to locate PDF streams with
 a single /FlateDecode filter. The compressed content is decompressed and
 made available through the file data rule option.
 
 ===== decompress_swf
 
 decompress_swf = true will enable decompression of compressed SWF (Adobe
-Flash content) files encountered in a response body. The available
+Flash content) files encountered in a message body. The available
 decompression modes are ’deflate’ and ’lzma’. http_inspect will search for
 the file signatures CWS for Deflate/ZLIB and ZWS for LZMA. The compressed
 content is decompressed and made available through the file data rule
 option. The compressed SWF file signature is converted to FWS to indicate
 an uncompressed file.
 
+===== decompress_zip
+
+decompress_zip = true will enable decompression of compressed zip archives encountered in a message
+body. The compressed content is decompressed and made available through the file_data rule option.
+
 ===== decompress_vba
 
 decompress_vba = true will enable decompression of RLE (Run Length Encoding)
 compressed vba (Visual Basic for Applications) macro data of MS Office 
-files. The MS office files are PKZIP compressed which are parsed to locate 
-the OLE (Object Linking and Embedding) file embedded with the files 
+files encountered in a message body. The MS office files are PKZIP compressed which are parsed to
+locate the OLE (Object Linking and Embedding) file embedded with the files 
 containing RLE compressed vba macro data. The decompressed vba macro data is
 then made available through the vba_data ips rule option.
 
@@ -270,6 +275,10 @@ For example:
     a("hello") // will be substituted to 'console.log("hello")'
 
 The default list of ignore-identifiers is present in "snort_defaults.lua".
+
+Unescape function names should remain intact in the output. They ought to be
+included in the ignore list. If for some reason the user wants to disable unescape
+related features, then removing function's name from the ignore list does the trick.
 
 ===== xff_headers
 
@@ -705,6 +714,13 @@ refers to the actual HTTP/2 protocol with framed data. Messages that follow
 the general HTTP/1 format but contain version fields falsely claiming to be
 HTTP/2.0 or HTTP/0.9 will match "other" as described above. The http_version
 rule option is available to examine the actual bytes in the version field.
+
+===== http_header_test and http_trailer_test
+
+Rule options that perform various tests against a specific header and 
+trailer field, respectively. It can perform a range test, check whether the
+value is numeric or whether it is absent. Negative values are considered
+non-numeric. Values with more than 18 digits are considered non-numeric.
 
 ==== Timing issues and combining rule options
 

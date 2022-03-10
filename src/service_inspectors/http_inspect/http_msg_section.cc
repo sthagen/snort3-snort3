@@ -92,13 +92,6 @@ void HttpMsgSection::update_depth() const
     const int64_t& detect_depth_remaining = session_data->detect_depth_remaining[source_id];
     const int32_t& publish_depth_remaining = session_data->publish_depth_remaining[source_id];
 
-    if ((detect_depth_remaining <= 0) &&
-        (session_data->detection_status[source_id] == DET_ON) &&
-        !session_data->for_http2)
-    {
-        session_data->detection_status[source_id] = DET_DEACTIVATING;
-    }
-
     const unsigned target_size = (session_data->compression[source_id] == CMP_NONE) ?
         SnortConfig::get_conf()->max_pdu : GZIP_BLOCK_SIZE;
 
@@ -155,7 +148,7 @@ const Field& HttpMsgSection::classic_normalize(const Field& raw, Field& norm,
 
 const Field& HttpMsgSection::get_classic_buffer(unsigned id, uint64_t sub_id, uint64_t form)
 {
-    HttpBufferInfo buffer_info(id, sub_id, form);
+    const HttpBufferInfo buffer_info(id, sub_id, form);
 
     return get_classic_buffer(buffer_info);
 }
@@ -183,8 +176,10 @@ const Field& HttpMsgSection::get_classic_buffer(const HttpBufferInfo& buf)
       }
     case HTTP_BUFFER_HEADER:
     case HTTP_BUFFER_TRAILER:
+    case HTTP_HEADER_TEST:
+    case HTTP_TRAILER_TEST:
       {
-        HttpMsgHeadShared* const head = (buf.type == HTTP_BUFFER_HEADER) ?
+        HttpMsgHeadShared* const head = (buf.type == HTTP_BUFFER_HEADER || buf.type == HTTP_HEADER_TEST) ?
             (HttpMsgHeadShared*)header[buffer_side] : (HttpMsgHeadShared*)trailer[buffer_side];
         if (head == nullptr)
             return Field::FIELD_NULL;

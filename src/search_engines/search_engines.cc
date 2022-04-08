@@ -27,10 +27,9 @@
 using namespace snort;
 
 extern const BaseApi* se_ac_bnfa[];
+extern const BaseApi* se_ac_full[];
 
 #ifdef STATIC_SEARCH_ENGINES
-extern const BaseApi* se_ac_std[];
-extern const BaseApi* se_acsmx2[];
 #ifdef HAVE_HYPERSCAN
 extern const BaseApi* se_hyperscan[];
 #endif
@@ -39,10 +38,9 @@ extern const BaseApi* se_hyperscan[];
 void load_search_engines()
 {
     PluginManager::load_plugins(se_ac_bnfa);
+    PluginManager::load_plugins(se_ac_full);
 
 #ifdef STATIC_SEARCH_ENGINES
-    PluginManager::load_plugins(se_ac_std);
-    PluginManager::load_plugins(se_acsmx2);
 #ifdef HAVE_HYPERSCAN
     PluginManager::load_plugins(se_hyperscan);
 #endif

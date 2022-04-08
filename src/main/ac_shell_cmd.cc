@@ -27,7 +27,7 @@
 
 #include "control/control.h"
 
-ACShellCmd::ACShellCmd(ControlConn* ctrlcon, AnalyzerCommand* ac) : ctrlcon(ctrlcon), ac(ac)
+ACShellCmd::ACShellCmd(ControlConn* conn, AnalyzerCommand* ac) : AnalyzerCommand(conn), ac(ac)
 {
     assert(ac);
 
@@ -37,6 +37,7 @@ ACShellCmd::ACShellCmd(ControlConn* ctrlcon, AnalyzerCommand* ac) : ctrlcon(ctrl
 
 bool ACShellCmd::execute(Analyzer& analyzer, void** state)
 {
+    ctrlcon->set_user_network_policy();
     return ac->execute(analyzer, state);
 }
 

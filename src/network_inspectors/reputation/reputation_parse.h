@@ -20,13 +20,14 @@
 #ifndef REPUTATION_PARSE_H
 #define REPUTATION_PARSE_H
 
-#include "reputation_config.h"
+#include <cstdint>
 
-#define MANIFEST_FILENAME "interface.info"
+struct ReputationConfig;
+class ReputationData;
 
-void ip_list_init(uint32_t,ReputationConfig *config);
-void estimate_num_entries(ReputationConfig* config);
-int read_manifest(const char* filename, ReputationConfig* config);
-void add_block_allow_List(ReputationConfig* config);
+void ip_list_init(uint32_t max_entries, const ReputationConfig&, ReputationData&);
+void estimate_num_entries(ReputationData&);
+void read_manifest(const char* filename, const ReputationConfig&, ReputationData&);
+void add_block_allow_List(const ReputationConfig&, ReputationData&);
 
 #endif

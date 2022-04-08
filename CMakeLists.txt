@@ -3,7 +3,7 @@ project (snort CXX C)
 
 set (VERSION_MAJOR 3)
 set (VERSION_MINOR 1)
-set (VERSION_PATCH 25)
+set (VERSION_PATCH 27)
 set (VERSION_SUBLEVEL 0)
 set (VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_SUBLEVEL}")
 
@@ -114,6 +114,14 @@ if (ENABLE_STATIC_DAQ)
 else ()
     message("\
     DAQ Modules:    Dynamic")
+endif ()
+
+if (HAVE_ATOMIC)
+    message("\
+    libatomic:      User-specified")
+else ()
+    message("\
+    libatomic:      System-provided")
 endif ()
 
 if (HAVE_FLATBUFFERS)

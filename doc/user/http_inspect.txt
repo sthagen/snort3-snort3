@@ -76,10 +76,14 @@ will be removed.
 Having ips option 'js_data' in the rules automatically enables Enhanced
 Normalizer. The Enhanced Normalizer can normalize inline/external scripts.
 It supports scripts over multiple PDUs. It is a stateful JavaScript whitespace
-and identifiers normalizer. All JavaScript identifier names, except those from
+and identifiers normalizer. Normalizer concatenates string literals whenever 
+it's possible to do. This also works with any other normalizations that result
+in string literals. All JavaScript identifier names, except those from
 the ignore list, will be substituted with unified names in the following
-format: var_0000 -> var_ffff. Moreover, Normalizer validates the syntax
-concerning ECMA-262 Standard, including scope tracking and restrictions
+format: var_0000 -> var_ffff. But the unescape-like function names will be removed
+from the normalized data. The Normalizer tries to expand an escaped text,
+so it will appear in a usual form in the output. Moreover, Normalizer validates
+the syntax concerning ECMA-262 Standard, including scope tracking and restrictions
 for script elements. For more information on how additionally configure
 Enhanced Normalizer check with the following configuration options:
 js_norm_bytes_depth, js_norm_identifier_depth, js_norm_max_tmpl_nest,

@@ -43,9 +43,10 @@ extern THREAD_LOCAL const snort::Trace* http_trace;
 enum JSProgramScopeType : unsigned int;
 
 class JSIdentifierCtxBase;
-#ifdef CATCH_TEST_BUILD
+#if defined(CATCH_TEST_BUILD) || defined(BENCHMARK_TEST)
 class JSTokenizerTester;
-#endif
+#endif // CATCH_TEST_BUILD || BENCHMARK_TEST
+
 class JSTokenizer : public yyFlexLexer
 {
 private:
@@ -98,7 +99,7 @@ private:
     {
         Scope(ScopeType t) :
             type(t), meta_type(ScopeMetaType::NOT_SET), func_call_type(FuncType::NOT_FUNC),
-            ident_norm(true), block_param(false), do_loop(false)
+            ident_norm(true), block_param(false), do_loop(false), encoding(0), char_code_str(false)
         {}
 
         ScopeType type;
@@ -107,6 +108,8 @@ private:
         bool ident_norm;
         bool block_param;
         bool do_loop;
+        uint32_t encoding;
+        bool char_code_str;
     };
 
     enum ASIGroup
@@ -161,9 +164,13 @@ public:
         int cap_size = JSTOKENIZER_BUF_MAX_SIZE);
     ~JSTokenizer() override;
 
-    JSRet process(size_t& bytes_in);
+    JSRet process(size_t& bytes_in, bool external_script = false);
+
+    void reset_output()
+    { ignored_id_pos = -1; }
 
     bool is_unescape_nesting_seen() const;
+    bool is_mixed_encoding_seen() const;
 protected:
     [[noreturn]] void LexerError(const char* msg) override
     { snort::FatalError("%s", msg); }
@@ -180,7 +187,9 @@ private:
     JSRet do_identifier_substitution(const char* lexeme, bool id_part);
     JSRet push_identifier(const char* ident);
     bool unescape(const char* lexeme);
+    bool concatenate();
     void process_punctuator(JSToken tok = PUNCTUATOR);
+    void skip_punctuator();
     void process_closing_brace();
     JSRet process_subst_open();
 
@@ -209,10 +218,23 @@ private:
     FuncType func_call_type();
     FuncType detect_func_type();
     void check_function_nesting(FuncType);
+    void check_mixed_encoding(uint32_t);
     void set_block_param(bool);
     bool block_param();
     void set_do_loop(bool);
     bool do_loop();
+
+    void set_encoding(uint32_t f)
+    { scope_cur().encoding |= f; }
+
+    uint32_t encoding()
+    { return scope_cur().encoding; }
+
+    void set_char_code_str(bool f)
+    { scope_cur().char_code_str = f; }
+
+    bool char_code_str()
+    { return scope_cur().char_code_str; }
 
     static JSProgramScopeType m2p(ScopeMetaType);
     static const char* m2str(ScopeMetaType);
@@ -269,6 +291,12 @@ private:
     JSRet general_literal();
     JSRet general_identifier();
     void general_unicode();
+    void escaped_unicode();
+    void escaped_code_point();
+    void escaped_url_sequence();
+    void dec_code_point();
+    void hex_code_point();
+    void char_code_no_match();
 
     static const char* p_scope_codes[];
 
@@ -283,6 +311,7 @@ private:
     bool prefix_increment = false;
     bool dealias_stored = false;
     bool unescape_nest_seen = false;
+    bool mixed_encoding_seen = false;
 
     uint8_t max_template_nesting;
     std::stack<uint16_t, std::vector<uint16_t>> brace_depth;
@@ -291,6 +320,7 @@ private:
     JSIdentifierCtxBase& ident_ctx;
     size_t bytes_read;
     size_t tmp_bytes_read;
+    bool ext_script;
 
     struct
     {
@@ -325,7 +355,7 @@ private:
         {false, false, false, false, false, false, false, false, false, false, false,}
     };
 
-    std::streampos ignored_id_pos = -1;
+    std::streampos ignored_id_pos;
     struct FunctionIdentifier
     {
         bool operator< (const FunctionIdentifier& other) const
@@ -335,20 +365,21 @@ private:
         FuncType type;
     };
 
-    const std::array<FunctionIdentifier, 4> function_identifiers
+    const std::array<FunctionIdentifier, 5> function_identifiers
     {{
-        {"unescape",            FuncType::UNESCAPE  },
-        {"decodeURI",           FuncType::UNESCAPE  },
-        {"decodeURIComponent",  FuncType::UNESCAPE  },
-        {"String.fromCharCode", FuncType::CHAR_CODE }        
+        {"unescape",             FuncType::UNESCAPE },
+        {"decodeURI",            FuncType::UNESCAPE },
+        {"decodeURIComponent",   FuncType::UNESCAPE },
+        {"String.fromCharCode",  FuncType::CHAR_CODE},
+        {"String.fromCodePoint", FuncType::CHAR_CODE}
     }};
 
     const uint32_t max_bracket_depth;
     std::stack<Scope> scope_stack;
 
-#ifdef CATCH_TEST_BUILD
+#if defined(CATCH_TEST_BUILD) || defined(BENCHMARK_TEST)
     friend JSTokenizerTester;
-#endif // CATCH_TEST_BUILD
+#endif // CATCH_TEST_BUILD || BENCHMARK_TEST
 };
 
 #endif // JS_TOKENIZER_H

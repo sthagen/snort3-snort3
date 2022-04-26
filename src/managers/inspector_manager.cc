@@ -30,6 +30,7 @@
 #include "binder/bind_module.h"
 #include "detection/detect.h"
 #include "detection/detection_engine.h"
+#include "detection/fp_utils.h"
 #include "flow/flow.h"
 #include "flow/session.h"
 #include "log/messages.h"
@@ -862,6 +863,7 @@ void InspectorManager::add_plugin(const InspectApi* api)
 {
     PHObject* g = new PHObject(*api);
     s_handlers.emplace_back(g);
+    update_buffer_map(api->buffers, api->service);
 }
 
 static const InspectApi* get_plugin(const char* keyword)
@@ -2050,7 +2052,7 @@ void InspectorManager::full_inspection(Packet* p)
 {
     Flow* flow = p->flow;
 
-    if ( flow->has_service() and flow->searching_for_service()
+    if ( flow->service and flow->searching_for_service()
          and (!(p->is_cooked()) or p->is_defrag()) )
         bumble(p);
 
@@ -2118,7 +2120,13 @@ void InspectorManager::internal_execute(Packet* p)
     if ( p->disable_inspect )
         return;
 
-    if (!p->flow)
+    unsigned reload_id = SnortConfig::get_thread_reload_id();
+    if ( p->flow )
+    {
+        if ( p->flow->reload_id != reload_id )
+            DataBus::publish(FLOW_STATE_RELOADED_EVENT, p, p->flow);
+    }
+    else
         DataBus::publish(PKT_WITHOUT_FLOW_EVENT, p);
 
     FrameworkPolicy* fp = get_inspection_policy()->framework_policy;
@@ -2162,7 +2170,6 @@ void InspectorManager::internal_execute(Packet* p)
         if ( !p->has_paf_payload() and p->flow->flow_state == Flow::FlowState::INSPECT )
             p->flow->session->process(p);
 
-        unsigned reload_id = SnortConfig::get_thread_reload_id();
         if ( p->flow->reload_id != reload_id )
         {
             ::execute<T>(p, tp->first.vec, tp->first.num);
@@ -2172,7 +2179,7 @@ void InspectorManager::internal_execute(Packet* p)
                 return;
         }
 
-        if ( !p->flow->has_service() )
+        if ( !p->flow->service )
             ::execute<T>(p, fp->network.vec, fp->network.num);
 
         if ( p->disable_inspect )

@@ -132,7 +132,7 @@ MemoryContext::MemoryContext(MemoryTracker&) : saved(nullptr) { }
 MemoryContext::~MemoryContext() = default;
 Packet::Packet(bool)
 {
-    memset(this , 0, sizeof(*this));
+    memset((char*) this , 0, sizeof(*this));
     ip_proto_next = IpProtocol::PROTO_NOT_SET;
     packet_flags = PKT_FROM_CLIENT;
 }
@@ -156,6 +156,7 @@ bool SFDAQ::forwarding_packet(const DAQ_PktHdr_t*) { return false; }
 int SFDAQ::inject(DAQ_Msg_h, int, const uint8_t*, uint32_t) { return -1; }
 bool SFDAQ::can_inject() { return false; }
 bool SFDAQ::can_inject_raw() { return false; }
+bool SFDAQ::can_replace() { return false; }
 int SFDAQInstance::set_packet_verdict_reason(DAQ_Msg_h, uint8_t) { return 0; }
 DetectionEngine::DetectionEngine() = default;
 DetectionEngine::~DetectionEngine() = default;
@@ -206,7 +207,7 @@ void InspectorManager::thread_term() { }
 void InspectorManager::thread_stop(const SnortConfig*) { }
 void InspectorManager::thread_reinit(const SnortConfig*) { }
 void InspectorManager::thread_stop_removed(const SnortConfig*) { }
-void ModuleManager::accumulate() { }
+void ModuleManager::accumulate(const char*) { }
 void ModuleManager::accumulate_module(const char*) { }
 void Stream::handle_timeouts(bool) { }
 void Stream::purge_flows() { }

@@ -79,6 +79,16 @@ void FlowControl::clear_counts()
     num_flows = 0;
 }
 
+PegCount FlowControl::get_uni_flows() const
+{ return cache->uni_flows_size(); }
+
+PegCount FlowControl::get_uni_ip_flows() const
+{ return cache->uni_ip_flows_size(); }
+
+PegCount FlowControl::get_num_flows() const
+{ return cache->flows_size(); }
+
+
 //-------------------------------------------------------------------------
 // cache foo
 //-------------------------------------------------------------------------
@@ -437,11 +447,7 @@ unsigned FlowControl::process(Flow* flow, Packet* p)
     {
         unsigned reload_id = SnortConfig::get_thread_reload_id();
         if (flow->reload_id != reload_id)
-        {
             flow->network_policy_id = get_network_policy()->policy_id;
-            if (flow->flow_state == Flow::FlowState::INSPECT)
-                DataBus::publish(FLOW_STATE_RELOADED_EVENT, p, flow);
-        }
         else
         {
             set_inspection_policy(flow->inspection_policy_id);

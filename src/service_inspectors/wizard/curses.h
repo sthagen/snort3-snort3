@@ -21,9 +21,10 @@
 #define CURSES_H
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <vector>
+
+#include "mms_curse.h"
 
 enum DCE_State
 {
@@ -66,6 +67,12 @@ public:
         uint32_t helper;
     } dce;
 
+    struct MMS
+    {
+        MMS_State state;
+        MMS_State last_state;
+    } mms;
+
     struct SSL
     {
         SSL_State state;
@@ -78,6 +85,8 @@ public:
     CurseTracker()
     {
         dce.state = DCE_State::STATE_0;
+        mms.state = MMS_State::MMS_STATE__TPKT_VER;
+        mms.last_state = mms.state;
         ssl.state = SSL_State::BYTE_0_LEN_MSB;
     }
 };
@@ -87,7 +96,7 @@ typedef bool (* curse_alg)(const uint8_t* data, unsigned len, CurseTracker*);
 struct CurseDetails
 {
     std::string name;
-    std::shared_ptr<std::string> service;
+    const char* service;
     curse_alg alg;
     bool is_tcp;
 };

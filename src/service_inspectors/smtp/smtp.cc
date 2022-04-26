@@ -121,6 +121,7 @@ const SMTPToken smtp_resps[] =
     { "450",  3,  RESP_450, SMTP_CMD_TYPE_NORMAL },  /* Mailbox unavailable */
     { "451",  3,  RESP_451, SMTP_CMD_TYPE_NORMAL },  /* Local error in processing */
     { "452",  3,  RESP_452, SMTP_CMD_TYPE_NORMAL },  /* Insufficient system storage */
+    { "454",  3,  RESP_454, SMTP_CMD_TYPE_NORMAL },  /* TLS not available due to temporary reason */
     { "500",  3,  RESP_500, SMTP_CMD_TYPE_NORMAL },  /* Command unrecognized */
     { "501",  3,  RESP_501, SMTP_CMD_TYPE_NORMAL },  /* Syntax error in parameters or arguments */
     { "502",  3,  RESP_502, SMTP_CMD_TYPE_NORMAL },  /* Command not implemented */
@@ -200,7 +201,6 @@ static void SMTP_ResetState(Flow*);
 
 SmtpFlowData::SmtpFlowData() : FlowData(inspector_id)
 {
-    memset(&session, 0, sizeof(session));
     smtpstats.concurrent_sessions++;
     if (smtpstats.max_concurrent_sessions < smtpstats.concurrent_sessions)
         smtpstats.max_concurrent_sessions = smtpstats.concurrent_sessions;
@@ -703,6 +703,9 @@ static const uint8_t* SMTP_HandleCommand(SmtpProtoConf* config, Packet* p, SMTPD
     /* see if we actually found a command and not a substring */
     if (cmd_found > 0)
     {
+        if (!smtp_ssn->client_requested_starttls)
+            ++smtp_ssn->pipelined_command_counter;
+
         const uint8_t* tmp = ptr;
         const uint8_t* cmd_start = ptr + smtp_search_info.index;
         const uint8_t* cmd_end = cmd_start + smtp_search_info.length;
@@ -795,6 +798,8 @@ static const uint8_t* SMTP_HandleCommand(SmtpProtoConf* config, Packet* p, SMTPD
         DetectionEngine::queue_event(GID_SMTP, SMTP_ILLEGAL_CMD);
     }
 
+    bool alert_on_command_injection = smtp_ssn->client_requested_starttls;
+
     switch (smtp_search_info.id)
     {
     /* unless we do our own parsing of MAIL and RCTP commands we have to assume they
@@ -829,6 +834,10 @@ static const uint8_t* SMTP_HandleCommand(SmtpProtoConf* config, Packet* p, SMTPD
     case CMD_EHLO:
     case CMD_QUIT:
         smtp_ssn->state_flags &= ~(SMTP_FLAG_GOT_MAIL_CMD | SMTP_FLAG_GOT_RCPT_CMD);
+        smtp_ssn->client_requested_starttls = false;
+        smtp_ssn->server_accepted_starttls = false;
+        smtp_ssn->pipelined_command_counter = 0;
+        alert_on_command_injection = false;
 
         break;
 
@@ -837,8 +846,11 @@ static const uint8_t* SMTP_HandleCommand(SmtpProtoConf* config, Packet* p, SMTPD
          * command in reassembled packet and if not reassembled it should be the
          * last line in the packet as you can't pipeline the tls hello */
         if (eol == end)
+        {
             smtp_ssn->state = STATE_TLS_CLIENT_PEND;
-
+            smtp_ssn->client_requested_starttls = true;
+        }
+            
         break;
 
     case CMD_X_LINK2STATE:
@@ -982,6 +994,13 @@ static const uint8_t* SMTP_HandleCommand(SmtpProtoConf* config, Packet* p, SMTPD
             return nullptr;
     }
 
+     /*If client sends another command after STARTTLS raise the alert of command injection
+      STARTTLS command should be the last command when PIPELINING*/
+    if (alert_on_command_injection)
+    {
+       DetectionEngine::queue_event(GID_SMTP, SMTP_STARTTLS_INJECTION_ATTEMPT);
+    }
+
     return eol;
 }
 
@@ -1058,6 +1077,8 @@ static void SMTP_ProcessServerPacket(
         if (IsTlsServerHello(ptr, end))
         {
             smtp_ssn->state = STATE_TLS_DATA;
+            //TLS server hello received, reset flag
+            smtp_ssn->server_accepted_starttls = false;
         }
         else if ( !p->test_session_flags(SSNFLAG_MIDSTREAM)
             && !Stream::missed_packets(p->flow, SSN_DIR_BOTH))
@@ -1094,16 +1115,6 @@ static void SMTP_ProcessServerPacket(
                 /* This is either an initial server response or a STARTTLS response */
                 if (smtp_ssn->state == STATE_CONNECT)
                     smtp_ssn->state = STATE_COMMAND;
-
-                if (smtp_ssn->state == STATE_TLS_CLIENT_PEND)
-                {
-                    OpportunisticTlsEvent event(p, p->flow->service);
-                    DataBus::publish(OPPORTUNISTIC_TLS_EVENT, event, p->flow);
-                    ++smtpstats.starttls;
-                    if (smtp_ssn->state_flags & SMTP_FLAG_ABANDON_EVT)
-                        ++smtpstats.ssl_search_abandoned_too_soon;
-                }
-
                 break;
 
             case RESP_250:
@@ -1131,6 +1142,25 @@ static void SMTP_ProcessServerPacket(
                     *next_state = STATE_COMMAND;
                 }
                 break;
+            }
+            //Count responses of client commands, reset starttls waiting flag if response to STARTTLS is not 220
+            if (smtp_ssn->pipelined_command_counter > 0 and --smtp_ssn->pipelined_command_counter == 0 and smtp_ssn->client_requested_starttls)
+            {
+                if (smtp_search_info.id != RESP_220)
+                {
+                    smtp_ssn->client_requested_starttls = false;
+                    smtp_ssn->server_accepted_starttls = false;
+                }
+                else
+                {
+                    smtp_ssn->server_accepted_starttls = true;
+                    
+                    OpportunisticTlsEvent event(p, p->flow->service);
+                    DataBus::publish(OPPORTUNISTIC_TLS_EVENT, event, p->flow);
+                    ++smtpstats.starttls;
+                    if (smtp_ssn->state_flags & SMTP_FLAG_ABANDON_EVT)
+                        ++smtpstats.ssl_search_abandoned_too_soon;
+                }
             }
         }
         else
@@ -1199,18 +1229,16 @@ static void snort_smtp(SmtpProtoConf* config, Packet* p)
     else
     {
         /* This packet should be a tls client hello */
-        if (smtp_ssn->state == STATE_TLS_CLIENT_PEND)
+        if (smtp_ssn->server_accepted_starttls)
         {
             if (IsTlsClientHello(p->data, p->data + p->dsize))
             {
                 smtp_ssn->state = STATE_TLS_SERVER_PEND;
             }
-            else
-            {
-                /* reset state - server may have rejected STARTTLS command */
-                smtp_ssn->state = STATE_COMMAND;
-            }
         }
+        
+        if(smtp_ssn->state == STATE_TLS_CLIENT_PEND)
+            smtp_ssn->state = STATE_COMMAND;
 
         if ((smtp_ssn->state == STATE_TLS_DATA)
             || (smtp_ssn->state == STATE_TLS_SERVER_PEND))
@@ -1418,8 +1446,8 @@ public:
 
     bool configure(SnortConfig*) override;
     void show(const SnortConfig*) const override;
+
     void eval(Packet*) override;
-    bool get_buf(InspectionBuffer::Type, Packet*, InspectionBuffer&) override;
     void clear(Packet*) override;
 
     StreamSplitter* get_splitter(bool c2s) override
@@ -1433,8 +1461,7 @@ public:
 
     void ProcessSmtpCmdsList(const SmtpCmd*);
 
-    bool get_fp_buf(snort::InspectionBuffer::Type ibt, snort::Packet* p,
-        snort::InspectionBuffer& b) override;
+    bool get_fp_buf(snort::InspectionBuffer::Type, snort::Packet*, snort::InspectionBuffer&) override;
 
 private:
     SmtpProtoConf* config;
@@ -1488,40 +1515,6 @@ void Smtp::eval(Packet* p)
     snort_smtp(config, p);
 }
 
-bool Smtp::get_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)
-{
-    // Fast pattern buffers only supplied at specific times
-    switch (ibt)
-    {
-        case InspectionBuffer::IBT_ALT:
-            b.data = SMTP_GetAltBuffer(p, b.len);
-            return (b.data != nullptr);
-
-        case InspectionBuffer::IBT_VBA:
-        {
-            SMTPData* smtp_ssn = get_session_data(p->flow);
-
-            if (!smtp_ssn)
-                return false;
-
-            const BufferData& vba_buf = smtp_ssn->mime_ssn->get_vba_inspect_buf();
-
-            if (vba_buf.data_ptr() && vba_buf.length())
-            {
-                b.data = vba_buf.data_ptr();
-                b.len = vba_buf.length();
-                return true;
-            }
-            else
-                return false;
-        }
-        default:
-            break;
-    }
-    return false;
-
-}
-
 void Smtp::clear(Packet* p)
 {
     SMTP_ResetAltBuffer(p);
@@ -1562,7 +1555,23 @@ void Smtp::ProcessSmtpCmdsList(const SmtpCmd* sc)
 
 bool Smtp::get_fp_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)
 {
-    return get_buf(ibt, p, b);
+    if ( ibt != InspectionBuffer::IBT_VBA )
+        return false;
+
+    SMTPData* smtp_ssn = get_session_data(p->flow);
+
+    if (!smtp_ssn)
+        return false;
+
+    const BufferData& vba_buf = smtp_ssn->mime_ssn->get_vba_inspect_buf();
+
+    if ( vba_buf.data_ptr() && vba_buf.length() )
+    {
+        b.data = vba_buf.data_ptr();
+        b.len = vba_buf.length();
+        return true;
+    }
+    return false;
 }
 
 //-------------------------------------------------------------------------
@@ -1605,6 +1614,13 @@ static void smtp_dtor(Inspector* p)
     delete p;
 }
 
+static const char* smtp_bufs[] =
+{
+    "file_data",
+    "vba_data",
+    nullptr
+};
+
 const InspectApi smtp_api =
 {
     {
@@ -1621,7 +1637,7 @@ const InspectApi smtp_api =
     },
     IT_SERVICE,
     PROTO_BIT__PDU,
-    nullptr,                // buffers
+    smtp_bufs,
     "smtp",
     smtp_init,
     smtp_term,

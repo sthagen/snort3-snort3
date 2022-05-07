@@ -88,7 +88,7 @@ AppIdConfig stub_config;
 AppIdContext stub_ctxt(stub_config);
 OdpContext stub_odp_ctxt(stub_config, nullptr);
 AppIdSession::AppIdSession(IpProtocol, const SfIp* ip, uint16_t, AppIdInspector&,
-    OdpContext&, uint16_t) : FlowData(0), config(stub_config),
+    OdpContext&, uint32_t) : FlowData(0), config(stub_config),
     api(*(new AppIdSessionApi(this, *ip))), odp_ctxt(stub_odp_ctxt) { }
 AppIdSession::~AppIdSession() = default;
 AppIdDiscovery::~AppIdDiscovery() = default;
@@ -125,6 +125,7 @@ EveCaPatternMatchers::~EveCaPatternMatchers() = default;
 HttpPatternMatchers::~HttpPatternMatchers() = default;
 SipPatternMatchers::~SipPatternMatchers() = default;
 SslPatternMatchers::~SslPatternMatchers() = default;
+AlpnPatternMatchers::~AlpnPatternMatchers() = default;
 snort::SearchTool::SearchTool(bool) { }
 snort::SearchTool::~SearchTool() = default;
 

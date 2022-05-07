@@ -84,6 +84,7 @@ EveCaPatternMatchers::~EveCaPatternMatchers() = default;
 HttpPatternMatchers::~HttpPatternMatchers() = default;
 SipPatternMatchers::~SipPatternMatchers() = default;
 SslPatternMatchers::~SslPatternMatchers() = default;
+AlpnPatternMatchers::~AlpnPatternMatchers() = default;
 
 void Field::set(int32_t length, const uint8_t* start, bool own_the_buffer_)
 {
@@ -117,13 +118,13 @@ bool AppInfoManager::configured()
 
 // Stubs for service_state.h
 ServiceDiscoveryState* AppIdServiceState::get(SfIp const*, IpProtocol,
-    unsigned short, int16_t, uint16_t, bool, bool)
+    unsigned short, int16_t, uint32_t, bool, bool)
 {
   return nullptr;
 }
 
 ServiceDiscoveryState* AppIdServiceState::add(SfIp const*, IpProtocol,
-    unsigned short, int16_t, uint16_t, bool, bool)
+    unsigned short, int16_t, uint32_t, bool, bool)
 {
   return nullptr;
 }

@@ -47,7 +47,7 @@ namespace snort
 {
 // Stubs for appid api
 AppIdApi appid_api;
-const char* AppIdApi::get_application_name(AppId, OdpContext&) { return NULL; } 
+const char* AppIdApi::get_application_name(AppId, OdpContext&) { return NULL; }
 
 // Stubs for packet tracer
 THREAD_LOCAL PacketTracer* s_pkt_trace = nullptr;
@@ -143,6 +143,7 @@ EveCaPatternMatchers::~EveCaPatternMatchers() = default;
 HttpPatternMatchers::~HttpPatternMatchers() = default;
 SipPatternMatchers::~SipPatternMatchers() = default;
 SslPatternMatchers::~SslPatternMatchers() = default;
+AlpnPatternMatchers::~AlpnPatternMatchers() = default;
 
 void ApplicationDescriptor::set_id(const Packet&, AppIdSession&, AppidSessionDirection, AppId, AppidChangeBits&) { }
 void ApplicationDescriptor::set_id(AppId app_id){my_id = app_id;}
@@ -279,7 +280,7 @@ HostPortVal* HostPortCache::find(const SfIp*, uint16_t, IpProtocol, const OdpCon
     return nullptr;
 }
 void AppIdServiceState::check_reset(AppIdSession&, const SfIp*, uint16_t,
-    int16_t, uint16_t) {}
+    int16_t, uint32_t) {}
 bool do_tp_discovery(ThirdPartyAppIdContext& , AppIdSession&, IpProtocol,
     Packet*, AppidSessionDirection&, AppidChangeBits&)
 {

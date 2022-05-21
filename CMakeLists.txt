@@ -3,7 +3,7 @@ project (snort CXX C)
 
 set (VERSION_MAJOR 3)
 set (VERSION_MINOR 1)
-set (VERSION_PATCH 29)
+set (VERSION_PATCH 30)
 set (VERSION_SUBLEVEL 0)
 set (VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_SUBLEVEL}")
 
@@ -122,14 +122,6 @@ if (HAVE_ATOMIC)
 else ()
     message("\
     libatomic:      System-provided")
-endif ()
-
-if (HAVE_FLATBUFFERS)
-    message("\
-    Flatbuffers:    ON")
-else ()
-    message("\
-    Flatbuffers:    OFF")
 endif ()
 
 if (HAVE_HYPERSCAN)

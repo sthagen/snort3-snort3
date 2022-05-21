@@ -1351,7 +1351,7 @@ static void DCE2_SmbInjectDeletePdu(DCE2_SmbFileTracker* ftracker)
     Packet* inject_pkt = DetectionEngine::get_current_wire_packet();
     Packet* p = DetectionEngine::get_current_packet();
 
-    if ( inject_pkt->flow != p->flow )
+    if ( !inject_pkt || inject_pkt->flow != p->flow )
         return;
 
     NbssHdr* nb_hdr = (NbssHdr*)dce2_smb_delete_pdu;
@@ -1722,6 +1722,7 @@ void DCE2_SmbProcessFileData(DCE2_SmbSsnData* ssd,
     {
         set_file_data(data_ptr, (data_len > UINT16_MAX) ? UINT16_MAX : (uint16_t)data_len);
         DCE2_FileDetect();
+        set_file_data(nullptr, 0);
     }
 
     if (ftracker == ssd->fapi_ftracker)

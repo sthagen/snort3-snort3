@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2022 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,25 +15,25 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
-// pp_search_engine_iface.cc author Joel Cornett <jocornet@cisco.com>
+// http2_varlen_int_decode.h author Maya Dagon <mdagon@cisco.com>
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
+#ifndef HTTP2_VARLEN_INT_DECODE_H
+#define HTTP2_VARLEN_INT_DECODE_H
+
+#include "main/snort_types.h"
+
+template <typename EGen, typename Inf>
+class VarLengthIntDecode
+{
+public:
+    VarLengthIntDecode(uint8_t prefix);
+    bool translate(const uint8_t* in_buff, const uint32_t in_len, uint32_t& bytes_consumed,
+        uint64_t& result, EGen* const events, Inf* const infractions,
+        bool partial_header) const;
+
+private:
+    const uint8_t prefix_mask;
+};
+
 #endif
 
-#include "pp_search_engine_iface.h"
-
-#include "framework/mpse.h"
-
-using namespace snort;
-
-static const luaL_Reg methods[] =
-{
-    { nullptr, nullptr }
-};
-
-const struct Lua::InstanceInterface<Mpse> SearchEngineIface =
-{
-    "SearchEngine",
-    methods
-};

@@ -396,6 +396,9 @@ void HttpMsgBody::do_enhanced_js_normalization(const Field& input, Field& output
     auto http_header = get_header(source_id);
     auto normalizer = params->js_norm_param.js_norm;
 
+    if ((*infractions & INF_UNKNOWN_ENCODING) or (*infractions & INF_UNSUPPORTED_ENCODING))
+        return;
+
     if (session_data->is_pdu_missed())
     {
         *infractions += INF_JS_PDU_MISS;
@@ -581,6 +584,12 @@ const Field& HttpMsgBody::get_norm_js_data()
 {
     if (norm_js_data.length() != STAT_NOT_COMPUTE)
         return norm_js_data;
+
+    if (decompressed_file_body.length() <= 0)
+    {
+        norm_js_data.set(STAT_NO_SOURCE);
+        return norm_js_data;
+    }
 
     do_enhanced_js_normalization(decompressed_file_body, norm_js_data);
 

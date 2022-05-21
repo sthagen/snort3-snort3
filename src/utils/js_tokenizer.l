@@ -1103,14 +1103,14 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <dqstr,unesc_dqstr>{LITERAL_DQ_STRING_TEXT}   { dealias_append(); ECHO; }
 <dqstr,unesc_dqstr><<EOF>>                    { RETURN(SCRIPT_CONTINUE) }
 <dqstr>{UNICODE_ESCAPE_SEQUENCE}              |
-<dqstr>{HEX_ESCAPE_SEQUENCE}                  { escaped_unicode(); }
+<dqstr>{HEX_ESCAPE_SEQUENCE}                  { escaped_unicode_utf_8(); }
 <dqstr>{ESCAPED_CODE_POINT}                   { escaped_code_point(); }
-<unesc_dqstr>{UNICODE_ESCAPE_SEQUENCE}        { set_encoding(IS_UBACKSLASH_2); escaped_unicode(); }
-<unesc_dqstr>{HEX_ESCAPE_SEQUENCE}            { set_encoding(IS_XBACKSLASH); escaped_unicode(); }
+<unesc_dqstr>{UNICODE_ESCAPE_SEQUENCE}        { set_encoding(IS_UBACKSLASH_2); escaped_unicode_utf_8(); }
+<unesc_dqstr>{HEX_ESCAPE_SEQUENCE}            { set_encoding(IS_XBACKSLASH); escaped_unicode_latin_1(); }
 <unesc_dqstr>{ESCAPED_CODE_POINT}             { set_encoding(IS_UCODEPOINT); escaped_code_point(); }
-<unesc_dqstr>{BYTE_ESCAPE_SEQUENCE}           { set_encoding(IS_UBACKSLASH_1); escaped_unicode(); }
-<unesc_dqstr>{PERCENT_ESCAPE_SEQUENCE}        { set_encoding(IS_UPERCENT); escaped_unicode(); }
-<unesc_dqstr>{URL_ESCAPE_SEQUENCE}            { set_encoding(IS_PERCENT); escaped_url_sequence(); }
+<unesc_dqstr>{BYTE_ESCAPE_SEQUENCE}           { set_encoding(IS_UBACKSLASH_1); escaped_unicode_latin_1(); }
+<unesc_dqstr>{PERCENT_ESCAPE_SEQUENCE}        { set_encoding(IS_UPERCENT); escaped_unicode_utf_8(); }
+<unesc_dqstr>{URL_ESCAPE_SEQUENCE}            { set_encoding(IS_PERCENT); escaped_url_sequence_latin_1(); }
 
     {LITERAL_SQ_STRING_START}                 { EXEC(literal_sq_string_start()) }
 <sqstr,unesc_sqstr>{LITERAL_SQ_STRING_END}    { dealias_append(); ECHO; BEGIN(divop); }
@@ -1124,14 +1124,14 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <sqstr,unesc_sqstr>{LITERAL_SQ_STRING_TEXT}   { dealias_append(); ECHO; }
 <sqstr,unesc_sqstr><<EOF>>                    { RETURN(SCRIPT_CONTINUE) }
 <sqstr>{UNICODE_ESCAPE_SEQUENCE}              |
-<sqstr>{HEX_ESCAPE_SEQUENCE}                  { escaped_unicode(); }
+<sqstr>{HEX_ESCAPE_SEQUENCE}                  { escaped_unicode_utf_8(); }
 <sqstr>{ESCAPED_CODE_POINT}                   { escaped_code_point(); }
-<unesc_sqstr>{UNICODE_ESCAPE_SEQUENCE}        { set_encoding(IS_UBACKSLASH_2); escaped_unicode(); }
-<unesc_sqstr>{HEX_ESCAPE_SEQUENCE}            { set_encoding(IS_XBACKSLASH); escaped_unicode(); }
+<unesc_sqstr>{UNICODE_ESCAPE_SEQUENCE}        { set_encoding(IS_UBACKSLASH_2); escaped_unicode_utf_8(); }
+<unesc_sqstr>{HEX_ESCAPE_SEQUENCE}            { set_encoding(IS_XBACKSLASH); escaped_unicode_latin_1(); }
 <unesc_sqstr>{ESCAPED_CODE_POINT}             { set_encoding(IS_UCODEPOINT); escaped_code_point(); }
-<unesc_sqstr>{BYTE_ESCAPE_SEQUENCE}           { set_encoding(IS_UBACKSLASH_1); escaped_unicode(); }
-<unesc_sqstr>{PERCENT_ESCAPE_SEQUENCE}        { set_encoding(IS_UPERCENT); escaped_unicode(); }
-<unesc_sqstr>{URL_ESCAPE_SEQUENCE}            { set_encoding(IS_PERCENT); escaped_url_sequence(); }
+<unesc_sqstr>{BYTE_ESCAPE_SEQUENCE}           { set_encoding(IS_UBACKSLASH_1); escaped_unicode_latin_1(); }
+<unesc_sqstr>{PERCENT_ESCAPE_SEQUENCE}        { set_encoding(IS_UPERCENT); escaped_unicode_utf_8(); }
+<unesc_sqstr>{URL_ESCAPE_SEQUENCE}            { set_encoding(IS_PERCENT); escaped_url_sequence_latin_1(); }
 
     {LITERAL_TEMPLATE_START}                                 { EXEC(literal_template_start()) }
 <tmpll,unesc_tmpll>(\\\\)*{LITERAL_TEMPLATE_END}             { dealias_append(); ECHO; BEGIN(divop); }
@@ -1142,14 +1142,14 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <tmpll,unesc_tmpll>{LITERAL_TEMPLATE_OTHER}                  { dealias_append(); ECHO; }
 <tmpll,unesc_tmpll><<EOF>>                                   { RETURN(SCRIPT_CONTINUE) }
 <tmpll>{UNICODE_ESCAPE_SEQUENCE}                             |
-<tmpll>{HEX_ESCAPE_SEQUENCE}                                 { escaped_unicode(); }
+<tmpll>{HEX_ESCAPE_SEQUENCE}                                 { escaped_unicode_utf_8(); }
 <tmpll>{ESCAPED_CODE_POINT}                                  { escaped_code_point(); }
-<unesc_tmpll>{UNICODE_ESCAPE_SEQUENCE}                       { set_encoding(IS_UBACKSLASH_2); escaped_unicode(); }
-<unesc_tmpll>{HEX_ESCAPE_SEQUENCE}                           { set_encoding(IS_XBACKSLASH); escaped_unicode(); }
+<unesc_tmpll>{UNICODE_ESCAPE_SEQUENCE}                       { set_encoding(IS_UBACKSLASH_2); escaped_unicode_utf_8(); }
+<unesc_tmpll>{HEX_ESCAPE_SEQUENCE}                           { set_encoding(IS_XBACKSLASH); escaped_unicode_latin_1(); }
 <unesc_tmpll>{ESCAPED_CODE_POINT}                            { set_encoding(IS_UCODEPOINT); escaped_code_point(); }
-<unesc_tmpll>{BYTE_ESCAPE_SEQUENCE}                          { set_encoding(IS_UBACKSLASH_1); escaped_unicode(); }
-<unesc_tmpll>{PERCENT_ESCAPE_SEQUENCE}                       { set_encoding(IS_UPERCENT); escaped_unicode(); }
-<unesc_tmpll>{URL_ESCAPE_SEQUENCE}                           { set_encoding(IS_PERCENT); escaped_url_sequence(); }
+<unesc_tmpll>{BYTE_ESCAPE_SEQUENCE}                          { set_encoding(IS_UBACKSLASH_1); escaped_unicode_latin_1(); }
+<unesc_tmpll>{PERCENT_ESCAPE_SEQUENCE}                       { set_encoding(IS_UPERCENT); escaped_unicode_utf_8(); }
+<unesc_tmpll>{URL_ESCAPE_SEQUENCE}                           { set_encoding(IS_PERCENT); escaped_url_sequence_latin_1(); }
 
 <regst>{LITERAL_REGEX_START}        { EXEC(literal_regex_start()) }
 <regex>{LITERAL_REGEX_END}          { EXEC(literal_regex_end()) }
@@ -1162,7 +1162,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <regex>{LITERAL_REGEX_G_OPEN}       { EXEC(literal_regex_g_open()) }
 <regex>{LITERAL_REGEX_G_CLOSE}      { EXEC(literal_regex_g_close()) }
 <regex>{UNICODE_ESCAPE_SEQUENCE}    |
-<regex>{HEX_ESCAPE_SEQUENCE}        { escaped_unicode(); }
+<regex>{HEX_ESCAPE_SEQUENCE}        { escaped_unicode_utf_8(); }
 <regex><<EOF>>                      { RETURN(SCRIPT_CONTINUE) }
 
 <divop>{DIV_OPERATOR}               |
@@ -1500,7 +1500,7 @@ JSTokenizer::JSRet JSTokenizer::do_identifier_substitution(const char* lexeme, b
 
     set_ident_norm(true);
 
-    const char* name = ident_ctx.substitute(lexeme);
+    const char* name = ident_ctx.substitute(lexeme, id_part);
 
     if (!name)
     {
@@ -1511,19 +1511,11 @@ JSTokenizer::JSRet JSTokenizer::do_identifier_substitution(const char* lexeme, b
 
     if (ident_ctx.is_ignored(name))
     {
-        if (id_part)
-        {
-            std::string n(name);
-            n.push_back('+'); // any illegal symbol as a part of ID name
-            name = ident_ctx.substitute(n.c_str());
-        }
-        else
-        {
+        if (!id_part)
             ignored_id_pos = yyout.rdbuf()->pubseekoff(0, yyout.cur, std::ios_base::out);
-            set_ident_norm(false);
-            yyout << name;
-            return EOS;
-        }
+        set_ident_norm(false);
+        yyout << name;
+        return EOS;
     }
 
     const char* alias = id_part ? nullptr : ident_ctx.alias_lookup(lexeme);
@@ -1933,22 +1925,18 @@ JSTokenizer::FuncType JSTokenizer::detect_func_type()
         return FuncType::GENERAL;
 
     case IDENTIFIER:
-    {
-        FuncType ret = FuncType::GENERAL;
+        if (meta_type() == ScopeMetaType::FUNCTION or ignored_id_pos < 0)
+            return FuncType::GENERAL;
 
-        if (meta_type() == ScopeMetaType::FUNCTION)
-            return ret;
-
-        if (ignored_id_pos >= 0)
         {
+            char tail[256];
             std::streambuf* pbuf = yyout.rdbuf();
             std::streamsize size = pbuf->pubseekoff(0, yyout.cur, yyout.out) - ignored_id_pos;
-            assert(size >= 0);
 
-            char tail[256];
-            assert((size_t)size <= sizeof(tail));
+            if (size <= 0)
+                return FuncType::GENERAL;
+
             size = std::min((size_t)size, sizeof(tail));
-
             pbuf->pubseekoff(-size, yyout.cur, yyout.out);
             pbuf->sgetn(tail, size);
 
@@ -1957,15 +1945,13 @@ JSTokenizer::FuncType JSTokenizer::detect_func_type()
                 if ((unsigned)size == (unsigned)id.identifier.size() &&
                     memcmp(tail, id.identifier.data(), size) == 0)
                 {
-                    ret = id.type;
                     pbuf->pubseekoff(-size, yyout.cur, yyout.out);
-
-                    break;
+                    return id.type;
                 }
             }
+
+            return FuncType::GENERAL;
         }
-        return ret;
-    }
 
     default:
         return FuncType::NOT_FUNC;
@@ -2082,7 +2068,8 @@ void JSTokenizer::dealias_clear_mutated(bool id_continue)
 {
     if (!id_continue && prefix_increment && dealias_stored)
     {
-        ident_ctx.add_alias(last_dealiased.c_str(), std::string(ident_ctx.substitute(last_dealiased.c_str())));
+        ident_ctx.add_alias(last_dealiased.c_str(),
+            std::string(ident_ctx.substitute(last_dealiased.c_str(), false)));
     }
     dealias_stored = false;
     prefix_increment = false;
@@ -2092,7 +2079,8 @@ void JSTokenizer::dealias_increment()
 {
     if (dealias_stored)
     {
-        ident_ctx.add_alias(last_dealiased.c_str(), std::string(ident_ctx.substitute(last_dealiased.c_str())));
+        ident_ctx.add_alias(last_dealiased.c_str(),
+            std::string(ident_ctx.substitute(last_dealiased.c_str(), false)));
     }
     prefix_increment = token != IDENTIFIER && token != CLOSING_BRACKET;
     dealias_stored = false;
@@ -2124,7 +2112,7 @@ void JSTokenizer::dealias_identifier(bool id_part, bool assignment_start)
     {
         auto dealias = ident_ctx.alias_lookup(lexeme);
         if ((!ident_norm() && id_part) ||
-            (ident_ctx.is_ignored(ident_ctx.substitute(lexeme)) && !id_part))
+            (!id_part && ident_ctx.is_ignored(ident_ctx.substitute(lexeme, false))))
             aliased << YYText();
         else if (dealias)
             aliased << dealias;
@@ -2142,7 +2130,10 @@ void JSTokenizer::dealias_equals(bool complex_assignment)
         if (complex_assignment)
         {
             if (ident_ctx.alias_lookup(alias.c_str()))
-                ident_ctx.add_alias(alias.c_str(), std::string(ident_ctx.substitute(alias.c_str())));
+            {
+                ident_ctx.add_alias(alias.c_str(),
+                    std::string(ident_ctx.substitute(alias.c_str(), false)));
+            }
             alias_state = ALIAS_NONE;
         }
         else
@@ -2156,7 +2147,10 @@ void JSTokenizer::dealias_reset()
     {
         if (alias_state == ALIAS_VALUE || alias_state == ALIAS_EQUALS)
             if (ident_ctx.alias_lookup(alias.c_str()))
-                ident_ctx.add_alias(alias.c_str(), std::string(ident_ctx.substitute(alias.c_str())));
+            {
+                ident_ctx.add_alias(alias.c_str(),
+                    std::string(ident_ctx.substitute(alias.c_str(), false)));
+            }
         alias_state = ALIAS_NONE;
     }
 }
@@ -2306,30 +2300,63 @@ JSTokenizer::JSRet JSTokenizer::literal_regex_g_open()
     if (regex_stack.size() >= max_template_nesting)
         return TEMPLATE_NESTING_OVERFLOW;
 
-    regex_stack.push(yytext[0]);
+    // special meaning only outside of a character class
+    if (regex_stack.empty() or regex_stack.top() != '[')
+        regex_stack.push(yytext[0]);
+
     ECHO;
     return EOS;
 }
 
 JSTokenizer::JSRet JSTokenizer::literal_regex_g_close()
 {
+    char c_close = yytext[0];
+
     if (regex_stack.empty())
     {
+        // a raw bracket is allowed in regex w/o unicode flag,
+        // but the parser will accept a bracket in regex with unicode flag
+        if (c_close == ']')
+        {
+            ECHO;
+            return EOS;
+        }
+
         debug_logf(5, http_trace, TRACE_JS_PROC, nullptr,
             "no group to close, .. %c\n", yytext[0]);
         return BAD_TOKEN;
     }
 
-    char c = yytext[0];
-    char o = regex_stack.top();
-    char d = o == '(' ? 1 : 2;
+    char c_open = regex_stack.top();
+    bool mismatch = false;
 
-    regex_stack.pop();
+    switch (c_open)
+    {
+    case '(':
+        mismatch = c_close != ')';
+        regex_stack.pop();
+        break;
 
-    if (o + d != c)
+    case '[':
+         // only the closing bracket has an effect in a character set
+        if (c_close == ']')
+            regex_stack.pop();
+        break;
+
+    case '{':
+        mismatch = c_close != '}';
+        regex_stack.pop();
+        break;
+
+    default:
+        assert(false);
+        mismatch = true;
+    }
+
+    if (mismatch)
     {
         debug_logf(5, http_trace, TRACE_JS_PROC, nullptr,
-            "closing symbol mismatch, %c .. %c\n", o, c);
+            "closing symbol mismatch, %c .. %c\n", c_open, c_close);
         return BAD_TOKEN;
     }
 
@@ -2768,7 +2795,7 @@ JSTokenizer::JSRet JSTokenizer::operator_prefix()
     EXEC(do_semicolon_insertion(ASI_GROUP_6))
     EXEC(do_operator_spacing())
     ECHO;
-    BEGIN(divop);
+    BEGIN(regst);
     set_ident_norm(true);
     return EOS;
 }
@@ -2792,7 +2819,7 @@ JSTokenizer::JSRet JSTokenizer::general_operator()
     dealias_prefix_reset();
     EXEC(do_operator_spacing())
     ECHO;
-    BEGIN(divop);
+    BEGIN(regst);
     set_ident_norm(true);
     return EOS;
 }
@@ -2836,7 +2863,14 @@ void JSTokenizer::general_unicode()
     set_ident_norm(true);
 }
 
-void JSTokenizer::escaped_unicode()
+void JSTokenizer::escaped_unicode_latin_1()
+{
+    // truncate escape symbol, get hex number only
+    std::string code(YYText() + 2);
+    yyout << (char)std::stoi(code, nullptr, 16);
+}
+
+void JSTokenizer::escaped_unicode_utf_8()
 {
     // truncate escape symbol, get hex number only
     std::string code(YYText() + 2);
@@ -2851,11 +2885,11 @@ void JSTokenizer::escaped_code_point()
     yyout << unicode_to_utf8(std::stoi(code, nullptr, 16));
 }
 
-void JSTokenizer::escaped_url_sequence()
+void JSTokenizer::escaped_url_sequence_latin_1()
 {
     // truncate escape symbol, get hex number only
     std::string code(YYText() + 1);
-    yyout << unicode_to_utf8(std::stoi(code, nullptr, 16));
+    yyout << (char)std::stoi(code, nullptr, 16);
 }
 
 void JSTokenizer::dec_code_point()

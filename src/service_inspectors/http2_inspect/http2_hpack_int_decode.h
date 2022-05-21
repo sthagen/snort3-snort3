@@ -21,6 +21,8 @@
 #define HTTP2_HPACK_INT_DECODE_H
 
 #include "http2_enum.h"
+#include "http2_varlen_int_decode.h"
+
 #include "main/snort_types.h"
 #include "utils/event_gen.h"
 #include "utils/infractions.h"
@@ -30,17 +32,7 @@ using Http2Infractions = Infractions<Http2Enums::INF__MAX_VALUE, Http2Enums::INF
 using Http2EventGen = EventGen<Http2Enums::EVENT__MAX_VALUE, Http2Enums::EVENT__NONE,
     Http2Enums::HTTP2_GID>;
 
-class Http2HpackIntDecode
-{
-public:
-    Http2HpackIntDecode(uint8_t prefix);
-    bool translate(const uint8_t* in_buff, const uint32_t in_len, uint32_t& bytes_consumed,
-        uint64_t& result, Http2EventGen* const events, Http2Infractions* const infractions,
-        bool partial_header) const;
-
-private:
-    const uint8_t prefix_mask;
-};
+using Http2HpackIntDecode = VarLengthIntDecode<Http2EventGen, Http2Infractions>;
 
 #endif
 

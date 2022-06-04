@@ -137,6 +137,7 @@ private:
         ALIAS_PREFIX,     // var a +%possible PDU split%
                           // to handle ambiguity between a++, a+=, and a + b
         ALIAS_EQUALS,     // var a =
+        ALIAS_NEW,        // var a = new
         ALIAS_VALUE       // var a = eval
     };
 
@@ -285,6 +286,7 @@ private:
     JSRet keyword_catch();
     JSRet keyword_while();
     JSRet keyword_B();
+    JSRet keyword_new();
     JSRet keyword_BA();
     JSRet keyword_finally();
     JSRet keyword_do();
@@ -301,8 +303,7 @@ private:
     void escaped_unicode_utf_8();
     void escaped_code_point();
     void escaped_url_sequence_latin_1();
-    void dec_code_point();
-    void hex_code_point();
+    void lit_int_code_point(int base);
     void char_code_no_match();
 
     static const char* p_scope_codes[];

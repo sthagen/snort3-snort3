@@ -32,6 +32,7 @@
 
 #include "utils/js_tokenizer.h"
 
+#include <algorithm>
 #include <cassert>
 
 #include "utils/js_identifier_ctx.h"
@@ -86,14 +87,16 @@ constexpr bool JSTokenizer::insert_semicolon[ASI_GROUP_MAX][ASI_GROUP_MAX];
 
 enum EncodingType
 {
-    IS_HEX          = 1 << 0,   // hex code unit: 0xXXXX
-    IS_DEC          = 1 << 1,   // dec code unit: XXXX
-    IS_XBACKSLASH   = 1 << 2,   // \xXX
-    IS_UBACKSLASH_1 = 1 << 3,   // \uXX
-    IS_UBACKSLASH_2 = 1 << 4,   // \uXXXX
-    IS_UPERCENT     = 1 << 5,   // %uXXXX
-    IS_PERCENT      = 1 << 6,   // %XX
-    IS_UCODEPOINT   = 1 << 7    // \u{0xXXXX}
+    IS_BIN          = 1 << 0,   // bin code unit: 0bXXXX
+    IS_OCT          = 1 << 1,   // oct code unit: 0oXXXX
+    IS_DEC          = 1 << 2,   // dec code unit: XXXX
+    IS_HEX          = 1 << 3,   // hex code unit: 0xXXXX
+    IS_XBACKSLASH   = 1 << 4,   // \xXX
+    IS_UBACKSLASH_1 = 1 << 5,   // \uXX
+    IS_UBACKSLASH_2 = 1 << 6,   // \uXXXX
+    IS_UPERCENT     = 1 << 7,   // %uXXXX
+    IS_PERCENT      = 1 << 8,   // %XX
+    IS_UCODEPOINT   = 1 << 9    // \u{0xXXXX}
 };
 
 %}
@@ -936,7 +939,8 @@ KEYWORD_DO          do
 KEYWORD_WITH        with
 KEYWORD_SWITCH      switch
 KEYWORD_TRY         try
-KEYWORD_B           delete|new|throw|typeof|void
+KEYWORD_B           delete|throw|typeof|void
+KEYWORD_NEW         new
 /* keywords that can not appear at the beginning or the end of Statement*/
 KEYWORD_ELSE        else
 KEYWORD_CATCH       catch
@@ -980,25 +984,32 @@ IDENTIFIER          ({IDENTIFIER_START}{IDENTIFIER_PART})*
 LITERAL_NULL                  null
 LITERAL_THIS                  this
 LITERAL_BOOLEAN               true|false
-LITERAL_DECIMAL               [.]?[0-9]+[\.]?[0-9]*[eE]?[0-9]*
-LITERAL_INTEGER               [0-9]*
-LITERAL_HEX_INTEGER           0x[0-9a-fA-F]*|0X[0-9a-fA-F]*
+LITERAL_BIN_INTEGER           0[bB][01](_?[01])*
+LITERAL_OCT_INTEGER           0[oO]?[0-7](_?[0-7])*
+LITERAL_DECIMAL               [.]?(_?[0-9])+[\.]?(_?[0-9])*([eE](_?[0-9])+)?
+LITERAL_INTEGER               [0-9](_?[0-9])*
+LITERAL_HEX_INTEGER           0[xX][a-fA-F0-9](_?[a-fA-F0-9])*
+LITERAL_BIG_INTEGER           ({LITERAL_DECIMAL}|{LITERAL_BIN_INTEGER}|{LITERAL_OCT_INTEGER}|{LITERAL_HEX_INTEGER})n
+
 LITERAL_DQ_STRING_START       \"
 LITERAL_DQ_STRING_END         \"
 LITERAL_DQ_STRING_SKIP        \\\"|\\\\
-LITERAL_DQ_STRING_TEXT        [^\"\\%\xA\xD\{0x10}(\xE2\x80\xA8)(\xE2\x80\xA9)("<"+(?i:script))("<"+(?i:\/script>))]{1,32}
+LITERAL_DQ_STRING_TEXT        [^\\%<\xA\xD\xE2"]{1,32}|.
+
 LITERAL_SQ_STRING_START       \'
 LITERAL_SQ_STRING_END         \'
 LITERAL_SQ_STRING_SKIP        \\\'|\\\\
-LITERAL_SQ_STRING_TEXT        [^\'\\%\xA\xD\{0x10}(\xE2\x80\xA8)(\xE2\x80\xA9)("<"+(?i:script))("<"+(?i:\/script>))]{1,32}
+LITERAL_SQ_STRING_TEXT        [^\\%<\xA\xD\xE2']{1,32}|.
+
 LITERAL_TEMPLATE_START        \`
 LITERAL_TEMPLATE_END          \`
 LITERAL_TEMPLATE_SUBST_START  \$\{
-LITERAL_TEMPLATE_OTHER        [^\\%\`(\$\{)("<"+(?i:\/script>))]{1,32}
+LITERAL_TEMPLATE_TEXT         [^\\%<$`]{1,32}|.
+
 LITERAL_REGEX_START           \/[^*\/]
 LITERAL_REGEX_END             \/[gimsuy]*
 LITERAL_REGEX_SKIP            \\\/|\\\\|\\\(|\\\)|\\\[|\\\]|\\\{|\\\}
-LITERAL_REGEX_TEXT            [^<{LF}{CR}{LS}{PS}\\\/\(\[\{\)\]\}]+
+LITERAL_REGEX_TEXT            [^\\<\xA\xD\xE2/\(\)\[\]\{\}]{1,32}|.
 LITERAL_REGEX_G_OPEN          \(|\[|\{
 LITERAL_REGEX_G_CLOSE         \)|\]|\}
 /* extra literals */
@@ -1006,7 +1017,7 @@ LITERAL_REGEX_G_CLOSE         \)|\]|\}
 LITERAL_UNDEFINED             undefined
 LITERAL_INFINITY              Infinity|\xE2\x88\x9E
 LITERAL_NAN                   NaN
-LITERAL                       {LITERAL_NULL}|{LITERAL_THIS}|{LITERAL_BOOLEAN}|{LITERAL_DECIMAL}|{LITERAL_HEX_INTEGER}|{LITERAL_UNDEFINED}|{LITERAL_INFINITY}|{LITERAL_NAN}
+LITERAL                       {LITERAL_NULL}|{LITERAL_THIS}|{LITERAL_BOOLEAN}|{LITERAL_DECIMAL}|{LITERAL_BIN_INTEGER}|{LITERAL_OCT_INTEGER}|{LITERAL_HEX_INTEGER}|{LITERAL_BIG_INTEGER}|{LITERAL_UNDEFINED}|{LITERAL_INFINITY}|{LITERAL_NAN}
 
 HTML_COMMENT_OPEN         "<"+"!--"
 HTML_TAG_SCRIPT_OPEN      "<"+(?i:script)[\x9\xA\xC\x20\x2f\x3e]
@@ -1073,10 +1084,11 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <char_code>{LINE_COMMENT_START}               { BEGIN(char_code_lcomm); }
 <lcomm>{LINE_COMMENT_END1}                    { BEGIN(regst); newline_found = true; }
 <lcomm>{LINE_COMMENT_END2}                    { BEGIN(regst); newline_found = true; }
+<lcomm>{LINE_COMMENT_END4}                    { if (!ext_script) { BEGIN(regst); EXEC(html_closing_script_tag()) } }
 <char_code_lcomm>{LINE_COMMENT_END1}          { BEGIN(char_code); newline_found = true; }
 <char_code_lcomm>{LINE_COMMENT_END2}          { BEGIN(char_code); newline_found = true; }
+<char_code_lcomm>{LINE_COMMENT_END4}          { if (!ext_script) { BEGIN(regst); RETURN(CLOSING_TAG) } }
 <lcomm,char_code_lcomm>{LINE_COMMENT_END3}    { if (!ext_script) { BEGIN(regst); RETURN(OPENING_TAG) } }
-<lcomm,char_code_lcomm>{LINE_COMMENT_END4}    { if (!ext_script) { BEGIN(regst); RETURN(CLOSING_TAG) } }
 <lcomm,char_code_lcomm>{LINE_COMMENT_SKIP}    { /* skip */ }
 <lcomm,char_code_lcomm><<EOF>>                { RETURN(SCRIPT_CONTINUE) }
 
@@ -1099,8 +1111,6 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <dqstr,unesc_dqstr>\\{LF}                     { /* skip */ }
 <dqstr,unesc_dqstr>\\{CR}                     { /* skip */ }
 <dqstr,unesc_dqstr>{LINE_TERMINATORS}         { BEGIN(regst); RETURN(BAD_TOKEN) }
-<dqstr,unesc_dqstr>{LITERAL_DQ_STRING_SKIP}   { dealias_append(); ECHO; }
-<dqstr,unesc_dqstr>{LITERAL_DQ_STRING_TEXT}   { dealias_append(); ECHO; }
 <dqstr,unesc_dqstr><<EOF>>                    { RETURN(SCRIPT_CONTINUE) }
 <dqstr>{UNICODE_ESCAPE_SEQUENCE}              |
 <dqstr>{HEX_ESCAPE_SEQUENCE}                  { escaped_unicode_utf_8(); }
@@ -1111,6 +1121,8 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <unesc_dqstr>{BYTE_ESCAPE_SEQUENCE}           { set_encoding(IS_UBACKSLASH_1); escaped_unicode_latin_1(); }
 <unesc_dqstr>{PERCENT_ESCAPE_SEQUENCE}        { set_encoding(IS_UPERCENT); escaped_unicode_utf_8(); }
 <unesc_dqstr>{URL_ESCAPE_SEQUENCE}            { set_encoding(IS_PERCENT); escaped_url_sequence_latin_1(); }
+<dqstr,unesc_dqstr>{LITERAL_DQ_STRING_SKIP}   { dealias_append(); ECHO; }
+<dqstr,unesc_dqstr>{LITERAL_DQ_STRING_TEXT}   { dealias_append(); ECHO; }
 
     {LITERAL_SQ_STRING_START}                 { EXEC(literal_sq_string_start()) }
 <sqstr,unesc_sqstr>{LITERAL_SQ_STRING_END}    { dealias_append(); ECHO; BEGIN(divop); }
@@ -1120,8 +1132,6 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <sqstr,unesc_sqstr>\\{LF}                     { /* skip */ }
 <sqstr,unesc_sqstr>\\{CR}                     { /* skip */ }
 <sqstr,unesc_sqstr>{LINE_TERMINATORS}         { BEGIN(regst); RETURN(BAD_TOKEN) }
-<sqstr,unesc_sqstr>{LITERAL_SQ_STRING_SKIP}   { dealias_append(); ECHO; }
-<sqstr,unesc_sqstr>{LITERAL_SQ_STRING_TEXT}   { dealias_append(); ECHO; }
 <sqstr,unesc_sqstr><<EOF>>                    { RETURN(SCRIPT_CONTINUE) }
 <sqstr>{UNICODE_ESCAPE_SEQUENCE}              |
 <sqstr>{HEX_ESCAPE_SEQUENCE}                  { escaped_unicode_utf_8(); }
@@ -1132,14 +1142,13 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <unesc_sqstr>{BYTE_ESCAPE_SEQUENCE}           { set_encoding(IS_UBACKSLASH_1); escaped_unicode_latin_1(); }
 <unesc_sqstr>{PERCENT_ESCAPE_SEQUENCE}        { set_encoding(IS_UPERCENT); escaped_unicode_utf_8(); }
 <unesc_sqstr>{URL_ESCAPE_SEQUENCE}            { set_encoding(IS_PERCENT); escaped_url_sequence_latin_1(); }
+<sqstr,unesc_sqstr>{LITERAL_SQ_STRING_SKIP}   { dealias_append(); ECHO; }
+<sqstr,unesc_sqstr>{LITERAL_SQ_STRING_TEXT}   { dealias_append(); ECHO; }
 
     {LITERAL_TEMPLATE_START}                                 { EXEC(literal_template_start()) }
 <tmpll,unesc_tmpll>(\\\\)*{LITERAL_TEMPLATE_END}             { dealias_append(); ECHO; BEGIN(divop); }
 <tmpll,unesc_tmpll>(\\\\)*{LITERAL_TEMPLATE_SUBST_START}     { EXEC(process_subst_open()) dealias_reset(); }
 <tmpll,unesc_tmpll>{HTML_TAG_SCRIPT_CLOSE}                   { BEGIN(regst); RETURN(CLOSING_TAG) }
-<tmpll,unesc_tmpll>(\\\\)*\\{LITERAL_TEMPLATE_SUBST_START}   | /* escaped template substitution */
-<tmpll,unesc_tmpll>(\\\\)*\\{LITERAL_TEMPLATE_END}           | /* escaped backtick */
-<tmpll,unesc_tmpll>{LITERAL_TEMPLATE_OTHER}                  { dealias_append(); ECHO; }
 <tmpll,unesc_tmpll><<EOF>>                                   { RETURN(SCRIPT_CONTINUE) }
 <tmpll>{UNICODE_ESCAPE_SEQUENCE}                             |
 <tmpll>{HEX_ESCAPE_SEQUENCE}                                 { escaped_unicode_utf_8(); }
@@ -1150,6 +1159,9 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <unesc_tmpll>{BYTE_ESCAPE_SEQUENCE}                          { set_encoding(IS_UBACKSLASH_1); escaped_unicode_latin_1(); }
 <unesc_tmpll>{PERCENT_ESCAPE_SEQUENCE}                       { set_encoding(IS_UPERCENT); escaped_unicode_utf_8(); }
 <unesc_tmpll>{URL_ESCAPE_SEQUENCE}                           { set_encoding(IS_PERCENT); escaped_url_sequence_latin_1(); }
+<tmpll,unesc_tmpll>(\\\\)*\\{LITERAL_TEMPLATE_SUBST_START}   | /* escaped template substitution */
+<tmpll,unesc_tmpll>(\\\\)*\\{LITERAL_TEMPLATE_END}           | /* escaped backtick */
+<tmpll,unesc_tmpll>{LITERAL_TEMPLATE_TEXT}                   { dealias_append(); ECHO; }
 
 <regst>{LITERAL_REGEX_START}        { EXEC(literal_regex_start()) }
 <regex>{LITERAL_REGEX_END}          { EXEC(literal_regex_end()) }
@@ -1157,12 +1169,12 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <regex>\\{LF}                       |
 <regex>\\{CR}                       |
 <regex>{LINE_TERMINATORS}           { BEGIN(regst); RETURN(BAD_TOKEN) }
-<regex>{LITERAL_REGEX_SKIP}         { ECHO; }
-<regex>{LITERAL_REGEX_TEXT}         { ECHO; }
 <regex>{LITERAL_REGEX_G_OPEN}       { EXEC(literal_regex_g_open()) }
 <regex>{LITERAL_REGEX_G_CLOSE}      { EXEC(literal_regex_g_close()) }
 <regex>{UNICODE_ESCAPE_SEQUENCE}    |
 <regex>{HEX_ESCAPE_SEQUENCE}        { escaped_unicode_utf_8(); }
+<regex>{LITERAL_REGEX_SKIP}         { ECHO; }
+<regex>{LITERAL_REGEX_TEXT}         { ECHO; }
 <regex><<EOF>>                      { RETURN(SCRIPT_CONTINUE) }
 
 <divop>{DIV_OPERATOR}               |
@@ -1200,6 +1212,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 {KEYWORD_CATCH}                     { EXEC(keyword_catch()) }
 {KEYWORD_WHILE}                     { EXEC(keyword_while()) }
 {KEYWORD_B}                         { EXEC(keyword_B()) }
+{KEYWORD_NEW}                       { EXEC(keyword_new())}
 {KEYWORD_BA}                        { EXEC(keyword_BA()) }
 {KEYWORD_TRY}                       |
 {KEYWORD_ELSE}                      |
@@ -1215,8 +1228,10 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 {LITERAL}                           { EXEC(general_literal()) }
 {IDENTIFIER}                        { EXEC(general_identifier()) }
 
-<char_code>{LITERAL_INTEGER}       { set_encoding(IS_DEC); dec_code_point(); }
-<char_code>{LITERAL_HEX_INTEGER}   { set_encoding(IS_HEX); hex_code_point(); }
+<char_code>{LITERAL_BIN_INTEGER}   { set_encoding(IS_BIN); lit_int_code_point(2); }
+<char_code>{LITERAL_OCT_INTEGER}   { set_encoding(IS_OCT); lit_int_code_point(8); }
+<char_code>{LITERAL_INTEGER}       { set_encoding(IS_DEC); lit_int_code_point(10); }
+<char_code>{LITERAL_HEX_INTEGER}   { set_encoding(IS_HEX); lit_int_code_point(16); }
 
 .|{ALL_UNICODE}                     { general_unicode(); }
 
@@ -2120,6 +2135,13 @@ void JSTokenizer::dealias_identifier(bool id_part, bool assignment_start)
             dealias_reset();
         break;
     }
+    case ALIAS_NEW:
+    {
+        if (ident_norm())
+            break;
+        ident_ctx.add_alias(alias.c_str(), std::string(ident_ctx.substitute(alias.c_str(), false)));
+        alias_state = ALIAS_NONE;
+    }
     }
 }
 
@@ -2711,6 +2733,20 @@ JSTokenizer::JSRet JSTokenizer::keyword_B()
     return EOS;
 }
 
+JSTokenizer::JSRet JSTokenizer::keyword_new()
+{
+    EXEC(do_semicolon_insertion(ASI_GROUP_10))
+    if (token != DOT)
+        set_ident_norm(true);
+    EXEC(do_spacing(KEYWORD))
+    ECHO;
+    BEGIN(regst);
+
+    if (alias_state == ALIAS_EQUALS)
+        alias_state = ALIAS_NEW;
+    return EOS;
+}
+
 JSTokenizer::JSRet JSTokenizer::keyword_BA()
 {
     EXEC(do_semicolon_insertion(ASI_GROUP_9))
@@ -2892,16 +2928,11 @@ void JSTokenizer::escaped_url_sequence_latin_1()
     yyout << (char)std::stoi(code, nullptr, 16);
 }
 
-void JSTokenizer::dec_code_point()
+void JSTokenizer::lit_int_code_point(int base)
 {
-    std::string code(YYText());
-    yyout << unicode_to_utf8(std::stoi(code, nullptr, 10));
-}
-
-void JSTokenizer::hex_code_point()
-{
-    std::string code(YYText());
-    yyout << unicode_to_utf8(std::stoi(code, nullptr, 16));
+    std::string code(base != 10 && !isdigit(YYText()[1]) ? YYText() + 2 : YYText());
+    code.erase(std::remove(code.begin(), code.end(), '_'), code.end());
+    yyout << unicode_to_utf8(std::stoi(code, nullptr, base));
 }
 
 void JSTokenizer::char_code_no_match()

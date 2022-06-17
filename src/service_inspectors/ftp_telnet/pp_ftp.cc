@@ -1394,8 +1394,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
         req->cmd_begin = (const char*)read_ptr;
 
         while ((read_ptr < end) &&
-            (*read_ptr != SP) &&
-            (*read_ptr != CR) &&
+            (!isspace(*read_ptr)) &&
             (*read_ptr != LF) &&    /* Check for LF when there wasn't a CR,
                                      * protocol violation, but accepted by
                                      * some servers. */
@@ -1443,7 +1442,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
                 {
                     if (!isalpha((int)(*ptr)))
                     {
-                        if (!isascii((int)(*ptr)) || !isprint((int)(*ptr)))
+                        if (!isascii((int)(*ptr)) || (!isprint((int)(*ptr)) && (!isspace((int)(*ptr)))))
                         {
                             encrypted = 1;
                         }
@@ -1520,7 +1519,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
                 {
                     if (!isdigit((int)(*ptr)))
                     {
-                        if (!isascii((int)(*ptr)) || !isprint((int)(*ptr)))
+                        if (!isascii((int)(*ptr)) || (!isprint((int)(*ptr)) && (!isspace((int)(*ptr)))))
                         {
                             encrypted = 1;
                         }
@@ -1634,7 +1633,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
 
         if (read_ptr < end)
         {
-            if (*read_ptr == SP)
+            if (isspace(*read_ptr))
             {
                 space = 1;
             }

@@ -30,6 +30,8 @@
 #include <vector>
 
 #include "log/messages.h"
+#include "managers/module_manager.h"
+#include "main/reload_tuner.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "pub_sub/netflow_event.h"
@@ -72,11 +74,13 @@ struct IpCompare
     { return a.first.less_than(b.first); }
 };
 
+static std::unordered_map<int, int>* udp_srv_map = nullptr;
+static std::unordered_map<int, int>* tcp_srv_map = nullptr;
+
 // -----------------------------------------------------------------------------
 // static functions
 // -----------------------------------------------------------------------------
-
-static bool filter_record(const NetflowRules* rules, const int zone,
+static const NetflowRule* filter_record(const NetflowRules* rules, const int zone,
     const SfIp* src, const SfIp* dst)
 {
     const SfIp* addr[2] = {src, dst};
@@ -86,7 +90,7 @@ static bool filter_record(const NetflowRules* rules, const int zone,
         for( auto const& rule : rules->exclude )
         {
             if ( rule.filter_match(address, zone) )
-                return false;
+                return nullptr;
         }
     }
 
@@ -95,10 +99,23 @@ static bool filter_record(const NetflowRules* rules, const int zone,
         for( auto const& rule : rules->include )
         {
             if ( rule.filter_match(address, zone) )
-                return true;
+                return &rule;
         }
     }
-    return false;
+    return nullptr;
+}
+
+static void publish_service_event(const Packet* p, const NetflowRule* match, NetflowSessionRecord& record)
+{
+    uint32_t serviceID = 0;
+
+    if (record.proto == (int) ProtocolId::TCP and tcp_srv_map)
+        serviceID = (*tcp_srv_map)[record.responder_port];
+    else if (record.proto == (int) ProtocolId::UDP and udp_srv_map)
+        serviceID = (*udp_srv_map)[record.responder_port];
+
+    NetflowEvent event(p, &record, match->create_host, match->create_service, serviceID);
+    DataBus::publish(NETFLOW_EVENT, event);
 }
 
 static bool version_9_record_update(const unsigned char* data, uint32_t unix_secs,
@@ -439,7 +456,8 @@ static bool decode_netflow_v9(const unsigned char* data, uint16_t size,
                 }
 
                 // filter based on configuration
-                if ( !filter_record(p_rules, zone, &record.initiator_ip, &record.responder_ip) )
+                const NetflowRule* match = filter_record(p_rules, zone, &record.initiator_ip, &record.responder_ip);
+                if ( !match )
                 {
                     records--;
                     continue;
@@ -459,9 +477,10 @@ static bool decode_netflow_v9(const unsigned char* data, uint16_t size,
                         if ( !record_status.src_tos )
                             record.nf_src_tos = record.nf_dst_tos;
                     }
-                    // send create_host and create_service flags too so that rna event handler can log those
-                    NetflowEvent event(p, &record);
-                    DataBus::publish(NETFLOW_EVENT, event);
+
+                    if (match->create_service)
+                        publish_service_event(p, match, record);
+
                 }
 
                 if ( netflow_cache->add(record.initiator_ip, record, true) )
@@ -605,7 +624,8 @@ static bool decode_netflow_v5(const unsigned char* data, uint16_t size,
         if ( record.next_hop_ip.set(&precord->next_hop_addr, AF_INET) != SFIP_SUCCESS )
             return false;
 
-        if ( !filter_record(p_rules, zone, &record.initiator_ip, &record.responder_ip) )
+        const NetflowRule* match = filter_record(p_rules, zone, &record.initiator_ip, &record.responder_ip);
+        if ( !match )
             continue;
 
         record.initiator_port = ntohs(precord->src_port);
@@ -630,9 +650,8 @@ static bool decode_netflow_v5(const unsigned char* data, uint16_t size,
         if ( netflow_cache->add(record.initiator_ip, record, false) )
             ++netflow_stats.unique_flows;
 
-        // send create_host and create_service flags too so that rna event handler can log those
-        NetflowEvent event(p, &record);
-        DataBus::publish(NETFLOW_EVENT, event);
+        if (match->create_service)
+            publish_service_event(p, match, record);
     }
     return true;
 }
@@ -671,7 +690,6 @@ static bool validate_netflow(const Packet* p, const NetflowRules* p_rules)
 
     return retval;
 }
-
 //-------------------------------------------------------------------------
 // inspector stuff
 //-------------------------------------------------------------------------
@@ -687,12 +705,23 @@ public:
 
     void eval(snort::Packet*) override;
     void show(const snort::SnortConfig*) const override;
+    void install_reload_handler(snort::SnortConfig*) override;
 
 private:
     const NetflowConfig *config;
 
     bool log_netflow_cache();
     void stringify(std::ofstream&);
+};
+
+class NetflowReloadSwapper : public snort::ReloadSwapper
+{
+public:
+    explicit NetflowReloadSwapper(NetflowInspector& ins) : inspector(ins) { }
+    void tswap() override;
+
+private:
+    NetflowInspector& inspector;
 };
 
 static std::string to_string(const std::vector <snort::SfCidr>& networks)
@@ -752,8 +781,8 @@ static void show_device(const NetflowRule& d, bool is_exclude)
 
 void NetflowInspector::show(const SnortConfig*) const
 {
-    ConfigLogger::log_value("flow_memcap", config->flow_memcap);
-    ConfigLogger::log_value("template_memcap", config->template_memcap);
+    ConfigLogger::log_value("flow_memcap", (uint64_t)config->flow_memcap);
+    ConfigLogger::log_value("template_memcap", (uint64_t)config->template_memcap);
     ConfigLogger::log_value("dump_file", config->dump_file);
     ConfigLogger::log_value("update_timeout", config->update_timeout);
     bool log_header = true;
@@ -870,6 +899,14 @@ NetflowInspector::NetflowInspector(const NetflowConfig* pc)
         if ( ! dump_cache )
             dump_cache = new DumpCache;
     }
+
+    NetflowModule* mod = (NetflowModule*) ModuleManager::get_module(NETFLOW_NAME);
+
+    if (mod)
+    {
+        udp_srv_map = &mod->udp_service_mappings;
+        tcp_srv_map = &mod->tcp_service_mappings;
+    }
 }
 
 NetflowInspector::~NetflowInspector()
@@ -914,11 +951,11 @@ void NetflowInspector::eval(Packet* p)
 
 void NetflowInspector::tinit()
 {
-    if ( !netflow_cache )
-        netflow_cache = new NetflowCache(config->flow_memcap, netflow_stats);
+    delete netflow_cache;
+    netflow_cache = new NetflowCache(config->flow_memcap, netflow_stats);
 
-    if ( !template_cache )
-        template_cache = new TemplateFieldCache(config->template_memcap, netflow_stats);
+    delete template_cache;
+    template_cache = new TemplateFieldCache(config->template_memcap, netflow_stats);
 }
 
 void NetflowInspector::tterm()
@@ -931,6 +968,16 @@ void NetflowInspector::tterm()
     }
     delete netflow_cache;
     delete template_cache;
+}
+
+void NetflowInspector::install_reload_handler(SnortConfig* sc)
+{
+    sc->register_reload_handler(new NetflowReloadSwapper(*this));
+}
+
+void NetflowReloadSwapper::tswap()
+{
+    inspector.tinit();
 }
 
 //-------------------------------------------------------------------------

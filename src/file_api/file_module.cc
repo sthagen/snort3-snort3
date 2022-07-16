@@ -32,55 +32,19 @@
 #include "log/messages.h"
 #include "main/snort.h"
 #include "main/snort_config.h"
+#include "managers/module_manager.h"
 #include "packet_io/active.h"
 #include "trace/trace.h"
 
 #include "file_service.h"
 #include "file_stats.h"
 
+#include "parser/parser.h"
+
 using namespace snort;
 
 THREAD_LOCAL const Trace* file_trace = nullptr;
-
-static const Parameter file_magic_params[] =
-{
-    { "content", Parameter::PT_STRING, nullptr, nullptr,
-      "file magic content" },
-
-    { "offset", Parameter::PT_INT, "0:max32", "0",
-      "file magic offset" },
-
-    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
-};
-
-static const Parameter file_rule_params[] =
-{
-    { "rev", Parameter::PT_INT, "0:max32", "0",
-      "rule revision" },
-
-    { "msg", Parameter::PT_STRING, nullptr, nullptr,
-      "information about the file type" },
-
-    { "type", Parameter::PT_STRING, nullptr, nullptr,
-      "file type name" },
-
-    { "id", Parameter::PT_INT, "0:max32", "0",
-      "file type id" },
-
-    { "category", Parameter::PT_STRING, nullptr, nullptr,
-      "file type category" },
-
-    { "group", Parameter::PT_STRING, nullptr, nullptr,
-      "comma separated list of groups associated with file type" },
-
-    { "version", Parameter::PT_STRING, nullptr, nullptr,
-      "file type version" },
-
-    { "magic", Parameter::PT_LIST, file_magic_params, nullptr,
-      "list of file magic rules" },
-
-    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
-};
+extern THREAD_LOCAL snort::ProfileStats file_perf_stats;
 
 static const Parameter file_id_params[] =
 {
@@ -120,8 +84,8 @@ static const Parameter file_id_params[] =
     { "show_data_depth", Parameter::PT_INT, "0:max53", "100",
       "print this many octets" },
 
-    { "file_rules", Parameter::PT_LIST, file_rule_params, nullptr,
-      "list of file magic rules" },
+    { "rules_file", Parameter::PT_STRING, nullptr, nullptr,
+      "name of file with IPS rules for file identification" },
 
     { "trace_type", Parameter::PT_BOOL, nullptr, "false",
       "enable runtime dump of type info" },
@@ -164,6 +128,9 @@ const TraceOption* FileIdModule::get_trace_options() const
     static const TraceOption filetrace_options(nullptr, 0, nullptr);
     return &filetrace_options;
 }
+
+ProfileStats* FileIdModule::get_profile() const
+{ return &file_perf_stats; }
 
 const PegInfo* FileIdModule::get_pegs() const
 { return file_pegs; }
@@ -241,75 +208,19 @@ bool FileIdModule::set(const char*, Value& v, SnortConfig*)
     else if ( v.is("decompress_buffer_size") )
         FileService::decode_conf.set_decompress_buffer_size(v.get_uint32());
 
-    else if ( v.is("rev") )
-        rule.rev = v.get_uint32();
-
-    else if ( v.is("msg") )
-        rule.message = v.get_string();
-
-    else if ( v.is("type") )
-        rule.type = v.get_string();
-
-    else if ( v.is("id") )
-        rule.id = v.get_uint32();
-
-    else if ( v.is("category") )
-        rule.category = v.get_string();
-
-    else if ( v.is("group") )
+    else if ( v.is("rules_file") )
     {
-        std::istringstream stream(v.get_string());
-        std::string tmpstr;
-        while (std::getline(stream, tmpstr, ','))
-        {
-            rule.groups.emplace_back(tmpstr);
-        }
-    }
-
-    else if ( v.is("version") )
-        rule.version = v.get_string();
-
-    else if ( v.is("content") )
-        magic.content_str = v.get_string();
-
-    else if ( v.is("offset") )
-        magic.offset = v.get_uint32();
-
-    return true;
-}
-
-bool FileIdModule::begin(const char* fqn, int idx, SnortConfig*)
-{
-    if (!idx)
-        return true;
-
-    if ( !strcmp(fqn, "file_id.file_rules") )
-    {
-        rule.clear();
-    }
-    else if ( !strcmp(fqn, "file_id.file_rules.magic") )
-    {
-        magic.clear();
+        magic_file = "include ";
+        magic_file += v.get_string();
     }
 
     return true;
 }
 
-bool FileIdModule::end(const char* fqn, int idx, SnortConfig*)
+bool FileIdModule::end(const char*, int, SnortConfig*)
 {
-    if (!idx)
-        return true;
-
-    if ( !strcmp(fqn, "file_id.file_rules") )
-    {
-        fc->process_file_rule(rule);
-    }
-    else if ( !strcmp(fqn, "file_id.file_rules.magic") )
-    {
-        fc->process_file_magic(magic);
-        rule.file_magics.emplace_back(magic);
-    }
-
+    const char* inc = ModuleManager::get_includer("file_id");
+    parser_append_rules_special(magic_file.c_str(), inc);
     return true;
 }
 
@@ -329,3 +240,4 @@ void FileIdModule::reset_stats()
     file_stats_clear();
     Module::reset_stats();
 }
+

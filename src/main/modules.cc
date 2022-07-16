@@ -1146,9 +1146,6 @@ static const Parameter ips_params[] =
     { "include", Parameter::PT_STRING, nullptr, nullptr,
       "snort rules and includes" },
 
-    { "includer", Parameter::PT_STRING, "(optional)", nullptr,
-      "for internal use; where includes are included from" },
-
     // FIXIT-L no default; it breaks initialization by -Q
     { "mode", Parameter::PT_ENUM, "tap | inline | inline-test", nullptr,
       "set policy mode" },
@@ -1214,9 +1211,6 @@ bool IpsModule::set(const char* fqn, Value& v, SnortConfig*)
     else if ( v.is("include") )
         p->include = v.get_string();
 
-    else if ( v.is("includer") )
-        p->includer = v.get_string();
-
     else if ( v.is("mode") )
         p->policy_mode = (PolicyMode)v.get_uint8();
 
@@ -1278,6 +1272,7 @@ bool IpsModule::end(const char* fqn, int idx, SnortConfig* sc)
     else if (!idx and !strcmp(fqn, "ips"))
     {
         IpsPolicy* p = get_ips_policy();
+        p->includer = ModuleManager::get_includer("ips");
         sc->policy_map->set_user_ips(p);
     }
     return true;
@@ -1551,19 +1546,19 @@ bool SuppressModule::end(const char*, int idx, SnortConfig* sc)
 
     if ( thdx.gen_id == 0 and thdx.sig_id >= 1 )
     {
-        ParseError("bad or incomplete gid:sid pair [%d]", idx);
+        ParseError("bad or incomplete gid:sid pair");
         return false;
     }
 
     if ( ( thdx.tracking == 0 and thdx.ip_address ) or ( thdx.tracking > 0 and !thdx.ip_address ) )
     {
-        ParseError("incomplete pair of track and IP [%d]", idx);
+        ParseError("incomplete pair of track and IP");
         return false;
     }
 
     if ( sfthreshold_create(sc, sc->threshold_config, &thdx, get_network_policy()->policy_id) )
     {
-        ParseError("threshold object cannot be created from the given parameters [%d]", idx);
+        ParseError("threshold object cannot be created from the given parameters");
         return false;
     }
 

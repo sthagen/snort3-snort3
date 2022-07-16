@@ -26,8 +26,8 @@
 #include <vector>
 
 #include "log/messages.h"
-#include "main/snort_debug.h"
 #include "service_inspectors/http_inspect/http_enum.h"
+#include "trace/trace_api.h"
 
 extern THREAD_LOCAL const snort::Trace* http_trace;
 
@@ -83,9 +83,10 @@ private:
     enum ScopeMetaType
     {
         NOT_SET = 0,
-        FUNCTION,   // function, arrow function
-        BLOCK,      // if, else, for, while, do, with, switch, try, catch, finally, block of code
-        OBJECT,     // object definition, class definition
+        ARROW_FUNCTION, // arrow function
+        FUNCTION,       // function
+        BLOCK,          // if, else, for, while, do, with, switch, try, catch, finally, block of code
+        OBJECT,         // object definition, class definition
         SCOPE_META_TYPE_MAX
     };
     enum FuncType

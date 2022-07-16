@@ -637,11 +637,13 @@ static const char all_patterns_expected4[] =
 
 static const char all_patterns_buf5[] =
     "$2abc _2abc abc $__$ 肖晗 XÆA12 \\u0041abc \\u00FBdef \\u1234ghi ab\xE2\x80\xA8ww "
-    "ab\xE2\x80\xA9ww ab\xEF\xBB\xBFww ab∞ww 2abc";
+    "ab\xE2\x80\xA9ww ab\xEF\xBB\xBFww ab∞ww 2abc _a _1;"
+    "var a;var _1;";
 
 static const char all_patterns_expected5[] =
     "$2abc _2abc abc $__$ 肖晗 XÆA12 \u0041abc \u00FBdef \u1234ghi ab;ww "
-    "ab;ww ab ww ab ∞ ww 2 abc";
+    "ab;ww ab ww ab ∞ ww 2 abc _a _1;"
+    "var a;var _1;";
 
 static const char all_patterns_buf6[] =
     "tag` template\n   ${ a   +   b }   template`";
@@ -4767,6 +4769,9 @@ TEST_CASE("Scope tracking - basic","[JSNormalizer]")
     SECTION("Function scope - arrow function without scope")
         test_scope("var f = (a,b)=> a",{GLOBAL,FUNCTION});
 
+    SECTION("Function scope - function call in an arrow function without scope")
+        test_scope("var f = (a,b)=> call(",{GLOBAL,FUNCTION});
+
     SECTION("Function scope - method in object initialization")
         test_scope("var o = { f(){",{GLOBAL,BLOCK,BLOCK});
 
@@ -4914,6 +4919,9 @@ TEST_CASE("Scope tracking - closing","[JSNormalizer]")
 
     SECTION("Function scope - arrow function without scope")
         test_scope("var f = (a,b)=>a;",{GLOBAL});
+
+    SECTION("Function scope - function call in an arrow function without scope")
+        test_scope("var f = a=>call();",{GLOBAL});
 
     SECTION("Function scope - arrow function as a function parameter")
         test_scope("console.log(a=>c)",{GLOBAL});

@@ -113,13 +113,20 @@ function include(file)
         if ( sandbox_env.ips ) then
             ips = sandbox_env.ips
         end
+
+        if ( sandbox_env.file_id ) then
+            file_id = sandbox_env.file_id
+        end
     else
         dofile(fname)
     end
 
-    local iname = path_top()
-    if ( (ips ~= nil) and (ips.includer == nil) and (iname ~= nil) ) then
-        ips.includer = iname
+    if ( (ips ~= nil) and (ips.includer == nil) ) then
+        ips.includer = fname
+    end
+
+    if ( file_id ~= nil and file_id.includer == nil ) then
+        file_id.includer = fname
     end
 
     path_pop()

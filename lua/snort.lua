@@ -28,7 +28,6 @@ HOME_NET = 'any'
 EXTERNAL_NET = 'any'
 
 include 'snort_defaults.lua'
-include 'file_magic.lua'
 
 ---------------------------------------------------------------------------
 -- 2. configure inspection
@@ -88,8 +87,8 @@ ftp_data = { }
 http_inspect = default_http_inspect
 http2_inspect = { }
 
--- see file_magic.lua for file id rules
-file_id = { file_rules = file_magic }
+-- see file_magic.rules for file id rules
+file_id = { rules_file = 'file_magic.rules' }
 file_policy = { }
 
 -- the following require additional configuration to be fully effective:

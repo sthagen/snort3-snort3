@@ -58,7 +58,6 @@ TEST_GROUP(http2_hpack_string_decode_success)
     void teardown() override
     {
         CHECK(inf.none_found() == true);
-        CHECK(events.none_found() == true);
         delete decode;
     }
 };
@@ -659,7 +658,7 @@ TEST(http2_hpack_string_decode_infractions, 0_len_field)
     CHECK(success == false);
     CHECK(bytes_processed == 0);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_STRING_EMPTY_BUFF));
+    CHECK(local_inf.get_raw(0) == (1<<INF_STRING_EMPTY_BUFF));
 }
 
 TEST(http2_hpack_string_decode_infractions, missing_bytes)
@@ -680,7 +679,7 @@ TEST(http2_hpack_string_decode_infractions, missing_bytes)
     CHECK(success == false);
     CHECK(bytes_written == 0);
     CHECK(bytes_processed == 1);
-    CHECK(local_inf.get_raw() == (1<<INF_STRING_MISSING_BYTES));
+    CHECK(local_inf.get_raw(0) == (1<<INF_STRING_MISSING_BYTES));
 }
 
 TEST(http2_hpack_string_decode_infractions, bad_int)
@@ -701,7 +700,7 @@ TEST(http2_hpack_string_decode_infractions, bad_int)
     CHECK(success == false);
     CHECK(bytes_processed == 2);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_INT_MISSING_BYTES));
+    CHECK(local_inf.get_raw(0) == (1<<INF_INT_MISSING_BYTES));
 }
 
 TEST(http2_hpack_string_decode_infractions, max_field_length_plus_1)
@@ -727,7 +726,7 @@ TEST(http2_hpack_string_decode_infractions, max_field_length_plus_1)
     CHECK(success == false);
     CHECK(bytes_processed == 4);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_STRING_MISSING_BYTES));
+    CHECK(local_inf.get_raw(0) == (1<<INF_STRING_MISSING_BYTES));
 }
 
 TEST(http2_hpack_string_decode_infractions, out_buf_out_of_space)
@@ -753,7 +752,7 @@ TEST(http2_hpack_string_decode_infractions, out_buf_out_of_space)
     CHECK(success == false);
     CHECK(bytes_processed == 4);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_DECODED_HEADER_BUFF_OUT_OF_SPACE));
+    CHECK(local_inf.get_raw(0) == (1<<INF_DECODED_HEADER_BUFF_OUT_OF_SPACE));
 }
 
 TEST(http2_hpack_string_decode_infractions, huffman_1_byte_bad_padding)
@@ -774,7 +773,7 @@ TEST(http2_hpack_string_decode_infractions, huffman_1_byte_bad_padding)
     CHECK(success == false);
     CHECK(bytes_processed == 2);
     CHECK(bytes_written == 1);
-    CHECK(local_inf.get_raw() == (1<<INF_HUFFMAN_BAD_PADDING));
+    CHECK(local_inf.get_raw(0) == (1<<INF_HUFFMAN_BAD_PADDING));
 }
 
 TEST(http2_hpack_string_decode_infractions, huffman_1_byte_incomplete_FF)
@@ -795,7 +794,7 @@ TEST(http2_hpack_string_decode_infractions, huffman_1_byte_incomplete_FF)
     CHECK(success == false);
     CHECK(bytes_processed == 2);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
+    CHECK(local_inf.get_raw(0) == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
 }
 
 TEST(http2_hpack_string_decode_infractions, huffman_1_byte_incomplete_FE)
@@ -816,7 +815,7 @@ TEST(http2_hpack_string_decode_infractions, huffman_1_byte_incomplete_FE)
     CHECK(success == false);
     CHECK(bytes_processed == 2);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
+    CHECK(local_inf.get_raw(0) == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
 }
 
 TEST(http2_hpack_string_decode_infractions, huffman_2_bytes_incomplete_FF_FE)
@@ -837,7 +836,7 @@ TEST(http2_hpack_string_decode_infractions, huffman_2_bytes_incomplete_FF_FE)
     CHECK(success == false);
     CHECK(bytes_processed == 3);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
+    CHECK(local_inf.get_raw(0) == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
 }
 
 TEST(http2_hpack_string_decode_infractions, huffman_3_bytes_incomplete)
@@ -858,7 +857,7 @@ TEST(http2_hpack_string_decode_infractions, huffman_3_bytes_incomplete)
     CHECK(success == false);
     CHECK(bytes_processed == 4);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
+    CHECK(local_inf.get_raw(0) == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
 }
 
 TEST(http2_hpack_string_decode_infractions, huffman_FB_incomplete_FF)
@@ -879,7 +878,7 @@ TEST(http2_hpack_string_decode_infractions, huffman_FB_incomplete_FF)
     CHECK(success == false);
     CHECK(bytes_processed == 3);
     CHECK(bytes_written == 1);
-    CHECK(local_inf.get_raw() == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
+    CHECK(local_inf.get_raw(0) == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
     CHECK(memcmp(res, ";", 1) == 0);
 }
 
@@ -901,7 +900,7 @@ TEST(http2_hpack_string_decode_infractions, huffman_07_incomplete_FF)
     CHECK(success == false);
     CHECK(bytes_processed == 3);
     CHECK(bytes_written == 1);
-    CHECK(local_inf.get_raw() == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
+    CHECK(local_inf.get_raw(0) == (1<<INF_HUFFMAN_INCOMPLETE_CODE_PADDING));
     CHECK(memcmp(res, "0", 1) == 0);
 }
 
@@ -923,7 +922,7 @@ TEST(http2_hpack_string_decode_infractions, huffman_decoded_eos)
     CHECK(success == false);
     CHECK(bytes_processed == 4);
     CHECK(bytes_written == 0);
-    CHECK(local_inf.get_raw() == (1<<INF_HUFFMAN_DECODED_EOS));
+    CHECK(local_inf.get_raw(0) == (1<<INF_HUFFMAN_DECODED_EOS));
 }
 
 int main(int argc, char** argv)

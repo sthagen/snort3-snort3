@@ -24,9 +24,9 @@
 #include "http_flow_data.h"
 
 #include "decompress/file_decomp.h"
-#include "main/snort_debug.h"
 #include "mime/file_mime_process.h"
 #include "service_inspectors/http2_inspect/http2_flow_data.h"
+#include "trace/trace_api.h"
 #include "utils/js_identifier_ctx.h"
 #include "utils/js_normalizer.h"
 
@@ -77,6 +77,8 @@ HttpFlowData::HttpFlowData(Flow* flow) : FlowData(inspector_id)
     {
         for_http2 = true;
         h2_stream_id = h2i_flow_data->get_processing_stream_id();
+        events[0]->suppress_event(HttpEnums::EVENT_LOSS_OF_SYNC);
+        events[1]->suppress_event(HttpEnums::EVENT_LOSS_OF_SYNC);
     }
 }
 

@@ -1,3 +1,45 @@
+2022/07/14 - 3.1.36.0
+
+appid: fix stats cleanup
+dce_smb: fix stats cleanup
+file_api: fix stats cleanup
+http_inspect: do not abort midstream pickups
+normalizer: make normalizer and tcp_normalizer peg counts shared
+stream: fix stats cleanup
+utils: fix arrow functions parsing
+utils: fix parsing of decimal number literals
+
+2022/07/08 - 3.1.35.0
+
+sandbox: must propagate file_id for includer logic
+
+2022/07/07 - 3.1.34.0
+
+build: remove unnecessary type casts
+dce_rpc: set presistent flag for dcerpc pinhole session
+file_id: fix rules_file path resolution
+http2_inspect: consider continuation when checking headers length
+log: add log_value and log_limit overloads with built-in integer types
+utils: make shutdown timing stats more precise. Thanks to trevor tao <trevor.tao@arm.com> for the update.
+
+2022/06/30 - 3.1.33.0
+
+file_api: implement file type identification over ips engine
+filters: check if a configured gid value is supported by filter's implementation
+framework: update base API version to 14
+ftp_telnet: make active ftp expected session in the correct direction
+http2_inspect: fix unit tests depending on REG_TEST
+http_inspect: implement uniform alerts when splitter aborts
+hyperscan: delete databases upon error
+lua: update sid and rev fields
+main: move trace related code to trace folder
+netflow: fix v5 header time value
+parser: update do_hash() function to work correctly with port variables
+parser: use std::string in ExpandVars
+rna: allow rna to fire an event when a new netflow connection is detected
+rna: use the longest user agent fingerprint among multiple matches
+wizard: update wizard's patterns to follow the proto option
+
 2022/06/16 - 3.1.32.0
 
 appid: config for logging eve process to client mappings

@@ -150,6 +150,7 @@ StreamSplitter::Status Http2StreamSplitter::implement_scan(Http2FlowData* sessio
             return StreamSplitter::FLUSH;
         case V_BAD:
             session_data->events[source_id]->create_event(EVENT_PREFACE_MATCH_FAILURE);
+            session_data->events[source_id]->create_event(EVENT_LOSS_OF_SYNC);
             return StreamSplitter::ABORT;
         case V_TBD:
             session_data->preface_octets_seen += length;
@@ -203,6 +204,7 @@ StreamSplitter::Status Http2StreamSplitter::implement_scan(Http2FlowData* sessio
                 {
                     *session_data->infractions[source_id] += INF_MISSING_CONTINUATION;
                     session_data->events[source_id]->create_event(EVENT_MISSING_CONTINUATION);
+                    session_data->events[source_id]->create_event(EVENT_LOSS_OF_SYNC);
                     return StreamSplitter::ABORT;
                 }
 
@@ -211,6 +213,10 @@ StreamSplitter::Status Http2StreamSplitter::implement_scan(Http2FlowData* sessio
                 session_data->frame_lengths[source_id].push(frame_length);
                 const uint8_t frame_flags = get_frame_flags(session_data->
                     scan_frame_header[source_id]);
+
+                uint32_t& accumulated_frame_length = session_data->accumulated_frame_length[source_id];
+                if ((type == FT_HEADERS || type == FT_PUSH_PROMISE) && !(frame_flags & FLAG_END_HEADERS))
+                    accumulated_frame_length = frame_length + FRAME_HEADER_LENGTH;
 
                 if (type != FT_CONTINUATION)
                 {
@@ -224,6 +230,7 @@ StreamSplitter::Status Http2StreamSplitter::implement_scan(Http2FlowData* sessio
                     {
                         *session_data->infractions[source_id] += INF_UNEXPECTED_CONTINUATION;
                         session_data->events[source_id]->create_event(EVENT_UNEXPECTED_CONTINUATION);
+                        session_data->events[source_id]->create_event(EVENT_LOSS_OF_SYNC);
                         return StreamSplitter::ABORT;
                     }
                     // Do flags check for continuation frame, since it is not saved
@@ -233,13 +240,16 @@ StreamSplitter::Status Http2StreamSplitter::implement_scan(Http2FlowData* sessio
                         *session_data->infractions[source_id] += INF_INVALID_FLAG;
                         session_data->events[source_id]->create_event(EVENT_INVALID_FLAG);
                     }
+                    accumulated_frame_length += frame_length + FRAME_HEADER_LENGTH;
                 }
 
-                if ((type != FT_DATA) && (frame_length + FRAME_HEADER_LENGTH > MAX_OCTETS))
+                if (((type == FT_CONTINUATION) && (accumulated_frame_length > MAX_OCTETS)) ||
+                    ((type != FT_DATA) && (frame_length + FRAME_HEADER_LENGTH > MAX_OCTETS)))
                 {
                     // FIXIT-E long non-data frames may need to be supported
                     *session_data->infractions[source_id] += INF_NON_DATA_FRAME_TOO_LONG;
                     session_data->events[source_id]->create_event(EVENT_NON_DATA_FRAME_TOO_LONG);
+                    session_data->events[source_id]->create_event(EVENT_LOSS_OF_SYNC);
                     return StreamSplitter::ABORT;
                 }
 
@@ -254,6 +264,7 @@ StreamSplitter::Status Http2StreamSplitter::implement_scan(Http2FlowData* sessio
                         *session_data->infractions[source_id] += INF_PADDING_ON_EMPTY_FRAME;
                         session_data->events[source_id]->create_event(
                             EVENT_PADDING_ON_EMPTY_FRAME);
+                        session_data->events[source_id]->create_event(EVENT_LOSS_OF_SYNC);
                         return StreamSplitter::ABORT;
                     }
                     session_data->scan_state[source_id] = SCAN_PADDING_LENGTH;
@@ -287,6 +298,7 @@ StreamSplitter::Status Http2StreamSplitter::implement_scan(Http2FlowData* sessio
                 {
                     *session_data->infractions[source_id] += INF_PADDING_LEN;
                     session_data->events[source_id]->create_event(EVENT_PADDING_LEN);
+                    session_data->events[source_id]->create_event(EVENT_LOSS_OF_SYNC);
                     return StreamSplitter::ABORT;
                 }
                 data_offset++;

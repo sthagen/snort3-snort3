@@ -27,10 +27,10 @@
 
 #include "netflow_cache.h"
 
-THREAD_LOCAL NetflowCache* netflow_cache = nullptr;
+THREAD_LOCAL NetFlowCache* netflow_cache = nullptr;
 
 template <class T>
-LruCacheAllocNetflow<T>::LruCacheAllocNetflow()
+LruCacheAllocNetFlow<T>::LruCacheAllocNetFlow()
 {
     lru = netflow_cache;
 }

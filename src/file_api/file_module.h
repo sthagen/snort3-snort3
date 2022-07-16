@@ -22,11 +22,13 @@
 #ifndef FILE_MODULE_H
 #define FILE_MODULE_H
 
+#include <string>
+
 #include "framework/module.h"
 
 #include "file_config.h"
 #include "file_identifier.h"
-#include "main/snort_debug.h"
+#include "trace/trace_api.h"
 #include "utils/util.h"
 //-------------------------------------------------------------------------
 // file_id module
@@ -48,9 +50,9 @@ public:
     ~FileIdModule() override;
 
     bool set(const char*, snort::Value&, snort::SnortConfig*) override;
-    bool begin(const char*, int, snort::SnortConfig*) override;
     bool end(const char*, int, snort::SnortConfig*) override;
 
+    snort::ProfileStats* get_profile() const override;
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
 
@@ -73,9 +75,9 @@ public:
     const snort::RuleMap* get_rules() const override;
 
 private:
-    FileMagicRule rule;
-    FileMagicData magic;
+    FileMeta rule;
     FileConfig *fc = nullptr;
+    std::string magic_file;
 };
 
 enum FileSid

@@ -42,6 +42,8 @@
 #include "tp_appid_utils.h"
 #include "tp_lib_handler.h"
 
+#define HTTP_CONNECT_RESPONSE_LEN 13
+
 using namespace std;
 using namespace snort;
 
@@ -399,7 +401,11 @@ static inline void process_ftp_control(AppIdSession& asd,
     {
         asd.set_client_user(APP_ID_FTP_CONTROL, field->c_str(), change_bits);
         asd.set_user_logged_in();
+        asd.tpsession->set_attr(TP_ATTR_UNAME_KNOWN);
     }
+    // This is a safe bail out condition in case username is not known 
+    if ((asd.init_tpPackets + asd.resp_tpPackets) >= asd.get_odp_ctxt().max_tp_flow_depth)
+        asd.tpsession->set_attr(TP_ATTR_UNAME_KNOWN);
 }
 
 static inline void process_quic(AppIdSession& asd,
@@ -650,6 +656,14 @@ bool do_tp_discovery(ThirdPartyAppIdContext& tp_appid_ctxt, AppIdSession& asd, I
                 hsession->set_payload(tp_app_id, change_bits, "3rd party");
 
             hsession->process_http_packet(direction, change_bits, asd.get_odp_ctxt().get_http_matchers());
+
+            if (!hsession->get_tunnel() and (direction == APP_ID_FROM_RESPONDER)
+                and asd.get_tp_payload_app_id() == APP_ID_HTTP_TUNNEL)
+            {
+                if ((p->dsize >= HTTP_CONNECT_RESPONSE_LEN) and
+                    !strncasecmp((const char*)p->data, "HTTP/1.1 200 ", HTTP_CONNECT_RESPONSE_LEN))
+                    hsession->set_tunnel(true);
+            }
 
             if (asd.get_tp_app_id() == APP_ID_HTTP and
                 !asd.get_session_flags(APPID_SESSION_APP_REINSPECT) and

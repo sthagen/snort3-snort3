@@ -67,12 +67,14 @@ public:
     friend class Http2Frame;
     friend class Http2DataFrame;
     friend class Http2DataCutter;
+    friend class Http2GoAwayFrame;
     friend class Http2HeadersFrame;
     friend class Http2HeadersFrameHeader;
     friend class Http2HeadersFrameTrailer;
     friend class Http2HeadersFrameWithStartline;
     friend class Http2Hpack;
     friend class Http2Inspect;
+    friend class Http2PriorityFrame;
     friend class Http2PushPromiseFrame;
     friend class Http2RequestLine;
     friend class Http2RstStreamFrame;

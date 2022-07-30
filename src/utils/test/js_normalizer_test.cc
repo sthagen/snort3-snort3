@@ -67,6 +67,12 @@ using namespace snort;
     CHECK(!memcmp(dst, expected, act_len));                \
     delete[] dst;
 
+#define CHECK_OTAG(is_set)                 \
+    if (is_set)                            \
+        CHECK(norm.is_opening_tag_seen()); \
+    else                                   \
+        CHECK(!norm.is_opening_tag_seen());
+
 
 #define NORMALIZE_L(src, src_len, dst, dst_len, depth, ret, ptr, len) \
     {                                                                 \
@@ -1074,7 +1080,7 @@ static const char syntax_cases_buf15[] =
     "var invalid_str = 'abc\u2028 def' ;\n";
 
 static const char syntax_cases_expected15[] =
-    "var invalid_str='abc";
+    "var invalid_str='abc\u2028 def';";
 
 static const char syntax_cases_buf16[] =
     "var invalid_str = \"abc\n def\"";
@@ -1110,7 +1116,7 @@ static const char syntax_cases_buf21[] =
     "var invalid_str = 'abc\u2029 def' ;\n\r";
 
 static const char syntax_cases_expected21[] =
-    "var invalid_str='abc";
+    "var invalid_str='abc\u2029 def';";
 
 static const char syntax_cases_buf22[] =
     "tag`template\n \\\\\\${   }   \\\\${   a  + ` template ${ 1 + c  }`  }`";
@@ -1139,6 +1145,12 @@ static const char syntax_cases_buf25[] =
 static const char syntax_cases_expected25[] =
     "return /regex0/.var_0000+/regex1/.var_0001;"
     "return /regex2/.var_0002*/regex3/.var_0003;";
+
+static const char syntax_cases_buf26[] =
+    "var invalid_re = /abc \n def/ ;";
+
+static const char syntax_cases_expected26[] =
+    "var invalid_re=/abc ";
 
 TEST_CASE("syntax cases", "[JSNormalizer]")
 {
@@ -1217,6 +1229,16 @@ TEST_CASE("syntax cases", "[JSNormalizer]")
         NORMALIZE(syntax_cases_buf14);
         VALIDATE(syntax_cases_buf14, syntax_cases_expected14);
     }
+    SECTION("LS within literal")
+    {
+        NORMALIZE(syntax_cases_buf15);
+        VALIDATE(syntax_cases_buf15, syntax_cases_expected15);
+    }
+    SECTION("PS within literal")
+    {
+        NORMALIZE(syntax_cases_buf21);
+        VALIDATE(syntax_cases_buf21, syntax_cases_expected21);
+    }
     SECTION("template literals")
     {
         NORMALIZE(syntax_cases_buf22);
@@ -1230,16 +1252,6 @@ TEST_CASE("syntax cases", "[JSNormalizer]")
 
 TEST_CASE("bad tokens", "[JSNormalizer]")
 {
-    SECTION("LS chars within literal")
-    {
-        NORMALIZE(syntax_cases_buf15);
-        VALIDATE_FAIL(syntax_cases_buf15, syntax_cases_expected15, JSTokenizer::BAD_TOKEN, 25);
-    }
-    SECTION("PS chars within literal")
-    {
-        NORMALIZE(syntax_cases_buf21);
-        VALIDATE_FAIL(syntax_cases_buf21, syntax_cases_expected21, JSTokenizer::BAD_TOKEN, 25);
-    }
     SECTION("explicit LF within literal")
     {
         NORMALIZE(syntax_cases_buf16);
@@ -1264,6 +1276,11 @@ TEST_CASE("bad tokens", "[JSNormalizer]")
     {
         NORMALIZE(syntax_cases_buf20);
         VALIDATE_FAIL(syntax_cases_buf20, syntax_cases_expected20, JSTokenizer::BAD_TOKEN, 23);
+    }
+    SECTION("explicit LF within regex literal")
+    {
+        NORMALIZE(syntax_cases_buf26);
+        VALIDATE_FAIL(syntax_cases_buf26, syntax_cases_expected26, JSTokenizer::BAD_TOKEN, 23);
     }
 }
 
@@ -1672,10 +1689,7 @@ static const char unexpected_tag_buf0[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected0[] =
-    "var a=1;";
-
-static const char unexpected_tag_expected0_ext[] =
-    "var a=1;";
+    "var a=1;<script>var b=2;";
 
 static const char unexpected_tag_buf1[] =
     "var a = 1;\n"
@@ -1683,10 +1697,7 @@ static const char unexpected_tag_buf1[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected1[] =
-    "var a=1;";
-
-static const char unexpected_tag_expected1_ext[] =
-    "var a=1;";
+    "var a=1;<script type=application/javascript>var b=2;";
 
 static const char unexpected_tag_buf2[] =
     "var a = 1;\n"
@@ -1694,9 +1705,6 @@ static const char unexpected_tag_buf2[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected2[] =
-    "var a=1;var str='";
-
-static const char unexpected_tag_expected2_ext[] =
     "var a=1;var str='<script> something';var b=2;";
 
 static const char unexpected_tag_buf3[] =
@@ -1705,9 +1713,6 @@ static const char unexpected_tag_buf3[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected3[] =
-    "var a=1;var str='something ";
-
-static const char unexpected_tag_expected3_ext[] =
     "var a=1;var str='something <script> something';var b=2;";
 
 static const char unexpected_tag_buf4[] =
@@ -1716,9 +1721,6 @@ static const char unexpected_tag_buf4[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected4[] =
-    "var a=1;var str='something ";
-
-static const char unexpected_tag_expected4_ext[] =
     "var a=1;var str='something <script>';var b=2;";
 
 static const char unexpected_tag_buf5[] =
@@ -1760,9 +1762,6 @@ static const char unexpected_tag_buf8[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected8[] =
-    "var a=1;var str='something \\";
-
-static const char unexpected_tag_expected8_ext[] =
     "var a=1;var str='something \\<script> something';var b=2;";
 
 static const char unexpected_tag_buf9[] =
@@ -1782,9 +1781,6 @@ static const char unexpected_tag_buf10[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected10[] =
-    "var a=1;";
-
-static const char unexpected_tag_expected10_ext[] =
     "var a=1;var b=2;";
 
 static const char unexpected_tag_buf11[] =
@@ -1793,9 +1789,6 @@ static const char unexpected_tag_buf11[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected11[] =
-    "var a=1;";
-
-static const char unexpected_tag_expected11_ext[] =
     "var a=1;var b=2;";
 
 static const char unexpected_tag_buf12[] =
@@ -1804,9 +1797,6 @@ static const char unexpected_tag_buf12[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected12[] =
-    "var a=1;";
-
-static const char unexpected_tag_expected12_ext[] =
     "var a=1;var b=2;";
 
 static const char unexpected_tag_buf13[] =
@@ -1815,9 +1805,6 @@ static const char unexpected_tag_buf13[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected13[] =
-    "var a=1;";
-
-static const char unexpected_tag_expected13_ext[] =
     "var a=1;var b=2;";
 
 static const char unexpected_tag_buf14[] =
@@ -1826,9 +1813,6 @@ static const char unexpected_tag_buf14[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected14[] =
-    "var a=1;";
-
-static const char unexpected_tag_expected14_ext[] =
     "var a=1;var b=2;";
 
 static const char unexpected_tag_buf15[] =
@@ -1837,9 +1821,6 @@ static const char unexpected_tag_buf15[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected15[] =
-    "var a=1;";
-
-static const char unexpected_tag_expected15_ext[] =
     "var a=1;var b=2;";
 
 static const char unexpected_tag_buf16[] =
@@ -1920,18 +1901,12 @@ static const char unexpected_tag_buf22[] =
 static const char unexpected_tag_expected22[] =
     "var a=1;var str='script somescript /script something';var b=2;";
 
-static const char unexpected_tag_expected22_ext[] =
-    "var a=1;var str='script somescript /script something';var b=2;";
-
 static const char unexpected_tag_buf23[] =
     "var a = 1;\n"
     "var str = 'script somescript /script something <script>';\n"
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected23[] =
-    "var a=1;var str='script somescript /script something ";
-
-static const char unexpected_tag_expected23_ext[] =
     "var a=1;var str='script somescript /script something <script>';var b=2;";
 
 static const char unexpected_tag_buf24[] =
@@ -1940,37 +1915,51 @@ static const char unexpected_tag_buf24[] =
     "var b = 2;\r\n";
 
 static const char unexpected_tag_expected24[] =
-    "var a=1;var str='something ";
-
-static const char unexpected_tag_expected24_ext[] =
     "var a=1;var str='something <sCrIpT>';var b=2;";
+
+static const char unexpected_tag_buf25[] =
+    "var template = ` <script> ` ;";
+
+static const char unexpected_tag_expected25[] =
+    "var template=` <script> `;";
+
+static const char unexpected_tag_buf26[] =
+    "var regex = / <script> / ;";
+
+static const char unexpected_tag_expected26[] =
+    "var regex=/ <script> /;";
 
 TEST_CASE("nested script tags", "[JSNormalizer]")
 {
     SECTION("explicit open tag - simple")
     {
         NORMALIZE(unexpected_tag_buf0);
-        VALIDATE_FAIL(unexpected_tag_buf0, unexpected_tag_expected0, JSTokenizer::OPENING_TAG, 19);
+        VALIDATE(unexpected_tag_buf0, unexpected_tag_expected0);
+        CHECK_OTAG(true);
     }
     SECTION("explicit open tag - complex")
     {
         NORMALIZE(unexpected_tag_buf1);
-        VALIDATE_FAIL(unexpected_tag_buf1, unexpected_tag_expected1, JSTokenizer::OPENING_TAG, 19);
+        VALIDATE(unexpected_tag_buf1, unexpected_tag_expected1);
+        CHECK_OTAG(true);
     }
     SECTION("open tag within literal - start")
     {
         NORMALIZE(unexpected_tag_buf2);
-        VALIDATE_FAIL(unexpected_tag_buf2, unexpected_tag_expected2, JSTokenizer::OPENING_TAG, 30);
+        VALIDATE(unexpected_tag_buf2, unexpected_tag_expected2);
+        CHECK_OTAG(true);
     }
     SECTION("open tag within literal - mid")
     {
         NORMALIZE(unexpected_tag_buf3);
-        VALIDATE_FAIL(unexpected_tag_buf3, unexpected_tag_expected3, JSTokenizer::OPENING_TAG, 40);
+        VALIDATE(unexpected_tag_buf3, unexpected_tag_expected3);
+        CHECK_OTAG(true);
     }
     SECTION("open tag within literal - end")
     {
         NORMALIZE(unexpected_tag_buf4);
-        VALIDATE_FAIL(unexpected_tag_buf4, unexpected_tag_expected4, JSTokenizer::OPENING_TAG, 40);
+        VALIDATE(unexpected_tag_buf4, unexpected_tag_expected4);
+        CHECK_OTAG(true);
     }
     SECTION("close tag within literal - start")
     {
@@ -1990,7 +1979,8 @@ TEST_CASE("nested script tags", "[JSNormalizer]")
     SECTION("open tag within literal - escaped")
     {
         NORMALIZE(unexpected_tag_buf8);
-        VALIDATE_FAIL(unexpected_tag_buf8, unexpected_tag_expected8, JSTokenizer::OPENING_TAG, 41);
+        VALIDATE(unexpected_tag_buf8, unexpected_tag_expected8);
+        CHECK_OTAG(true);
     }
     SECTION("close tag within literal - escaped")
     {
@@ -2000,32 +1990,38 @@ TEST_CASE("nested script tags", "[JSNormalizer]")
     SECTION("open tag within single-line comment - start")
     {
         NORMALIZE(unexpected_tag_buf10);
-        VALIDATE_FAIL(unexpected_tag_buf10, unexpected_tag_expected10, JSTokenizer::OPENING_TAG, 20);
+        VALIDATE(unexpected_tag_buf10, unexpected_tag_expected10);
+        CHECK_OTAG(true);
     }
     SECTION("open tag within single-line comment - mid")
     {
         NORMALIZE(unexpected_tag_buf11);
-        VALIDATE_FAIL(unexpected_tag_buf11, unexpected_tag_expected11, JSTokenizer::OPENING_TAG, 30);
+        VALIDATE(unexpected_tag_buf11, unexpected_tag_expected11);
+        CHECK_OTAG(true);
     }
     SECTION("open tag within single-line comment - end")
     {
         NORMALIZE(unexpected_tag_buf12);
-        VALIDATE_FAIL(unexpected_tag_buf12, unexpected_tag_expected12, JSTokenizer::OPENING_TAG, 30);
+        VALIDATE(unexpected_tag_buf12, unexpected_tag_expected12);
+        CHECK_OTAG(true);
     }
     SECTION("open tag within multi-line comment - start")
     {
         NORMALIZE(unexpected_tag_buf13);
-        VALIDATE_FAIL(unexpected_tag_buf13, unexpected_tag_expected13, JSTokenizer::OPENING_TAG, 20);
+        VALIDATE(unexpected_tag_buf13, unexpected_tag_expected13);
+        CHECK_OTAG(true);
     }
     SECTION("open tag within multi-line comment - mid")
     {
         NORMALIZE(unexpected_tag_buf14);
-        VALIDATE_FAIL(unexpected_tag_buf14, unexpected_tag_expected14, JSTokenizer::OPENING_TAG, 30);
+        VALIDATE(unexpected_tag_buf14, unexpected_tag_expected14);
+        CHECK_OTAG(true);
     }
     SECTION("open tag within multi-line comment - end")
     {
         NORMALIZE(unexpected_tag_buf15);
-        VALIDATE_FAIL(unexpected_tag_buf15, unexpected_tag_expected15, JSTokenizer::OPENING_TAG, 30);
+        VALIDATE(unexpected_tag_buf15, unexpected_tag_expected15);
+        CHECK_OTAG(true);
     }
     SECTION("close tag within single-line comment - start")
     {
@@ -2065,12 +2061,26 @@ TEST_CASE("nested script tags", "[JSNormalizer]")
     SECTION("multiple patterns - matched")
     {
         NORMALIZE(unexpected_tag_buf23);
-        VALIDATE_FAIL(unexpected_tag_buf23, unexpected_tag_expected23, JSTokenizer::OPENING_TAG, 66);
+        VALIDATE(unexpected_tag_buf23, unexpected_tag_expected23);
+        CHECK_OTAG(true);
     }
     SECTION("mixed lower and upper case")
     {
         NORMALIZE(unexpected_tag_buf24);
-        VALIDATE_FAIL(unexpected_tag_buf24, unexpected_tag_expected24, JSTokenizer::OPENING_TAG, 40);
+        VALIDATE(unexpected_tag_buf24, unexpected_tag_expected24);
+        CHECK_OTAG(true);
+    }
+    SECTION("opening tag within template literal")
+    {
+        NORMALIZE(unexpected_tag_buf25);
+        VALIDATE(unexpected_tag_buf25, unexpected_tag_expected25);
+        CHECK_OTAG(true);
+    }
+    SECTION("opening tag within regex literal")
+    {
+        NORMALIZE(unexpected_tag_buf26);
+        VALIDATE(unexpected_tag_buf26, unexpected_tag_expected26);
+        CHECK_OTAG(true);
     }
 }
 
@@ -2083,6 +2093,7 @@ TEST_CASE("opening tag sequence", "[JSNormalizer]")
 
         NORMALIZE(src);
         VALIDATE(src, exp);
+        CHECK_OTAG(false);
     }
     SECTION("valid 1")
     {
@@ -2091,6 +2102,7 @@ TEST_CASE("opening tag sequence", "[JSNormalizer]")
 
         NORMALIZE(src);
         VALIDATE(src, exp);
+        CHECK_OTAG(false);
     }
     SECTION("valid 2")
     {
@@ -2099,54 +2111,61 @@ TEST_CASE("opening tag sequence", "[JSNormalizer]")
 
         NORMALIZE(src);
         VALIDATE(src, exp);
+        CHECK_OTAG(false);
     }
     SECTION("tabulation")
     {
         const char src[] = "<script\x9";
-        const char exp[] = "";
+        const char exp[] = "<script";
 
         NORMALIZE(src);
-        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+        VALIDATE(src, exp);
+        CHECK_OTAG(true);
     }
     SECTION("line feed")
     {
         const char src[] = "<script\xA";
-        const char exp[] = "";
+        const char exp[] = "<script";
 
         NORMALIZE(src);
-        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+        VALIDATE(src, exp);
+        CHECK_OTAG(true);
     }
     SECTION("form feed")
     {
         const char src[] = "<script\xC";
-        const char exp[] = "";
+        const char exp[] = "<script";
 
         NORMALIZE(src);
-        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+        VALIDATE(src, exp);
+        CHECK_OTAG(true);
     }
     SECTION("space")
     {
         const char src[] = "<script\x20";
-        const char exp[] = "";
+        const char exp[] = "<script";
 
         NORMALIZE(src);
-        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+        VALIDATE(src, exp);
+        CHECK_OTAG(true);
     }
     SECTION("solidus")
     {
         const char src[] = "<script\x2F";
-        const char exp[] = "";
+        const char exp[] = "<script\x2F";
 
         NORMALIZE(src);
-        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+        VALIDATE(src, exp);
+        CHECK_OTAG(true);
     }
     SECTION("greater than")
     {
         const char src[] = "<script\x3E";
-        const char exp[] = "";
+        const char exp[] = "<script\x3E";
 
         NORMALIZE(src);
-        VALIDATE_FAIL(src, exp, JSTokenizer::OPENING_TAG, 8);
+        VALIDATE(src, exp);
+        CHECK_OTAG(true);
     }
 }
 
@@ -2155,27 +2174,32 @@ TEST_CASE("nested script tags in an external script", "[JSNormalizer]")
     SECTION("explicit open tag - simple")
     {
         NORMALIZE_EXT(unexpected_tag_buf0);
-        VALIDATE_FAIL(unexpected_tag_buf0, unexpected_tag_expected0_ext, JSTokenizer::OPENING_TAG, 19);
+        VALIDATE(unexpected_tag_buf0, unexpected_tag_expected0);
+        CHECK_OTAG(false);
     }
     SECTION("explicit open tag - complex")
     {
         NORMALIZE_EXT(unexpected_tag_buf1);
-        VALIDATE_FAIL(unexpected_tag_buf1, unexpected_tag_expected1_ext, JSTokenizer::OPENING_TAG, 19);
+        VALIDATE(unexpected_tag_buf1, unexpected_tag_expected1);
+        CHECK_OTAG(false);
     }
     SECTION("open tag within literal - start")
     {
         NORMALIZE_EXT(unexpected_tag_buf2);
-        VALIDATE(unexpected_tag_buf2, unexpected_tag_expected2_ext);
+        VALIDATE(unexpected_tag_buf2, unexpected_tag_expected2);
+        CHECK_OTAG(false);
     }
     SECTION("open tag within literal - mid")
     {
         NORMALIZE_EXT(unexpected_tag_buf3);
-        VALIDATE(unexpected_tag_buf3, unexpected_tag_expected3_ext);
+        VALIDATE(unexpected_tag_buf3, unexpected_tag_expected3);
+        CHECK_OTAG(false);
     }
     SECTION("open tag within literal - end")
     {
         NORMALIZE_EXT(unexpected_tag_buf4);
-        VALIDATE(unexpected_tag_buf4, unexpected_tag_expected4_ext);
+        VALIDATE(unexpected_tag_buf4, unexpected_tag_expected4);
+        CHECK_OTAG(false);
     }
     SECTION("close tag within literal - start")
     {
@@ -2195,7 +2219,8 @@ TEST_CASE("nested script tags in an external script", "[JSNormalizer]")
     SECTION("open tag within literal - escaped")
     {
         NORMALIZE_EXT(unexpected_tag_buf8);
-        VALIDATE(unexpected_tag_buf8, unexpected_tag_expected8_ext);
+        VALIDATE(unexpected_tag_buf8, unexpected_tag_expected8);
+        CHECK_OTAG(false);
     }
     SECTION("close tag within literal - escaped")
     {
@@ -2205,32 +2230,38 @@ TEST_CASE("nested script tags in an external script", "[JSNormalizer]")
     SECTION("open tag within single-line comment - start")
     {
         NORMALIZE_EXT(unexpected_tag_buf10);
-        VALIDATE(unexpected_tag_buf10, unexpected_tag_expected10_ext);
+        VALIDATE(unexpected_tag_buf10, unexpected_tag_expected10);
+        CHECK_OTAG(false);
     }
     SECTION("open tag within single-line comment - mid")
     {
         NORMALIZE_EXT(unexpected_tag_buf11);
-        VALIDATE(unexpected_tag_buf11, unexpected_tag_expected11_ext);
+        VALIDATE(unexpected_tag_buf11, unexpected_tag_expected11);
+        CHECK_OTAG(false);
     }
     SECTION("open tag within single-line comment - end")
     {
         NORMALIZE_EXT(unexpected_tag_buf12);
-        VALIDATE(unexpected_tag_buf12, unexpected_tag_expected12_ext);
+        VALIDATE(unexpected_tag_buf12, unexpected_tag_expected12);
+        CHECK_OTAG(false);
     }
     SECTION("open tag within multi-line comment - start")
     {
         NORMALIZE_EXT(unexpected_tag_buf13);
-        VALIDATE(unexpected_tag_buf13, unexpected_tag_expected13_ext);
+        VALIDATE(unexpected_tag_buf13, unexpected_tag_expected13);
+        CHECK_OTAG(false);
     }
     SECTION("open tag within multi-line comment - mid")
     {
         NORMALIZE_EXT(unexpected_tag_buf14);
-        VALIDATE(unexpected_tag_buf14, unexpected_tag_expected14_ext);
+        VALIDATE(unexpected_tag_buf14, unexpected_tag_expected14);
+        CHECK_OTAG(false);
     }
     SECTION("open tag within multi-line comment - end")
     {
         NORMALIZE_EXT(unexpected_tag_buf15);
-        VALIDATE(unexpected_tag_buf15, unexpected_tag_expected15_ext);
+        VALIDATE(unexpected_tag_buf15, unexpected_tag_expected15);
+        CHECK_OTAG(false);
     }
     SECTION("close tag within single-line comment - start")
     {
@@ -2265,17 +2296,31 @@ TEST_CASE("nested script tags in an external script", "[JSNormalizer]")
     SECTION("multiple patterns - not matched")
     {
         NORMALIZE_EXT(unexpected_tag_buf22);
-        VALIDATE(unexpected_tag_buf22, unexpected_tag_expected22_ext);
+        VALIDATE(unexpected_tag_buf22, unexpected_tag_expected22);
     }
     SECTION("multiple patterns - matched")
     {
         NORMALIZE_EXT(unexpected_tag_buf23);
-        VALIDATE(unexpected_tag_buf23, unexpected_tag_expected23_ext);
+        VALIDATE(unexpected_tag_buf23, unexpected_tag_expected23);
+        CHECK_OTAG(false);
     }
     SECTION("mixed lower and upper case")
     {
         NORMALIZE_EXT(unexpected_tag_buf24);
-        VALIDATE(unexpected_tag_buf24, unexpected_tag_expected24_ext);
+        VALIDATE(unexpected_tag_buf24, unexpected_tag_expected24);
+        CHECK_OTAG(false);
+    }
+    SECTION("opening tag within template literal")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf25);
+        VALIDATE(unexpected_tag_buf25, unexpected_tag_expected25);
+        CHECK_OTAG(false);
+    }
+    SECTION("opening tag within regex literal")
+    {
+        NORMALIZE_EXT(unexpected_tag_buf26);
+        VALIDATE(unexpected_tag_buf26, unexpected_tag_expected26);
+        CHECK_OTAG(false);
     }
 }
 
@@ -2326,6 +2371,94 @@ TEST_CASE("split between tokens", "[JSNormalizer]")
 
         NORMALIZE_3(dat1, dat2, dat3, exp1, exp2, exp3);
         NORM_COMBINED_3(dat1, dat2, dat3, exp);
+    }
+    SECTION("complete open tag - identifier")
+    {
+        const char dat1[] = " ( a <script> ";
+        const char dat2[] = " b ) ";
+        const char exp1[] = "(a<script>";
+        const char exp2[] = "b)";
+        const char exp[] = "(a<script>b)";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("incomplete open tag - identifier")
+    {
+        const char dat1[] = " <script  ";
+        const char dat2[] = " a ; ";
+        const char exp1[] = "<script";
+        const char exp2[] = " a;";
+        const char exp[] = "<script a;";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("incomplete open tag - operator")
+    {
+        const char dat1[] = " ( a <script  ";
+        const char dat2[] = " ) ";
+        const char exp1[] = "(a<script";
+        const char exp2[] = ")";
+        const char exp[] = "(a<script)";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("identifier - complete open tag")
+    {
+        const char dat1[] = " ( a  ";
+        const char dat2[] = " <script> b ) ";
+        const char exp1[] = "(a";
+        const char exp2[] = "<script>b)";
+        const char exp[] = "(a<script>b)";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("identifier - incomplete open tag")
+    {
+        const char dat1[] = " ( a  ";
+        const char dat2[] = " <script  ) ";
+        const char exp1[] = "(a";
+        const char exp2[] = "<script)";
+        const char exp[] = "(a<script)";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("operator - incomplete open tag")
+    {
+        const char dat1[] = " ( a  < ";
+        const char dat2[] = " <script ) ";
+        const char exp1[] = "(a<";
+        const char exp2[] = "<script)";
+        const char exp[] = "(a<<script)";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("identifier - incomplete open tag as a comparison")
+    {
+        const char dat1[] = " ( a  < ";
+        const char dat2[] = " script ) ";
+        const char exp1[] = "(a<";
+        const char exp2[] = "script)";
+        const char exp[] = "(a<script)";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
+    }
+    SECTION("identifier - complete open tag as a comparison")
+    {
+        const char dat1[] = " ( a  <";
+        const char dat2[] = "script ) ";
+        const char exp1[] = "(a<";
+        const char exp2[] = "<script)";
+        const char exp[] = "(a<script)";
+
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
     }
 }
 
@@ -2478,33 +2611,33 @@ TEST_CASE("split in opening tag", "[JSNormalizer]")
         const char dat1[] = "<";
         const char dat2[] = "script>";
         const char exp1[] = "<";
-        const char exp2[] = "";
-        const char exp[] = "";
+        const char exp2[] = "<script>";
+        const char exp[] = "<script>";
 
-        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::OPENING_TAG);
-        NORM_COMBINED_BAD_2(dat1, dat2, exp, JSTokenizer::OPENING_TAG);
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
     }
     SECTION("str='<s cript'")
     {
         const char dat1[] = "var str ='<s";
         const char dat2[] = "cript>';";
         const char exp1[] = "var str='<s";
-        const char exp2[] = "";
-        const char exp[]  = "var str='";
+        const char exp2[] = "<script>';";
+        const char exp[]  = "var str='<script>';";
 
-        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::OPENING_TAG);
-        NORM_COMBINED_BAD_2(dat1, dat2, exp, JSTokenizer::OPENING_TAG);
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
     }
     SECTION("str='<scrip t'")
     {
         const char dat1[] = "var str ='<scrip";
         const char dat2[] = "t>';";
         const char exp1[] = "var str='<scrip";
-        const char exp2[] = "";
-        const char exp[] = "var str='";
+        const char exp2[] = "<script>';";
+        const char exp[] = "var str='<script>';";
 
-        NORM_BAD_2(dat1, dat2, exp1, exp2, JSTokenizer::OPENING_TAG);
-        NORM_COMBINED_BAD_2(dat1, dat2, exp, JSTokenizer::OPENING_TAG);
+        NORMALIZE_2(dat1, dat2, exp1, exp2);
+        NORM_COMBINED_2(dat1, dat2, exp);
     }
     SECTION("< scr ipt")
     {
@@ -2513,11 +2646,11 @@ TEST_CASE("split in opening tag", "[JSNormalizer]")
         const char dat3[] = "ipt>";
         const char exp1[] = "<";
         const char exp2[] = "scr";
-        const char exp3[] = "";
-        const char exp[] = "";
+        const char exp3[] = "<script>";
+        const char exp[] = "<script>";
 
-        NORM_BAD_3(dat1, dat2, dat3, exp1, exp2, exp3, JSTokenizer::OPENING_TAG);
-        NORM_COMBINED_BAD_3(dat1, dat2, dat3, exp, JSTokenizer::OPENING_TAG);
+        NORMALIZE_3(dat1, dat2, dat3, exp1, exp2, exp3);
+        NORM_COMBINED_3(dat1, dat2, dat3, exp);
     }
     SECTION("str='<sc rip t'")
     {
@@ -2526,11 +2659,11 @@ TEST_CASE("split in opening tag", "[JSNormalizer]")
         const char dat3[] = "t>\";";
         const char exp1[] = "var str=\"<sc";
         const char exp2[] = "scrip";
-        const char exp3[] = "";
-        const char exp[] = "var str=\"";
+        const char exp3[] = "<script>\";";
+        const char exp[] = "var str=\"<script>\";";
 
-        NORM_BAD_3(dat1, dat2, dat3, exp1, exp2, exp3, JSTokenizer::OPENING_TAG);
-        NORM_COMBINED_BAD_3(dat1, dat2, dat3, exp, JSTokenizer::OPENING_TAG);
+        NORMALIZE_3(dat1, dat2, dat3, exp1, exp2, exp3);
+        NORM_COMBINED_3(dat1, dat2, dat3, exp);
     }
 }
 

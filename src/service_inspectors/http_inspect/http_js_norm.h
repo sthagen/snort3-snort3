@@ -40,9 +40,6 @@ public:
         const HttpParaList::JsNormParam& js_norm_param_);
     ~HttpJsNorm();
 
-    void set_detection_depth(size_t depth)
-    { detection_depth = depth; }
-
     void do_legacy(const Field& input, Field& output, HttpInfractions*, HttpEventGen*,
         int max_javascript_whitespaces) const;
     void do_inline(const Field& input, Field& output, HttpInfractions*, HttpFlowData*, bool) const;
@@ -51,7 +48,7 @@ public:
     void configure();
 
 private:
-    enum AttrId { AID_SLASH, AID_GT, AID_SRC, AID_JS, AID_ECMA, AID_VB };
+    enum AttrId { AID_SLASH, AID_GT, AID_SRC, AID_JS, AID_NON_JS, AID_ECMA, AID_VB };
 
     struct MatchContext
     {
@@ -63,7 +60,6 @@ private:
 
     const HttpParaList::UriParam& uri_param;
     const HttpParaList::JsNormParam& js_norm_param;
-    size_t detection_depth;
     bool configure_once = false;
 
     snort::SearchTool* mpse_otag;

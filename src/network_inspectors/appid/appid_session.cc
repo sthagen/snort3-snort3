@@ -206,7 +206,8 @@ static inline PktType get_pkt_type_from_ip_proto(IpProtocol proto)
 
 AppIdSession* AppIdSession::create_future_session(const Packet* ctrlPkt, const SfIp* cliIp,
     uint16_t cliPort, const SfIp* srvIp, uint16_t srvPort, IpProtocol proto,
-    SnortProtocolId snort_protocol_id, bool swap_app_direction, bool bidirectional)
+    SnortProtocolId snort_protocol_id, bool swap_app_direction, bool bidirectional,
+    bool expect_persist)
 {
     enum PktType type = get_pkt_type_from_ip_proto(proto);
 
@@ -232,7 +233,8 @@ AppIdSession* AppIdSession::create_future_session(const Packet* ctrlPkt, const S
     is_session_monitored(asd->flags, ctrlPkt, *inspector);
 
     if (Stream::set_snort_protocol_id_expected(ctrlPkt, type, proto, cliIp,
-        cliPort, srvIp, srvPort, snort_protocol_id, asd, swap_app_direction, false, bidirectional))
+        cliPort, srvIp, srvPort, snort_protocol_id, asd, swap_app_direction, false,
+        bidirectional, expect_persist))
     {
         if (appidDebug->is_active())
         {
@@ -407,6 +409,10 @@ void AppIdSession::check_ssl_detection_restart(AppidChangeBits& change_bits,
 void AppIdSession::check_tunnel_detection_restart()
 {
     if (tp_payload_app_id != APP_ID_HTTP_TUNNEL or get_session_flags(APPID_SESSION_HTTP_TUNNEL))
+        return;
+
+    AppIdHttpSession* hsession = get_http_session();
+    if (!hsession or !hsession->get_tunnel())
         return;
 
     if (appidDebug->is_active())
@@ -878,8 +884,13 @@ AppId AppIdSession::pick_ss_payload_app_id(AppId service_id) const
         tmp_id = api.hsessions[0]->payload.get_id();
     if (tmp_id > APP_ID_NONE)
     {
-        if (tmp_id == APP_ID_HTTP_TUNNEL and tp_payload_app_id > APP_ID_NONE)
-            return tp_payload_app_id;
+        if (tmp_id == APP_ID_HTTP_TUNNEL)
+        {
+            if (api.payload.get_id() > APP_ID_NONE)
+                return api.payload.get_id();
+            else if (tp_payload_app_id > APP_ID_NONE)
+                return tp_payload_app_id;
+        }
         else
             return tmp_id;
     }

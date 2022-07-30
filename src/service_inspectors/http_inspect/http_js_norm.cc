@@ -39,7 +39,6 @@ static const char* jsret_codes[] =
     "end of stream",
     "script ended",
     "script continues",
-    "opening tag",
     "closing tag",
     "bad token",
     "identifier overflow",
@@ -84,7 +83,6 @@ HttpJsNorm::HttpJsNorm(const HttpParaList::UriParam& uri_param_,
     const HttpParaList::JsNormParam& js_norm_param_) :
     uri_param(uri_param_),
     js_norm_param(js_norm_param_),
-    detection_depth(UINT64_MAX),
     mpse_otag(nullptr),
     mpse_attr(nullptr),
     mpse_type(nullptr)
@@ -110,19 +108,52 @@ void HttpJsNorm::configure()
     static constexpr const char* attr_slash = "/";
     static constexpr const char* attr_gt = ">";
     static constexpr const char* attr_src = "SRC";
-    static constexpr const char* attr_js1 = "JAVASCRIPT";
-    static constexpr const char* attr_js2 = "ECMASCRIPT";
-    static constexpr const char* attr_vb = "VBSCRIPT";
+
+    static constexpr const char* attr_js = "JAVASCRIPT";    // legacy only
+    static constexpr const char* attr_ecma = "ECMASCRIPT";  // legacy only
+    static constexpr const char* attr_vb = "VBSCRIPT";      // legacy only
+
+    static constexpr const size_t attrs_js_size = 15;
+    static constexpr const char* attrs_js[attrs_js_size] =
+    {
+        "APPLICATION/JAVASCRIPT",
+        "APPLICATION/ECMASCRIPT",
+        "APPLICATION/X-JAVASCRIPT",
+        "APPLICATION/X-ECMASCRIPT",
+        "TEXT/JAVASCRIPT",
+        "TEXT/JAVASCRIPT1.0",
+        "TEXT/JAVASCRIPT1.1",
+        "TEXT/JAVASCRIPT1.2",
+        "TEXT/JAVASCRIPT1.3",
+        "TEXT/JAVASCRIPT1.4",
+        "TEXT/JAVASCRIPT1.5",
+        "TEXT/ECMASCRIPT",
+        "TEXT/X-JAVASCRIPT",
+        "TEXT/X-ECMASCRIPT",
+        "TEXT/JSCRIPT"
+    };
+
+    static constexpr const size_t attrs_non_js_size = 2;
+    static constexpr const char* attrs_non_js[attrs_non_js_size] =
+    {
+        "TEXT/VBSCRIPT",
+        "APPLICATION/JSON"
+    };
 
     mpse_otag->add(otag_start, strlen(otag_start), 0);
+
     mpse_attr->add(attr_slash, strlen(attr_slash), AID_SLASH);
     mpse_attr->add(attr_gt, strlen(attr_gt), AID_GT);
     mpse_attr->add(attr_src, strlen(attr_src), AID_SRC);
-    mpse_attr->add(attr_js1, strlen(attr_js1), AID_JS);
-    mpse_attr->add(attr_js2, strlen(attr_js2), AID_ECMA);
-    mpse_attr->add(attr_vb, strlen(attr_vb), AID_VB);
-    mpse_type->add(attr_js1, strlen(attr_js1), AID_JS);
-    mpse_type->add(attr_js2, strlen(attr_js2), AID_ECMA);
+
+    for (unsigned i = 0; i < attrs_js_size; ++i)
+        mpse_attr->add(attrs_js[i], strlen(attrs_js[i]), AID_JS);
+
+    for (unsigned i = 0; i < attrs_non_js_size; ++i)
+        mpse_attr->add(attrs_non_js[i], strlen(attrs_non_js[i]), AID_NON_JS);
+
+    mpse_type->add(attr_js, strlen(attr_js), AID_JS);
+    mpse_type->add(attr_ecma, strlen(attr_ecma), AID_ECMA);
     mpse_type->add(attr_vb, strlen(attr_vb), AID_VB);
 
     mpse_otag->prep();
@@ -173,11 +204,6 @@ void HttpJsNorm::do_external(const Field& input, Field& output,
             events->create_event(EVENT_JS_CLOSING_TAG);
             ssn->js_built_in_event = true;
             break;
-        case JSTokenizer::OPENING_TAG:
-            *infractions += INF_JS_OPENING_TAG;
-            events->create_event(EVENT_JS_OPENING_TAG);
-            ssn->js_built_in_event = true;
-            break;
         case JSTokenizer::BAD_TOKEN:
         case JSTokenizer::WRONG_CLOSING_SYMBOL:
         case JSTokenizer::ENDED_IN_INNER_SCOPE:
@@ -225,7 +251,7 @@ void HttpJsNorm::do_external(const Field& input, Field& output,
     debug_logf(4, http_trace, TRACE_JS_PROC, current_packet,
         "input data was %s\n", final_portion ? "last one in PDU" : "a part of PDU");
 
-    uint32_t data_len = std::min(detection_depth, js_ctx.script_size());
+    uint32_t data_len = js_ctx.script_size();
 
     if (data_len)
     {
@@ -313,10 +339,6 @@ void HttpJsNorm::do_inline(const Field& input, Field& output,
             break;
         case JSTokenizer::SCRIPT_CONTINUE:
             break;
-        case JSTokenizer::OPENING_TAG:
-            *infractions += INF_JS_OPENING_TAG;
-            events->create_event(EVENT_JS_OPENING_TAG);
-            break;
         case JSTokenizer::CLOSING_TAG:
             *infractions += INF_JS_CLOSING_TAG;
             events->create_event(EVENT_JS_CLOSING_TAG);
@@ -361,6 +383,11 @@ void HttpJsNorm::do_inline(const Field& input, Field& output,
             *infractions += INF_MIXED_ENCODINGS;
             events->create_event(EVENT_MIXED_ENCODINGS);
         }
+        if (js_ctx.is_opening_tag_seen())
+        {
+            *infractions += INF_JS_OPENING_TAG;
+            events->create_event(EVENT_JS_OPENING_TAG);
+        }
 
         script_continue = ret == JSTokenizer::SCRIPT_CONTINUE;
     }
@@ -374,7 +401,7 @@ void HttpJsNorm::do_inline(const Field& input, Field& output,
         "input data was %s\n", final_portion ? "last one in PDU" : "a part of PDU");
 
     auto js_ctx = ssn->js_normalizer;
-    uint32_t data_len = std::min(detection_depth, js_ctx->script_size());
+    uint32_t data_len = js_ctx->script_size();
 
     if (data_len)
     {
@@ -561,11 +588,7 @@ int HttpJsNorm::match_attr(void* pid, void*, int index, void* sctx, void*)
         ctx->is_javascript = true;
         return 0;
 
-    case AID_ECMA:
-        ctx->is_javascript = true;
-        return 0;
-
-    case AID_VB:
+    case AID_NON_JS:
         ctx->is_javascript = false;
         return 0;
 

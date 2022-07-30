@@ -1075,7 +1075,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 {LINE_TERMINATORS}                            { BEGIN(regst); newline_found = true; }
 <char_code>{LINE_TERMINATORS}                 { newline_found = true; }
 
-<INITIAL,regex,regst,divop,char_code>{HTML_TAG_SCRIPT_OPEN} { BEGIN(regst); RETURN(OPENING_TAG) }
+<INITIAL,regst,divop,char_code>{HTML_TAG_SCRIPT_OPEN} { explicit_otag(); }
 {HTML_TAG_SCRIPT_CLOSE}                       { EXEC(html_closing_script_tag()) }
 
     {HTML_COMMENT_OPEN}                       { BEGIN(lcomm); }
@@ -1088,7 +1088,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <char_code_lcomm>{LINE_COMMENT_END1}          { BEGIN(char_code); newline_found = true; }
 <char_code_lcomm>{LINE_COMMENT_END2}          { BEGIN(char_code); newline_found = true; }
 <char_code_lcomm>{LINE_COMMENT_END4}          { if (!ext_script) { BEGIN(regst); RETURN(CLOSING_TAG) } }
-<lcomm,char_code_lcomm>{LINE_COMMENT_END3}    { if (!ext_script) { BEGIN(regst); RETURN(OPENING_TAG) } }
+<lcomm,char_code_lcomm>{LINE_COMMENT_END3}    { if (!ext_script) { opening_tag_seen = true; } }
 <lcomm,char_code_lcomm>{LINE_COMMENT_SKIP}    { /* skip */ }
 <lcomm,char_code_lcomm><<EOF>>                { RETURN(SCRIPT_CONTINUE) }
 
@@ -1096,7 +1096,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 <char_code>{BLOCK_COMMENT_START}              { BEGIN(char_code_bcomm); }
 <bcomm>{BLOCK_COMMENT_END1}                   { BEGIN(regst); }
 <char_code_bcomm>{BLOCK_COMMENT_END1}         { BEGIN(char_code); }
-<bcomm,char_code_bcomm>{BLOCK_COMMENT_END2}   { if (!ext_script) { BEGIN(regst); RETURN(OPENING_TAG) } }
+<bcomm,char_code_bcomm>{BLOCK_COMMENT_END2}   { if (!ext_script) { opening_tag_seen = true; } }
 <bcomm,char_code_bcomm>{BLOCK_COMMENT_END3}   { if (!ext_script) { BEGIN(regst); RETURN(CLOSING_TAG) } }
 <bcomm,char_code_bcomm>{BLOCK_COMMENT_LINE1}  |
 <bcomm,char_code_bcomm>{BLOCK_COMMENT_LINE2}  { newline_found = true; }
@@ -1105,12 +1105,13 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 
     {LITERAL_DQ_STRING_START}                 { EXEC(literal_dq_string_start()) }
 <dqstr,unesc_dqstr>{LITERAL_DQ_STRING_END}    { dealias_append(); ECHO; BEGIN(divop); }
-<dqstr,unesc_dqstr>{HTML_TAG_SCRIPT_OPEN}     { if (ext_script) { ECHO; } else { BEGIN(regst); RETURN(OPENING_TAG) } }
+<dqstr,unesc_dqstr>{HTML_TAG_SCRIPT_OPEN}     { if (!ext_script) { opening_tag_seen = true; } ECHO; }
 <dqstr,unesc_dqstr>{HTML_TAG_SCRIPT_CLOSE}    { if (ext_script) { ECHO; } else { BEGIN(regst); RETURN(CLOSING_TAG) } }
 <dqstr,unesc_dqstr>\\{CR}{LF}                 { /* skip */ }
 <dqstr,unesc_dqstr>\\{LF}                     { /* skip */ }
 <dqstr,unesc_dqstr>\\{CR}                     { /* skip */ }
-<dqstr,unesc_dqstr>{LINE_TERMINATORS}         { BEGIN(regst); RETURN(BAD_TOKEN) }
+<dqstr,unesc_dqstr>{CR}                       { BEGIN(regst); RETURN(BAD_TOKEN) }
+<dqstr,unesc_dqstr>{LF}                       { BEGIN(regst); RETURN(BAD_TOKEN) }
 <dqstr,unesc_dqstr><<EOF>>                    { RETURN(SCRIPT_CONTINUE) }
 <dqstr>{UNICODE_ESCAPE_SEQUENCE}              |
 <dqstr>{HEX_ESCAPE_SEQUENCE}                  { escaped_unicode_utf_8(); }
@@ -1126,12 +1127,13 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 
     {LITERAL_SQ_STRING_START}                 { EXEC(literal_sq_string_start()) }
 <sqstr,unesc_sqstr>{LITERAL_SQ_STRING_END}    { dealias_append(); ECHO; BEGIN(divop); }
-<sqstr,unesc_sqstr>{HTML_TAG_SCRIPT_OPEN}     { if (ext_script) { ECHO; } else { BEGIN(regst); RETURN(OPENING_TAG) } }
+<sqstr,unesc_sqstr>{HTML_TAG_SCRIPT_OPEN}     { if (!ext_script) { opening_tag_seen = true; } ECHO; }
 <sqstr,unesc_sqstr>{HTML_TAG_SCRIPT_CLOSE}    { if (ext_script) { ECHO; } else { BEGIN(regst); RETURN(CLOSING_TAG) } }
 <sqstr,unesc_sqstr>\\{CR}{LF}                 { /* skip */ }
 <sqstr,unesc_sqstr>\\{LF}                     { /* skip */ }
 <sqstr,unesc_sqstr>\\{CR}                     { /* skip */ }
-<sqstr,unesc_sqstr>{LINE_TERMINATORS}         { BEGIN(regst); RETURN(BAD_TOKEN) }
+<sqstr,unesc_sqstr>{CR}                       { BEGIN(regst); RETURN(BAD_TOKEN) }
+<sqstr,unesc_sqstr>{LF}                       { BEGIN(regst); RETURN(BAD_TOKEN) }
 <sqstr,unesc_sqstr><<EOF>>                    { RETURN(SCRIPT_CONTINUE) }
 <sqstr>{UNICODE_ESCAPE_SEQUENCE}              |
 <sqstr>{HEX_ESCAPE_SEQUENCE}                  { escaped_unicode_utf_8(); }
@@ -1148,6 +1150,7 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
     {LITERAL_TEMPLATE_START}                                 { EXEC(literal_template_start()) }
 <tmpll,unesc_tmpll>(\\\\)*{LITERAL_TEMPLATE_END}             { dealias_append(); ECHO; BEGIN(divop); }
 <tmpll,unesc_tmpll>(\\\\)*{LITERAL_TEMPLATE_SUBST_START}     { EXEC(process_subst_open()) dealias_reset(); }
+<tmpll,unesc_tmpll>{HTML_TAG_SCRIPT_OPEN}                    { if (!ext_script) { opening_tag_seen = true; } ECHO; }
 <tmpll,unesc_tmpll>{HTML_TAG_SCRIPT_CLOSE}                   { BEGIN(regst); RETURN(CLOSING_TAG) }
 <tmpll,unesc_tmpll><<EOF>>                                   { RETURN(SCRIPT_CONTINUE) }
 <tmpll>{UNICODE_ESCAPE_SEQUENCE}                             |
@@ -1165,10 +1168,12 @@ ALL_UNICODE    [\0-\x7F]|[\xC2-\xDF][\x80-\xBF]|(\xE0[\xA0-\xBF]|[\xE1-\xEF][\x8
 
 <regst>{LITERAL_REGEX_START}        { EXEC(literal_regex_start()) }
 <regex>{LITERAL_REGEX_END}          { EXEC(literal_regex_end()) }
+<regex>{HTML_TAG_SCRIPT_OPEN}       { if (!ext_script) { opening_tag_seen = true; } ECHO; }
 <regex>{HTML_TAG_SCRIPT_CLOSE}      { BEGIN(regst); RETURN(CLOSING_TAG) }
-<regex>\\{LF}                       |
-<regex>\\{CR}                       |
-<regex>{LINE_TERMINATORS}           { BEGIN(regst); RETURN(BAD_TOKEN) }
+<regex>\\{CR}                       { BEGIN(regst); RETURN(BAD_TOKEN) }
+<regex>\\{LF}                       { BEGIN(regst); RETURN(BAD_TOKEN) }
+<regex>{CR}                         { BEGIN(regst); RETURN(BAD_TOKEN) }
+<regex>{LF}                         { BEGIN(regst); RETURN(BAD_TOKEN) }
 <regex>{LITERAL_REGEX_G_OPEN}       { EXEC(literal_regex_g_open()) }
 <regex>{LITERAL_REGEX_G_CLOSE}      { EXEC(literal_regex_g_close()) }
 <regex>{UNICODE_ESCAPE_SEQUENCE}    |
@@ -2001,6 +2006,11 @@ bool JSTokenizer::is_unescape_nesting_seen() const
 bool JSTokenizer::is_mixed_encoding_seen() const
 {
     return mixed_encoding_seen;
+}
+
+bool JSTokenizer::is_opening_tag_seen() const
+{
+    return opening_tag_seen;
 }
 
 void JSTokenizer::set_block_param(bool f)
@@ -2930,6 +2940,19 @@ void JSTokenizer::char_code_no_match()
     set_char_code_str(false);
     yyless(0);
     memset((void*)(states + sp), 0, sizeof(states[0]));
+}
+
+void JSTokenizer::explicit_otag()
+{
+    if (!ext_script)
+        opening_tag_seen = true;
+
+    // discard match of the script tag and scan again without leading '<'
+    states_correct(1);
+    yyless(1);
+
+    // process leading '<' as a comparison operator
+    operator_comparison();
 }
 
 JSTokenizer::JSRet JSTokenizer::process(size_t& bytes_in, bool external_script)

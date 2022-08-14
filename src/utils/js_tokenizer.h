@@ -331,6 +331,8 @@ private:
     JSIdentifierCtxBase& ident_ctx;
     size_t bytes_read;
     size_t tmp_bytes_read;
+    uint32_t tokens_read;
+    uint32_t tmp_tokens_read;
     bool ext_script;
     VStack<char> regex_stack;
 
@@ -339,7 +341,8 @@ private:
         JSToken token = UNDEFINED;          // the token before
         int orig_len = 0;                   // current token original length
         int norm_len = 0;                   // normalized length of previous tokens
-        int sc = 0;                        // current Starting Condition (0 means NOT_SET)
+        int sc = 0;                         // current Starting Condition (0 means NOT_SET)
+        int correction = 0;                 // correction length
     } states[JSTOKENIZER_MAX_STATES];
     int sp = 0;                             // points to the top of states
     int eof_sp = 0;                         // points to the last state before the EOF

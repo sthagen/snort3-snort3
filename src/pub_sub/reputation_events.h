@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2022-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,41 +15,11 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+// reputation_events.h author Ron Dempster <rdempste@cisco.com>
 
-#ifndef PROCESS_H
-#define PROCESS_H
+#ifndef REPUTATION_EVENTS_H
+#define REPUTATION_EVENTS_H
 
-#include "main/snort_types.h"
-
-// process oriented services like signal handling, heap info, etc.
-
-enum PigSignal
-{
-    PIG_SIG_NONE,
-    PIG_SIG_QUIT,
-    PIG_SIG_TERM,
-    PIG_SIG_INT,
-    PIG_SIG_RELOAD_CONFIG,
-    PIG_SIG_RELOAD_HOSTS,
-    PIG_SIG_DUMP_STATS,
-    PIG_SIG_ROTATE_STATS,
-    PIG_SIG_MAX
-};
-
-PigSignal get_pending_signal();
-const char* get_signal_name(PigSignal);
-
-void init_signals();
-void term_signals();
-SO_PUBLIC void install_oops_handler();
-SO_PUBLIC void remove_oops_handler();
-void help_signals();
-
-void daemonize();
-void set_quick_exit(bool);
-void set_main_thread();
-
-void trim_heap();
+#define REPUTATION_MATCHED_EVENT "rep.matched"
 
 #endif
-

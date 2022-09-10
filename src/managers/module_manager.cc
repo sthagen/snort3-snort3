@@ -106,6 +106,8 @@ extern "C"
 
     void snort_whitelist_append(const char*);
     void snort_whitelist_add_prefix(const char*);
+
+    int get_module_version(const char* name, const char* type);
 }
 
 //-------------------------------------------------------------------------
@@ -224,7 +226,12 @@ static void dump_field_std(const string& key, const Parameter* p)
     cout << " " << Markup::emphasis(Markup::escape(key));
 
     if ( p->deflt )
-        cout << " = " << p->deflt;
+    {
+        if ( p->is_quoted() )
+            cout << " = '" << p->deflt << "'";
+        else
+            cout << " = " << p->deflt;
+    }
 
     cout << ": " << p->help;
 
@@ -734,6 +741,25 @@ SO_PUBLIC bool set_includer(const char* fqn, const char* s)
         s_file_id_includer = s;
     }
     return true;
+}
+
+// cppcheck-suppress unusedFunction
+SO_PUBLIC int get_module_version(const char* name, const char* type)
+{
+    // not all modules are plugins
+    // not all plugins have modules
+    ModHook* h = get_hook(name);
+
+    if ( !h )
+    {
+        if ( !type )
+            return -1;
+
+        PlugType pt = PluginManager::get_type(type);
+        return PluginManager::get_api(pt, name) ? 0 : -1;
+    }
+
+    return h->api ? (int)h->api->version : 0;
 }
 
 //-------------------------------------------------------------------------

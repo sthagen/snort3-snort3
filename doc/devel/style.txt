@@ -213,7 +213,7 @@ yet firm so feedback is welcome to get something we can live with.
   signature, if, else, loop, switch, etc.
 
 * Use consistent spacing and line breaks.  Always indent 4 spaces from the
-  breaking line.  Keep lines less than 100 chars; it greatly helps
+  breaking line.  Keep lines less than 120 chars; it greatly helps
   readability.
 
     No:
@@ -351,4 +351,16 @@ added in 2 places to avoid a real mess.
 You can use uncrustify something like this:
 
     uncrustify -c crusty.cfg --replace file.cc
+
+=== Commit Messages
+
+Commit messages should follow some basic guidelines:
+
+* Messages should have a subject line followed by an optional body separated
+  by an empty line.
+
+* The subject line should be formatted like "<topic>: <summary>".
+
+* All lines should be 72 characters or less. Subject lines at 50 characters or
+  less are encouraged.
 

@@ -103,9 +103,9 @@ int32_t HttpMsgBody::get_publish_length() const
     return mock().getData("pub_length").getIntValue();
 }
 
-uint32_t HttpFlowData::get_h2_stream_id() const
+int64_t HttpFlowData::get_hx_stream_id() const
 {
-    return  mock().getData("stream_id").getUnsignedIntValue();
+    return  mock().getData("stream_id").getLongLongIntValue();
 }
 
 
@@ -132,7 +132,7 @@ TEST(pub_sub_http_request_body_event_test, first_event)
     CHECK(memcmp(data, msg.data(), length) == 0);
     CHECK(length == msg_len);
     CHECK(offset == 0);
-    CHECK(event.get_http2_stream_id() == stream_id);
+    CHECK(event.get_httpx_stream_id() == stream_id);
     CHECK_FALSE(event.is_last_request_body_piece());
     delete body;
 }
@@ -153,7 +153,7 @@ TEST(pub_sub_http_request_body_event_test, last_event)
     CHECK(memcmp(data, msg.data(), length) == 0);
     CHECK(length == msg_len);
     CHECK(offset == 1500);
-    CHECK(event.get_http2_stream_id() == stream_id);
+    CHECK(event.get_httpx_stream_id() == stream_id);
     CHECK(event.is_last_request_body_piece());
     delete body;
 }
@@ -169,7 +169,7 @@ TEST(pub_sub_http_request_body_event_test, empty_data_last_event)
     CHECK(data == nullptr);
     CHECK(length == 0);
     CHECK(offset == 1500);
-    CHECK(event.get_http2_stream_id() == stream_id);
+    CHECK(event.get_httpx_stream_id() == stream_id);
     CHECK(event.is_last_request_body_piece());
 }
 

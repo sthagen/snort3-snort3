@@ -51,7 +51,8 @@ unsigned HttpFlowData::inspector_id = 0;
 uint64_t HttpFlowData::instance_count = 0;
 #endif
 
-HttpFlowData::HttpFlowData(Flow* flow) : FlowData(inspector_id)
+HttpFlowData::HttpFlowData(Flow* flow, const HttpParaList* params_) :
+    FlowData(inspector_id), params(params_)
 {
     static HttpFlowStreamIntf h1_stream;
 #ifdef REG_TEST
@@ -121,6 +122,7 @@ HttpFlowData::~HttpFlowData()
         delete[] section_buffer[k];
         delete[] partial_buffer[k];
         delete[] partial_detect_buffer[k];
+        delete partial_mime_bufs[k];
         HttpTransaction::delete_transaction(transaction[k], nullptr);
         delete cutter[k];
         if (compress_stream[k] != nullptr)
@@ -147,6 +149,8 @@ HttpFlowData::~HttpFlowData()
 void HttpFlowData::half_reset(SourceId source_id)
 {
     assert((source_id == SRC_CLIENT) || (source_id == SRC_SERVER));
+    assert(partial_mime_bufs[source_id] == nullptr);
+    assert(partial_mime_last_complete[source_id]);
 
     version_id[source_id] = VERS__NOT_PRESENT;
     data_length[source_id] = STAT_NOT_PRESENT;
@@ -318,6 +322,14 @@ bool HttpFlowData::add_to_pipeline(HttpTransaction* latest)
     pipeline_back = new_back;
     HttpModule::increment_peg_counts(PEG_PIPELINED_REQUESTS);
     return true;
+}
+
+int HttpFlowData::pipeline_length()
+{
+    int size = pipeline_back - pipeline_front;
+    if (size < 0)
+        size += MAX_PIPELINE;
+    return size;
 }
 
 HttpTransaction* HttpFlowData::take_from_pipeline()

@@ -88,12 +88,12 @@ void Packet::reset()
     release_helpers();
     ptrs.reset();
 
-    iplist_id = 0;
     user_inspection_policy_id = 0;
     user_ips_policy_id = 0;
     user_network_policy_id = 0;
     vlan_idx = 0;
     filtering_state.clear();
+    sect = PS_NONE;
 }
 
 void Packet::release_helpers()

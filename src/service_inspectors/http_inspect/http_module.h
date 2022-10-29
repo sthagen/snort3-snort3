@@ -57,11 +57,13 @@ public:
     int64_t maximum_chunk_length = 0xFFFFFFFF;
     uint16_t maximum_header_length = 4096;
     uint16_t maximum_headers = 200;
+    uint16_t maximum_pipelined_requests = 99;
     bool decompress_pdf = false;
     bool decompress_swf = false;
     bool decompress_zip = false;
     bool decompress_vba = false;
     snort::DecodeConfig* mime_decode_conf;
+    uint32_t max_mime_attach = 5;
     bool script_detection = false;
     snort::LiteralSearch::Handle* script_detection_handle = nullptr;
     bool publish_request_body = true;

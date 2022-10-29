@@ -102,6 +102,7 @@
 #define STREAM_STATE_BLOCK_PENDING     0x0400
 #define STREAM_STATE_RELEASING         0x0800
 
+class Continuation;
 class BitOp;
 class Session;
 
@@ -427,6 +428,7 @@ public:  // FIXIT-M privatize if possible
     Session* session;
     Inspector* ssn_client;
     Inspector* ssn_server;
+    Continuation* ips_cont;
 
     long last_data_seen;
     Layer mpls_client, mpls_server;
@@ -455,8 +457,6 @@ public:  // FIXIT-M privatize if possible
     unsigned inspection_policy_id;
     unsigned ips_policy_id;
     unsigned reload_id;
-
-    uint32_t iplist_monitor_id;
 
     uint32_t tenant;
 
@@ -487,10 +487,6 @@ public:  // FIXIT-M privatize if possible
                                     // currently considered to be the client
         bool app_direction_swapped : 1; // Packet direction swapped from application perspective
         bool disable_inspect : 1;
-        bool reputation_src_dest : 1;
-        bool reputation_blocklist : 1;
-        bool reputation_monitor : 1;
-        bool reputation_allowlist : 1;
         bool trigger_detained_packet_event : 1;
         bool trigger_finalize_event : 1;
         bool use_direct_inject : 1;

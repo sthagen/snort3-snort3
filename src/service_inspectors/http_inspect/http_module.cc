@@ -80,6 +80,9 @@ const Parameter HttpModule::http_params[] =
     { "maximum_headers", Parameter::PT_INT, "0:65535", "200",
       "alert when the number of headers in a message exceeds this value" },
 
+    { "maximum_pipelined_requests", Parameter::PT_INT, "0:99", "99",
+      "alert when the number of pipelined requests exceeds this value" },
+
     { "normalize_utf", Parameter::PT_BOOL, nullptr, "true",
       "normalize charset utf encodings in response bodies" },
 
@@ -94,6 +97,9 @@ const Parameter HttpModule::http_params[] =
 
     { "decompress_vba", Parameter::PT_BOOL, nullptr, "false",
       "decompress MS Office Visual Basic for Applications macro files in response bodies" },
+
+    { "max_mime_attach", Parameter::PT_INT, "1:65535", "5",
+      "maximum number of mime attachments that will be inspected in a section of a request message" },
 
     { "script_detection", Parameter::PT_BOOL, nullptr, "false",
       "inspect JavaScript immediately upon script end" },
@@ -282,6 +288,10 @@ bool HttpModule::set(const char*, Value& val, SnortConfig*)
     {
         params->maximum_headers = val.get_uint16();
     }
+    else if (val.is("maximum_pipelined_requests"))
+    {
+        params->maximum_pipelined_requests = val.get_uint16();
+    }
     else if (val.is("decompress_pdf"))
     {
         params->decompress_pdf = val.get_bool();
@@ -297,6 +307,10 @@ bool HttpModule::set(const char*, Value& val, SnortConfig*)
     else if (val.is("decompress_vba"))
     {
         params->decompress_vba = val.get_bool();
+    }
+    else if (val.is("max_mime_attach"))
+    {
+        params->max_mime_attach = val.get_uint32();
     }
     else if (val.is("script_detection"))
     {

@@ -415,7 +415,7 @@ default_wizard =
           to_server = telnet_commands, to_client = telnet_commands },
     },
 
-    curses = {'dce_udp', 'dce_tcp', 'dce_smb', 'mms', 'sslv2'}
+    curses = {'dce_udp', 'dce_tcp', 'dce_smb', 'mms', 's7commplus', 'sslv2'}
 }
 
 ---------------------------------------------------------------------------
@@ -1340,6 +1340,9 @@ default_js_norm_prop_ignore =
     'contentEditable', 'contextMenu', 'dataset', 'dir', 'enterKeyHint', 'hidden', 'inert', 
     'innerText', 'lang', 'nonce', 'outerText', 'style', 'tabIndex', 'title',
     'attachInternals',
+
+    -- Promise
+    'catch', 'finally',
 
     -- Misc
     'ExportStyle', 'callee'

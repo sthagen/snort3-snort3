@@ -23,6 +23,7 @@
 #include <zlib.h>
 
 #include <cstdio>
+#include <list>
 
 #include "flow/flow.h"
 #include "utils/util_utf.h"
@@ -31,6 +32,7 @@
 #include "http_common.h"
 #include "http_enum.h"
 #include "http_event.h"
+#include "http_field.h"
 #include "http_module.h"
 
 class HttpTransaction;
@@ -49,7 +51,7 @@ class MimeSession;
 class HttpFlowData : public snort::FlowData
 {
 public:
-    HttpFlowData(snort::Flow* flow);
+    HttpFlowData(snort::Flow* flow, const HttpParaList* params_);
     ~HttpFlowData() override;
     static unsigned inspector_id;
     static void init() { inspector_id = snort::FlowData::create_flow_data_id(); }
@@ -90,6 +92,8 @@ public:
     bool is_for_httpx() const { return for_httpx; }
 
 private:
+    const HttpParaList* const params;
+
     // Convenience routines
     void half_reset(HttpCommon::SourceId source_id);
     void trailer_prep(HttpCommon::SourceId source_id);
@@ -180,6 +184,8 @@ private:
     uint8_t* partial_detect_buffer[2] = { nullptr, nullptr };
     uint32_t partial_detect_length[2] = { 0, 0 };
     uint32_t partial_js_detect_length[2] = { 0, 0 };
+    std::list<MimeBufs>* partial_mime_bufs[2] = { nullptr, nullptr };
+    bool partial_mime_last_complete[2] = { true, true };
     int32_t status_code_num = HttpCommon::STAT_NOT_PRESENT;
     HttpEnums::VersionId version_id[2] = { HttpEnums::VERS__NOT_PRESENT,
                                             HttpEnums::VERS__NOT_PRESENT };
@@ -199,6 +205,7 @@ private:
     bool pipeline_overflow = false;
     bool pipeline_underflow = false;
     bool add_to_pipeline(HttpTransaction* latest);
+    int pipeline_length();
     HttpTransaction* take_from_pipeline();
     void delete_pipeline();
 

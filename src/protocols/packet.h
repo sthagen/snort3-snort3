@@ -24,6 +24,7 @@
 
 #include "flow/flow.h"
 #include "framework/decode_data.h"
+#include "framework/pdu_section.h"
 #include "main/snort_types.h"
 #include "target_based/snort_protocols.h"
 
@@ -135,6 +136,7 @@ struct SO_PUBLIC Packet
     IpProtocol ip_proto_next;      /* the protocol ID after IP and all IP6 extension */
     bool disable_inspect;
     mutable FilteringState filtering_state;
+    PduSection sect;
 
     // nothing after this point is zeroed by reset() ...
     IpsContext* context;
@@ -159,7 +161,6 @@ struct SO_PUBLIC Packet
     Layer* layers;    /* decoded encapsulations */
 
     PseudoPacketType pseudo_type;    // valid only when PKT_PSEUDO is set
-    uint32_t iplist_id;
 
     uint32_t user_inspection_policy_id;
     uint32_t user_ips_policy_id;
@@ -366,6 +367,9 @@ struct SO_PUBLIC Packet
 
         return DAQ_PKTHDR_UNKNOWN;
     }
+
+    void set_pdu_section(PduSection pdu_sect)
+    { sect = pdu_sect; }
 
 private:
     bool allocated;

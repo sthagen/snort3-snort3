@@ -22,6 +22,7 @@
 
 #include "detection/detection_util.h"
 #include "framework/cursor.h"
+#include "framework/pdu_section.h"	
 #include "protocols/packet.h"
 
 #include "http_buffer_info.h"
@@ -42,8 +43,8 @@ class HttpMsgSection
 {
 public:
     virtual ~HttpMsgSection() = default;
-    virtual HttpEnums::InspectSection get_inspection_section() const
-        { return HttpEnums::IS_NONE; }
+    virtual snort::PduSection get_inspection_section() const
+        { return snort::PS_NONE; }
     virtual bool detection_required() const = 0;
     HttpCommon::SourceId get_source_id() const { return source_id; }
     HttpTransaction* get_transaction() const { return transaction; }
@@ -72,7 +73,7 @@ public:
     virtual void publish() {}
 
     // Call the detection engine to inspect the current packet
-    bool run_detection(snort::Packet* p);
+    virtual bool run_detection(snort::Packet* p);
 
     const Field& get_classic_buffer(unsigned id, uint64_t sub_id, uint64_t form);
     const Field& get_classic_buffer(const HttpBufferInfo& buf);
@@ -82,7 +83,7 @@ public:
 
     int32_t get_status_code_num() const { return status_code_num; }
 
-    void clear();
+    virtual void clear();
     bool is_clear() { return cleared; }
 
     uint64_t get_transaction_id() { return trans_num; }

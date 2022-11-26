@@ -298,9 +298,26 @@ static DAQ_Verdict distill_verdict(Packet* p)
     return verdict;
 }
 
-void Analyzer::add_to_retry_queue(DAQ_Msg_h daq_msg)
+static void packet_trace_dump(Packet* p, DAQ_Verdict verdict, bool msg_was_held)
+{
+    PacketTracer::log("Policies: Network %u, Inspection %u, Detection %u\n",
+        get_network_policy()->user_policy_id, get_inspection_policy()->user_policy_id,
+        get_ips_policy()->user_policy_id);
+
+    if (p->active->packet_retry_requested())
+        PacketTracer::log("Verdict: Queuing for Retry\n");
+    else if (msg_was_held)
+        PacketTracer::log("Verdict: Holding for Detection\n");
+    else
+        PacketTracer::log("Verdict: %s\n", SFDAQ::verdict_to_string(verdict));
+    PacketTracer::dump(p);
+}
+
+void Analyzer::add_to_retry_queue(DAQ_Msg_h daq_msg, Flow* flow)
 {
     retry_queue->put(daq_msg);
+    if (flow)
+        flow->flags.retry_queued = true;
 }
 
 /*
@@ -316,7 +333,7 @@ void Analyzer::post_process_daq_pkt_msg(Packet* p)
 
     if (p->active->packet_retry_requested())
     {
-        add_to_retry_queue(p->daq_msg);
+        add_to_retry_queue(p->daq_msg, p->flow);
         daq_stats.retries_queued++;
     }
     else
@@ -333,24 +350,6 @@ void Analyzer::post_process_daq_pkt_msg(Packet* p)
             verdict = distill_verdict(p);
     }
 
-    if (PacketTracer::is_active())
-    {
-        PacketTracer::log("Policies: Network %u, Inspection %u, Detection %u\n",
-            get_network_policy()->user_policy_id, get_inspection_policy()->user_policy_id,
-            get_ips_policy()->user_policy_id);
-
-        if (p->active->packet_retry_requested())
-            PacketTracer::log("Verdict: Queuing for Retry\n");
-        else if (msg_was_held)
-            PacketTracer::log("Verdict: Holding for Detection\n");
-        else
-            PacketTracer::log("Verdict: %s\n", SFDAQ::verdict_to_string(verdict));
-        PacketTracer::dump(p);
-    }
-
-    if (PacketTracer::is_daq_activated())
-        PacketTracer::daq_dump(p);
-
     HighAvailabilityManager::process_update(p->flow, p);
 
     if (verdict != MAX_DAQ_VERDICT)
@@ -363,6 +362,12 @@ void Analyzer::post_process_daq_pkt_msg(Packet* p)
             DataBus::publish(FINALIZE_PACKET_EVENT, event);
         }
 
+        if (PacketTracer::is_active())
+            packet_trace_dump(p, verdict, msg_was_held);
+
+        if (PacketTracer::is_daq_activated())
+            PacketTracer::daq_dump(p);
+
         if (verdict == DAQ_VERDICT_BLOCK or verdict == DAQ_VERDICT_BLACKLIST)
             p->active->send_reason_to_daq(*p);
 
@@ -373,6 +378,14 @@ void Analyzer::post_process_daq_pkt_msg(Packet* p)
             Profile profile(daqPerfStats);
             p->daq_instance->finalize_message(p->daq_msg, verdict);
         }
+    }
+    else
+    {
+        if (PacketTracer::is_active())
+            packet_trace_dump(p, verdict, msg_was_held);
+
+        if (PacketTracer::is_daq_activated())
+            PacketTracer::daq_dump(p);
     }
 }
 

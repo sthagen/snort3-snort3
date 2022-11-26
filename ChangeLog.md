@@ -1,3 +1,42 @@
+2022-11-17: 3.1.47.0
+
+* appid: add a changed bit for discovery finished
+* appid: ntp detection improvements
+* appid: service, client and payload detection by lua detectors and third-party when first packet re-inspection is enabled
+* doc: add JavaScript Normalization section to user manual
+* doc: add js_norm alerts to builtin_stubs.txt
+* http_inspect: subdivide dev_notes into topics
+* http_inspect: move Enhanced JS Normalizer from NHI to a standalone component
+* js_norm: implement standalone Enhanced JavaScript Normalizer
+* main: dump packet trace after publishing finalize event since verdict could be modified.
+* main: update to improve performance by making packet tracer checks before calling function.
+* netflow: implement deferred trust, cleanup
+* packet_io: allow ACT_TRUST to be used as a delayed action.
+* packet_io: the most strict delayed action takes precedence.
+* smtp: do not accumulate cmds across policies and reloads. Avoids memory and performance problem.
+* stream: add info about the splitter lifetime to dev_notes
+* stream: ignore flushing from meta-ack if sent after FIN
+* stream: remove splitter from session before inspectors
+* stream: set splitter only on initialized tcp sessions or if midstream sessions are allowed
+* wizard: remove inspector's ref counter increments from MagicSplitter
+
+2022-11-04: 3.1.46.0
+
+* appid: check for empty patterns in lua detector api input
+* appid: publish client and payload ids set in eve process event handler and ssl lookup api only after appid discovery is complete
+* detection: add config option for SSE
+* detection: skip a rule variable copy for a single-branched node
+* doc: add information about handling multiple detection in SSE
+* doc: specified which packages are sent on rejection
+* helpers: fix duplicate scratch_handler
+* http_inspect: add override to destructor
+* http_inspect: move LiteralSearch::setup for http_param to its module
+* main: add variables to lua environment
+* netflow: if LAST_SWITCHED isn't provided, use packet time
+* parser: improve port_object hash function
+* ports: align fields of PortObject and PortObject2
+* ports: enable checks in debug build only
+
 2022-10-25: 3.1.45.0
 
 * detection: check Pig run number in node state conditions. Fixes crash introduced in 3.1.44.0.

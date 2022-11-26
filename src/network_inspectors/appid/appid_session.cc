@@ -179,7 +179,7 @@ AppIdSession::~AppIdSession()
     // If api was not stored in the stash, delete it. An example would be when an appid future
     // session is created, but it doesn't get attached to a snort flow (because the packets for the
     // future session were never received by snort), api object is not stored in the stash.
-    if (!api.stored_in_stash)
+    if (!api.flags.stored_in_stash)
         delete &api;
     else
         api.asd = nullptr;
@@ -778,9 +778,13 @@ AppId AppIdSession::pick_service_app_id() const
         {
             if ((rval = api.service.get_id()) > APP_ID_NONE)
                 return rval;
+            else if (odp_ctxt.first_pkt_service_id > APP_ID_NONE)
+                return odp_ctxt.first_pkt_service_id;
             else
                 rval = APP_ID_UNKNOWN;
         }
+        else if (odp_ctxt.first_pkt_service_id > APP_ID_NONE)
+            return odp_ctxt.first_pkt_service_id;
     }
     else
     {
@@ -790,6 +794,9 @@ AppId AppIdSession::pick_service_app_id() const
 
             if (api.service.get_id() > APP_ID_NONE and !deferred)
                 return api.service.get_id();
+            if (odp_ctxt.first_pkt_service_id > APP_ID_NONE)
+                return odp_ctxt.first_pkt_service_id;
+
             if (is_tp_appid_available())
             {
                 if (tp_app_id > APP_ID_NONE)
@@ -804,7 +811,9 @@ AppId AppIdSession::pick_service_app_id() const
         }
         else if (tp_app_id > APP_ID_NONE)
             return tp_app_id;
-    }
+        else if (odp_ctxt.first_pkt_service_id > APP_ID_NONE)
+            return odp_ctxt.first_pkt_service_id;
+    }   
 
     if (client_inferred_service_id > APP_ID_NONE)
         return client_inferred_service_id;
@@ -864,8 +873,27 @@ AppId AppIdSession::pick_ss_client_app_id() const
         return api.client.get_id();
     }
 
+    if (odp_ctxt.first_pkt_client_id > APP_ID_NONE)
+    {
+        api.client.set_eve_client_app_detect_type(CLIENT_APP_DETECT_APPID);
+        return odp_ctxt.first_pkt_client_id;
+    }
+
     api.client.set_eve_client_app_detect_type(CLIENT_APP_DETECT_APPID);
     return encrypted.client_id;
+}
+
+AppId AppIdSession::check_first_pkt_tp_payload_app_id() const
+{
+    if (get_session_flags(APPID_SESSION_FIRST_PKT_CACHE_MATCHED) and 
+        (api.payload.get_id() <= APP_ID_NONE))    
+    {
+        if ((odp_ctxt.first_pkt_payload_id > APP_ID_NONE) and (tp_payload_app_id > APP_ID_NONE))
+        {
+            return tp_payload_app_id;
+        }
+    }
+    return APP_ID_NONE;
 }
 
 AppId AppIdSession::pick_ss_payload_app_id(AppId service_id) const
@@ -884,15 +912,24 @@ AppId AppIdSession::pick_ss_payload_app_id(AppId service_id) const
     {
         if (tmp_id == APP_ID_HTTP_TUNNEL)
         {
-            if (api.payload.get_id() > APP_ID_NONE)
+            AppId first_pkt_payload_appid = check_first_pkt_tp_payload_app_id();
+            if (first_pkt_payload_appid > APP_ID_NONE)
+                return first_pkt_payload_appid;
+            else if (api.payload.get_id() > APP_ID_NONE)
                 return api.payload.get_id();
             else if (tp_payload_app_id > APP_ID_NONE)
                 return tp_payload_app_id;
+            else if (odp_ctxt.first_pkt_payload_id > APP_ID_NONE)
+                return odp_ctxt.first_pkt_payload_id;
         }
         else
             return tmp_id;
     }
 
+    AppId first_pkt_payload_appid = check_first_pkt_tp_payload_app_id();
+    if (first_pkt_payload_appid > APP_ID_NONE)
+        return first_pkt_payload_appid;
+    
     if (api.payload.get_id() > APP_ID_NONE)
         return api.payload.get_id();
 
@@ -901,6 +938,9 @@ AppId AppIdSession::pick_ss_payload_app_id(AppId service_id) const
 
     if (encrypted.payload_id > APP_ID_NONE)
         return encrypted.payload_id;
+
+    if (odp_ctxt.first_pkt_payload_id > APP_ID_NONE)
+        return odp_ctxt.first_pkt_payload_id;
 
     // APP_ID_UNKNOWN is valid only for HTTP type services
     if (tmp_id == APP_ID_UNKNOWN)
@@ -1121,17 +1161,17 @@ void AppIdSession::set_tp_payload_app_id(const Packet& p, AppidSessionDirection 
 void AppIdSession::publish_appid_event(AppidChangeBits& change_bits, const Packet& p,
     bool is_httpx, uint32_t httpx_stream_index)
 {
-    if (!api.stored_in_stash)
+    if (!api.flags.stored_in_stash)
     {
         assert(p.flow and p.flow->stash);
         p.flow->stash->store(STASH_APPID_DATA, &api, false);
-        api.stored_in_stash = true;
+        api.flags.stored_in_stash = true;
     }
 
-    if (!api.published)
+    if (!api.flags.published)
     {
         change_bits.set(APPID_CREATED_BIT);
-        api.published = true;
+        api.flags.published = true;
     }
 
     if (consumed_ha_data)
@@ -1149,6 +1189,12 @@ void AppIdSession::publish_appid_event(AppidChangeBits& change_bits, const Packe
             change_bits.set(APPID_TLSHOST_BIT);
 
         consumed_ha_data = false;
+    }
+
+    if (!(api.flags.finished || api.is_appid_inspecting_session()))
+    {
+        change_bits.set(APPID_DISCOVERY_FINISHED_BIT);
+        api.flags.finished = true;
     }
 
     if (change_bits.none())

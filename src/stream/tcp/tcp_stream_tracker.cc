@@ -538,7 +538,7 @@ void TcpStreamTracker::update_tracker_ack_sent(TcpSegmentDescriptor& tsd)
     }
 
     if ( ( fin_seq_status == TcpStreamTracker::FIN_WITH_SEQ_SEEN )
-        && SEQ_GEQ(tsd.get_ack(), fin_final_seq + 1) )
+        && SEQ_GEQ(tsd.get_ack(), fin_final_seq + 1) && !(tsd.is_meta_ack_packet()) )
     {
         fin_seq_status = TcpStreamTracker::FIN_WITH_SEQ_ACKED;
     }
@@ -729,7 +729,7 @@ void TcpStreamTracker::finalize_held_packet(Packet* cp)
             if ( cp->active->packet_retry_requested() )
             {
                 tcpStats.held_packet_retries++;
-                Analyzer::get_local_analyzer()->add_to_retry_queue(msg);
+                Analyzer::get_local_analyzer()->add_to_retry_queue(msg, cp->flow);
             }
             else
             {

@@ -543,7 +543,7 @@ default_classifications =
       text = 'Attempt to login by a default username and password' },
 
     { name = 'sdf', priority = 2,
-      text = 'Senstive Data' },
+      text = 'Sensitive Data' },
 
     { name = 'file-format', priority = 1,
       text = 'Known malicious file or file based exploit' },
@@ -1176,7 +1176,7 @@ default_low_port_scan =
 }
 
 ---------------------------------------------------------------------------
--- default http configuration
+-- default js_norm configuration
 ---------------------------------------------------------------------------
 
 -- ECMAScript Standard Built-in Objects and Functions Names (Identifiers)
@@ -1281,7 +1281,14 @@ default_js_norm_ident_ignore =
     'IsConcatSpreadable', 'FlattenIntoArray', 'SortCompare', 'AddEntriesFromIterable',
     'CreateMapIterator', 'CreateSetIterator', 'EventSet', 'SharedDataBlockEventSet',
     'HostEventSet', 'ComposeWriteEventBytes', 'ValueOfReadEvent', 'escape', 'unescape',
-    'CreateHTML'
+    'CreateHTML',
+
+    -- Adobe Acrobat
+    'addAnnot', 'bookmarkRoot', 'calculateNow', 'closeDoc', 'createDataObject', 'docID',
+    'exportAsFDF', 'exportAsFDFStr', 'getAnnotRichMedia', 'getAnnots', 'getAnnotsRichMedia',
+    'getField', 'getLegalWarnings', 'getNthFieldName', 'getOCGs', 'openDataObject', 'removeField',
+    'removeLinks', 'modDate', 'scroll', 'setAction', 'setPageAction', 'submitForm', 'syncAnnotScan',
+    'Collab', 'Net', 'Rendition', 'XFA', 'XMLData', 'app', 'catalog', 'event', 'spell', 'util'
 }
 
 default_js_norm_prop_ignore =
@@ -1345,7 +1352,21 @@ default_js_norm_prop_ignore =
     'catch', 'finally',
 
     -- Misc
-    'ExportStyle', 'callee'
+    'ExportStyle', 'callee',
+
+    -- Adobe Acrobat
+    'activated', 'addAnnot', 'addLink', 'annot', 'attachIcon', 'begin', 'bookmarkRoot',
+    'borderColor', 'borderStyle', 'buttonGetIcon', 'calculate', 'calculateNow', 'callAS',
+    'children', 'close', 'closeDoc', 'commitOnSelChange', 'createChild', 'createDataObject', 'data',
+    'dataObjects', 'destroy', 'doc', 'docID', 'end', 'execute', 'exportAsFDF', 'exportAsFDFStr',
+    'exportDataObject', 'exportValues', 'get', 'getAnnot', 'getAnnots', 'getAnnotsRichMedia',
+    'getField', 'getLegalWarnings', 'getNthFieldName', 'getOCGs', 'getPageBox', 'openDataObject',
+    'getProps', 'inReplyTo', 'layout', 'media', 'modDate', 'newPlayer', 'objectMetadata', 'page',
+    'point', 'points', 'popupOpen', 'popupRect', 'print', 'println', 'qSilence', 'query', 'rect',
+    'removeField', 'removeLinks', 'reset', 'resetForm', 'richText', 'rotate', 'saveAs', 'scroll',
+    'setAction', 'setFocus', 'setIntent', 'setItems', 'setPageAction', 'setPersistent', 'setProps',
+    'show', 'state', 'stateModel', 'streamFromString', 'stringFromStream', 'submitForm',
+    'syncAnnotScan', 'talk', 'text', 'toggleNoView', 'type', 'userName', 'value', 'width', 'xfa'
 }
 
 default_js_norm =

@@ -15,13 +15,15 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
-//
 
 #ifndef SIP_H
 #define SIP_H
+
 // Implementation header with definitions, datatypes and flowdata class for SIP service inspector.
 
 #include "flow/flow.h"
+#include "framework/data_bus.h"
+
 #include "sip_dialog.h"
 #include "sip_parser.h"
 #include "sip_roptions.h"
@@ -34,6 +36,8 @@ struct SIPData
     SIP_DialogList dialogs;
     SIP_Roptions ropts;
     SIP_PROTO_CONF *sip_config;
+
+    static unsigned pub_id;
 };
 
 class SipFlowData : public snort::FlowData

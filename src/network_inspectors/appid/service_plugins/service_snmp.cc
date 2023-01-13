@@ -441,7 +441,8 @@ int SnmpServiceDetector::validate(AppIdDiscoveryArgs& args)
             args.asd.set_session_flags(APPID_SESSION_UDP_REVERSED);
             break;
         }
-        if (pdu == SNMP_PDU_GET_RESPONSE && args.dir == APP_ID_FROM_INITIATOR)
+        if ((pdu == SNMP_PDU_GET_RESPONSE or pdu == SNMP_PDU_REPORT) &&
+            args.dir == APP_ID_FROM_INITIATOR)
         {
             sd->state = SNMP_STATE_R_REQUEST;
             args.asd.set_session_flags(APPID_SESSION_UDP_REVERSED);
@@ -468,7 +469,7 @@ int SnmpServiceDetector::validate(AppIdDiscoveryArgs& args)
         const SfIp* sip = args.pkt->ptrs.ip_api.get_src();
         AppIdSession* pf = AppIdSession::create_future_session(args.pkt,
             dip, 0, sip, args.pkt->ptrs.sp, args.asd.protocol,
-            args.asd.config.snort_proto_ids[PROTO_INDEX_SNMP]);
+            args.asd.config.snort_proto_ids[PROTO_INDEX_SNMP], args.asd.get_odp_ctxt());
 
         if (pf)
         {

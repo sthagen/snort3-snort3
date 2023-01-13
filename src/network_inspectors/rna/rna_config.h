@@ -21,6 +21,8 @@
 #ifndef RNA_CONFIG_H
 #define RNA_CONFIG_H
 
+#include "framework/data_bus.h"
+
 namespace snort
 {
 class TcpFpProcessor;
@@ -50,6 +52,8 @@ struct RnaConfig
     uint16_t max_host_service_info = 16;
     bool enable_banner_grab = false;
     bool log_when_idle = false;
+
+    static unsigned pub_id;
 };
 
 #endif

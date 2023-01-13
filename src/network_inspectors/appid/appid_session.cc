@@ -34,6 +34,7 @@
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
+#include "pub_sub/appid_events.h"
 #include "stream/stream.h"
 #include "target_based/snort_protocols.h"
 #include "time/packet_time.h"
@@ -206,8 +207,8 @@ static inline PktType get_pkt_type_from_ip_proto(IpProtocol proto)
 
 AppIdSession* AppIdSession::create_future_session(const Packet* ctrlPkt, const SfIp* cliIp,
     uint16_t cliPort, const SfIp* srvIp, uint16_t srvPort, IpProtocol proto,
-    SnortProtocolId snort_protocol_id, bool swap_app_direction, bool bidirectional,
-    bool expect_persist)
+    SnortProtocolId snort_protocol_id, OdpContext& odp_ctxt, bool swap_app_direction,
+    bool bidirectional, bool expect_persist)
 {
     enum PktType type = get_pkt_type_from_ip_proto(proto);
 
@@ -228,8 +229,8 @@ AppIdSession* AppIdSession::create_future_session(const Packet* ctrlPkt, const S
 
     // FIXIT-RC - port parameter passed in as 0 since we may not know client port, verify
 
-    AppIdSession* asd = new AppIdSession(proto, cliIp, 0, *inspector,
-        inspector->get_ctxt().get_odp_ctxt(), ctrlPkt->pkth->address_space_id);
+    AppIdSession* asd = new AppIdSession(proto, cliIp, 0, *inspector, odp_ctxt,
+        ctrlPkt->pkth->address_space_id);
     is_session_monitored(asd->flags, ctrlPkt, *inspector);
 
     if (Stream::set_snort_protocol_id_expected(ctrlPkt, type, proto, cliIp,
@@ -1201,7 +1202,7 @@ void AppIdSession::publish_appid_event(AppidChangeBits& change_bits, const Packe
         return;
 
     AppidEvent app_event(change_bits, is_httpx, httpx_stream_index, api, p);
-    DataBus::publish(APPID_EVENT_ANY_CHANGE, app_event, p.flow);
+    DataBus::publish(AppIdInspector::get_pub_id(), AppIdEventIds::ANY_CHANGE, app_event, p.flow);
     if (appidDebug->is_active())
     {
         std::string str;

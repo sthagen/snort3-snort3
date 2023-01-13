@@ -51,9 +51,9 @@
 #include "detection/detection_engine.h"
 #include "detection/rules.h"
 #include "log/log.h"
-#include "memory/memory_cap.h"
 #include "profiler/profiler.h"
 #include "protocols/eth.h"
+#include "pub_sub/intrinsic_event_ids.h"
 
 #include "stream_tcp.h"
 #include "tcp_ha.h"
@@ -293,7 +293,7 @@ void TcpSession::update_perf_base_state(char newState)
     flow->update_session_flags(session_flags);
 
     if ( fire_event )
-        DataBus::publish(FLOW_STATE_EVENT, nullptr, flow);
+        DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::FLOW_STATE_CHANGE, nullptr, flow);
 }
 
 bool TcpSession::flow_exceeds_config_thresholds(TcpSegmentDescriptor& tsd)
@@ -608,7 +608,6 @@ bool TcpSession::handle_syn_on_reset_session(TcpSegmentDescriptor& tsd)
         else if ( tcph->is_syn_only() )
         {
             flow->ssn_state.direction = FROM_CLIENT;
-            flow->session_state = STREAM_STATE_SYN;
             flow->set_ttl(tsd.get_pkt(), true);
             init_session_on_syn(tsd);
             tcpStats.resyns++;
@@ -620,7 +619,6 @@ bool TcpSession::handle_syn_on_reset_session(TcpSegmentDescriptor& tsd)
             if ( tcp_config->midstream_allowed(tsd.get_pkt()) )
             {
                 flow->ssn_state.direction = FROM_SERVER;
-                flow->session_state = STREAM_STATE_SYN_ACK;
                 flow->set_ttl(tsd.get_pkt(), false);
                 init_session_on_synack(tsd);
                 tcpStats.resyns++;

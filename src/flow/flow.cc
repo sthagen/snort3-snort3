@@ -32,9 +32,9 @@
 #include "framework/data_bus.h"
 #include "helpers/bitop.h"
 #include "main/analyzer.h"
-#include "memory/memory_cap.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
+#include "pub_sub/intrinsic_event_ids.h"
 #include "sfip/sf_ip.h"
 #include "utils/stats.h"
 #include "utils/util.h"
@@ -408,9 +408,9 @@ void Flow::markup_packet_flags(Packet* p)
         {
             p->packet_flags |= PKT_STREAM_UNEST_UNI;
         }
-        if ( (ssn_state.session_flags & SSNFLAG_TCP_ONE_SIDED) == SSNFLAG_TCP_ONE_SIDED )
+        if ( (ssn_state.session_flags & SSNFLAG_TCP_PSEUDO_EST) == SSNFLAG_TCP_PSEUDO_EST )
         {
-            p->packet_flags |= PKT_TCP_ONE_SIDED;
+            p->packet_flags |= PKT_TCP_PSEUDO_EST;
         }
     }
     else
@@ -603,7 +603,7 @@ bool Flow::is_direction_aborted(bool from_client) const
 void Flow::set_service(Packet* pkt, const char* new_service)
 {
     service = new_service;
-    DataBus::publish(FLOW_SERVICE_CHANGE_EVENT, pkt);
+    DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::FLOW_SERVICE_CHANGE, pkt);
 }
 
 void Flow::swap_roles()

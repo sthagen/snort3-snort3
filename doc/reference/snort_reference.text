@@ -8,7 +8,7 @@ Snort 3 Reference Manual
 The Snort Team
 
 Revision History
-Revision 3.1.49.0 2022-12-15 16:32:12 EST TST
+Revision 3.1.51.0 2023-01-11 19:39:29 EST TST
 
 ---------------------------------------------------------------------
 
@@ -1071,20 +1071,30 @@ Usage: global
 
 Configuration:
 
-  * int memory.cap = 0: set the per-packet-thread cap on memory
-    (bytes, 0 to disable) { 0:maxSZ }
+  * int memory.cap = 0: set the process cap on memory in bytes (0 to
+    disable) { 0:maxSZ }
+  * int memory.interval = 50: approximate ms between memory epochs {
+    1:max32 }
+  * int memory.prune_target = 1048576: bytes to prune per packet
+    thread prune cycle { 1:max32 }
   * int memory.threshold = 100: scale cap to account for heap
     overhead { 1:100 }
 
 Peg counts:
 
-  * memory.allocations: total number of allocations (now)
-  * memory.deallocations: total number of deallocations (now)
-  * memory.allocated: total amount of memory allocated (now)
-  * memory.deallocated: total amount of memory deallocated (now)
+  * memory.start_up_use: memory used before packet processing (now)
+  * memory.cur_in_use: current memory used (now)
+  * memory.max_in_use: maximum memory used (max)
+  * memory.epochs: number of memory updates (now)
+  * memory.allocated: total amount of memory allocated by packet
+    threads (now)
+  * memory.deallocated: total amount of memory deallocated by packet
+    threads (now)
+  * memory.reap_cycles: number of actionable over-limit conditions
+    (now)
   * memory.reap_attempts: attempts to reclaim memory (now)
   * memory.reap_failures: failures to reclaim memory (now)
-  * memory.max_in_use: maximum memory used (max)
+  * memory.pruned: total amount of memory pruned (now)
 
 
 2.20. network
@@ -1759,6 +1769,7 @@ Configuration:
   * int trace.modules.js_norm.proc: enable processing logging { 0:255
     }
   * int trace.modules.js_norm.dump: enable data logging { 0:255 }
+  * int trace.modules.memory.all: enable all trace options { 0:255 }
   * int trace.modules.snort.all: enable all trace options { 0:255 }
   * int trace.modules.snort.inspector_manager: enable inspector
     manager trace logging { 0:255 }
@@ -9910,8 +9921,12 @@ libraries see the Getting Started section of the manual.
     start search
   * implied md5.relative = false: offset from cursor instead of start
     of buffer
-  * int memory.cap = 0: set the per-packet-thread cap on memory
-    (bytes, 0 to disable) { 0:maxSZ }
+  * int memory.cap = 0: set the process cap on memory in bytes (0 to
+    disable) { 0:maxSZ }
+  * int memory.interval = 50: approximate ms between memory epochs {
+    1:max32 }
+  * int memory.prune_target = 1048576: bytes to prune per packet
+    thread prune cycle { 1:max32 }
   * int memory.threshold = 100: scale cap to account for heap
     overhead { 1:100 }
   * string metadata.*: comma-separated list of arbitrary name value
@@ -10927,6 +10942,7 @@ libraries see the Getting Started section of the manual.
   * int trace.modules.js_norm.dump: enable data logging { 0:255 }
   * int trace.modules.js_norm.proc: enable processing logging { 0:255
     }
+  * int trace.modules.memory.all: enable all trace options { 0:255 }
   * int trace.modules.snort.all: enable all trace options { 0:255 }
   * int trace.modules.snort.inspector_manager: enable inspector
     manager trace logging { 0:255 }
@@ -11619,13 +11635,19 @@ libraries see the Getting Started section of the manual.
   * latency.total_packets: total packets monitored (sum)
   * latency.total_rule_evals: total rule evals monitored (sum)
   * latency.total_usecs: total usecs elapsed (sum)
-  * memory.allocated: total amount of memory allocated (now)
-  * memory.allocations: total number of allocations (now)
-  * memory.deallocated: total amount of memory deallocated (now)
-  * memory.deallocations: total number of deallocations (now)
+  * memory.allocated: total amount of memory allocated by packet
+    threads (now)
+  * memory.cur_in_use: current memory used (now)
+  * memory.deallocated: total amount of memory deallocated by packet
+    threads (now)
+  * memory.epochs: number of memory updates (now)
   * memory.max_in_use: maximum memory used (max)
+  * memory.pruned: total amount of memory pruned (now)
   * memory.reap_attempts: attempts to reclaim memory (now)
+  * memory.reap_cycles: number of actionable over-limit conditions
+    (now)
   * memory.reap_failures: failures to reclaim memory (now)
+  * memory.start_up_use: memory used before packet processing (now)
   * mem_test.packets: total packets (sum)
   * mms.concurrent_sessions: total concurrent MMS sessions (now)
   * mms.frames: total MMS messages (sum)

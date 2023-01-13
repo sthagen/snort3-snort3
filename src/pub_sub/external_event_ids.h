@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2022-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,25 +15,24 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+// external_event_ids.h author Russ Combs <rucombs@cisco.com>
 
-// prune_handler.cc author Joel Cornett <jocornet@cisco.com>
+#ifndef EXTERNAL_EVENT_IDS_H
+#define EXTERNAL_EVENT_IDS_H
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
+#include "framework/data_bus.h"
+
+struct ExternalEventIds
+{ enum : unsigned {
+
+    CPE_OS_INFO,
+    DATA_DECRYPT,
+    EVE_PROCESS,
+
+    num_ids
+}; };
+
+const snort::PubKey external_pub_key { "external", ExternalEventIds::num_ids };
+
 #endif
 
-#include "prune_handler.h"
-
-#include "stream/stream.h"
-
-using namespace snort;
-
-namespace memory
-{
-
-bool prune_handler()
-{
-    return Stream::prune_flows();
-}
-
-} // namespace memory

@@ -45,6 +45,7 @@
 #include "main/snort_config.h"
 #include "main/swapper.h"
 #include "main/thread_config.h"
+#include "memory/memory_cap.h"
 #include "network_inspectors/packet_tracer/packet_tracer.h"
 #include "packet_io/active.h"
 #include "packet_io/sfdaq.h"
@@ -139,8 +140,8 @@ Packet::Packet(bool)
 }
 Packet::~Packet()  = default;
 IpsPolicy* get_ips_policy() { return nullptr; }
-void DataBus::publish(const char*, Packet*, Flow*) { }
-void DataBus::publish(const char*, DataEvent&, Flow*) { }
+void DataBus::publish(unsigned, unsigned, Packet*, Flow*) { }
+void DataBus::publish(unsigned, unsigned, DataEvent&, Flow*) { }
 SFDAQInstance::SFDAQInstance(const char*, unsigned, const SFDAQConfig*) { }
 SFDAQInstance::~SFDAQInstance() = default;
 void SFDAQInstance::reload() { }
@@ -223,9 +224,9 @@ InspectionPolicy* get_inspection_policy() { return nullptr; }
 Flow::Flow() = default;
 Flow::~Flow() = default;
 void ThreadConfig::implement_thread_affinity(SThreadType, unsigned) { }
+void ThreadConfig::set_instance_tid(const int, const int) { }
 }
 
-namespace memory
-{
-void MemoryCap::free_space() { }
-}
+void memory::MemoryCap::thread_init() { }
+void memory::MemoryCap::free_space() { }
+

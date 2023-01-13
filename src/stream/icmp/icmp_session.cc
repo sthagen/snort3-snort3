@@ -25,13 +25,14 @@
 
 #include "detection/ips_context.h"
 #include "flow/flow_key.h"
-#include "memory/memory_cap.h"
 #include "profiler/profiler_defs.h"
 #include "protocols/icmp4.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
 #include "protocols/udp.h"
 #include "protocols/vlan.h"
+#include "pub_sub/stream_event_ids.h"
+#include "stream/stream.h"
 #include "utils/util.h"
 
 #include "icmp_ha.h"
@@ -218,7 +219,7 @@ int IcmpSession::process(Packet* p)
 
     if (!(flow->ssn_state.session_flags & SSNFLAG_ESTABLISHED) and !(p->is_from_client()))
     {
-        DataBus::publish(STREAM_ICMP_BIDIRECTIONAL_EVENT, p);
+        DataBus::publish(Stream::get_pub_id(), StreamEventIds::ICMP_BIDIRECTIONAL, p);
         flow->ssn_state.session_flags |= SSNFLAG_ESTABLISHED;
     }
 

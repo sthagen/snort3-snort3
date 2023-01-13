@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2022 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2022-2022 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -16,18 +16,30 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-// prune_handler.h author Joel Cornett <jocornet@cisco.com>
+// appid_event_ids.h author Russ Combs <rucombs@cisco.com>
 
-#ifndef PRUNE_HANDLER_H
-#define PRUNE_HANDLER_H
+#ifndef APPID_EVENT_IDS_H
+#define APPID_EVENT_IDS_H
 
-namespace memory
+#include "framework/data_bus.h"
+
+namespace snort
 {
 
-bool prune_handler();
+struct AppIdEventIds
+{ enum : unsigned {
+
+    ANY_CHANGE,
+    DEBUG_LOG,
+    DHCP_DATA,
+    DHCP_INFO,
+    FP_SMB_DATA,
+
+    num_ids
+}; };
+
+const PubKey appid_pub_key { "appid", AppIdEventIds::num_ids };
 
 }
-
-
 #endif
 

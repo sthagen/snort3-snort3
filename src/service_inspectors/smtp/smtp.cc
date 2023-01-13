@@ -1151,7 +1151,7 @@ static void SMTP_ProcessServerPacket(
                     and !(smtp_ssn->state_flags & SMTP_FLAG_ABANDON_EVT))
                 {
                     smtp_ssn->state_flags |= SMTP_FLAG_ABANDON_EVT;
-                    DataBus::publish(SSL_SEARCH_ABANDONED, p);
+                    DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::SSL_SEARCH_ABANDONED, p);
                     ++smtpstats.ssl_search_abandoned;
                 }
                 break;
@@ -1181,7 +1181,7 @@ static void SMTP_ProcessServerPacket(
                     smtp_ssn->server_accepted_starttls = true;
 
                     OpportunisticTlsEvent event(p, p->flow->service);
-                    DataBus::publish(OPPORTUNISTIC_TLS_EVENT, event, p->flow);
+                    DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::OPPORTUNISTIC_TLS, event, p->flow);
                     ++smtpstats.starttls;
                     if (smtp_ssn->state_flags & SMTP_FLAG_ABANDON_EVT)
                         ++smtpstats.ssl_search_abandoned_too_soon;
@@ -1583,7 +1583,9 @@ void Smtp::ProcessSmtpCmdsList(const SmtpCmd* sc)
 bool Smtp::get_fp_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)
 {
     SMTPData* smtp_ssn = get_session_data(p->flow);
-    assert(smtp_ssn);
+
+    if (!smtp_ssn)
+        return false;
 
     const void* dst = nullptr;
     size_t dst_len = 0;

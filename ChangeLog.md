@@ -1,3 +1,35 @@
+2023-01-11: 3.1.51.0
+
+* appid: add support for cip service, client and payload detection
+* appid: do not create snmp future flow for udp reversed session
+* appid: use packet thread's odp context for future flow creation
+* build: error out if both jemalloc and tcmalloc are configured
+* build: exclude unused memory related sources
+* js_norm: add benchmark tests for PDF parser
+* js_norm: decode UTF-16BE to UTF-8 for JS in PDF
+* js_norm: delete unused method
+* js_norm: tune PDF parser performance
+* lua: add Adobe JavaScript related identifiers to snort_defaults
+* lua: fix typo in Sensitive Data classifications name
+* main: fix const issues causing compile warnings
+* memory: delete unnecessary includes
+* memory: incorporate overloads into profiler
+* memory: refactor jemalloc code and add relevant pegs
+* memory: rename manager to overloads to better indicate purpose
+* memory: update developer notes
+* memory: update stats regardless of state; add unit tests
+* memory: use the process total instead of per thread totals to enforce cap
+* watchdog: print thread id as well for better identification of unresponsive threads
+
+2022-12-19: 3.1.50.0
+
+* alert_fast: fix initialization of http_inspect cheat codes
+* config: ensure table state is reset when starting a new shell
+* config: fix talos tweaks for the daq module
+* data_bus: improve pub-sub performance
+* host_cache: fix initialization from Lua
+* pop, imap, smtp: gracefully decline buffer requests when flow data is not present
+
 2022-12-15: 3.1.49.0
 
 * appid: appid_detector_builder.sh addPortPatternService call fixed

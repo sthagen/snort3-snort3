@@ -332,6 +332,20 @@ static int detector_log_message(lua_State* L)
     return 0;
 }
 
+/** Add a netbios domain
+ *  lua params:
+ *    1 - the netbios domain
+ */
+static int service_add_netbios_domain(lua_State* L)
+{
+    auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
+    // Verify detector user data and that we are in packet context
+    LuaStateDescriptor* lsd = ud->validate_lua_state(true);
+    const char* netbios_domain = lua_tostring(L, 2);
+    lsd->ldp.asd->set_netbios_domain(*lsd->ldp.change_bits, netbios_domain);
+    return 0;
+}
+
 // Analyze application payload
 // lua params:
 //  1 - detector/stack - detector object
@@ -545,7 +559,7 @@ static int service_add_service(lua_State* L)
     /*Phase2 - discuss AppIdServiceSubtype will be maintained on lua side therefore the last
       parameter on the following call is nullptr. Subtype is not displayed on DC at present. */
     unsigned int retValue = ud->sd->add_service(*lsd->ldp.change_bits, *lsd->ldp.asd, lsd->ldp.pkt,
-        lsd->ldp.dir, ud->get_odp_ctxt().get_app_info_mgr().get_appid_by_service_id(service_id),
+        lsd->ldp.dir, lsd->ldp.asd->get_odp_ctxt().get_app_info_mgr().get_appid_by_service_id(service_id),
         vendor, version, nullptr);
 
     lua_pushnumber(L, retValue);
@@ -723,6 +737,71 @@ static int detector_get_pcre_groups(lua_State* L)
 
     pcre_free(re);
     return rc;
+}
+
+/** Extracts a specific substring of packet data.
+ *
+ * @param Lua_State* - Lua state variable.
+ * @param detector/stack - detector object,
+ * @param offset/stack - the offset at which we want our substring to start.
+ * @param len/stack - the number of bytes we want in our buffer
+ *
+ * @return substring/stack - the requested substring.
+ */
+static int detector_get_substr(lua_State* L)
+{
+    auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
+    // Verify detector user data and that we are in packet context
+    LuaStateDescriptor* lsd = ud->validate_lua_state(true);
+    unsigned int offset = lua_tonumber(L, 2);
+    unsigned int substr_len = lua_tonumber(L, 3);
+    if (offset + substr_len > lsd->ldp.size)
+    {
+        WarningMessage("Requested substr end offset %d is greater than data size %d\n",
+            offset + substr_len, lsd->ldp.size);
+        return 0;
+    }
+    lua_pushlstring(L, (const char*)lsd->ldp.data + offset, substr_len);
+    return 1;
+}
+
+/** Searches through packet data for a substr, and returns starting index if found.
+ *
+ *  Lazy search; only returns index to first match.
+ */
+static int detector_find_substr(lua_State* L)
+{
+    auto& ud = *UserData<LuaObject>::check(L, DETECTOR, 1);
+    // Verify detector user data and that we are in packet context
+    LuaStateDescriptor* lsd = ud->validate_lua_state(true);
+    unsigned int offset = lua_tonumber(L, 2);
+    size_t substr_len = 0;
+    const char* substr = lua_tolstring(L, 3, &substr_len);
+
+    for (unsigned int i = 0; i + offset <= lsd->ldp.size - substr_len; i++)
+    {
+        if (*((const char*)lsd->ldp.data + i + offset) == *substr)
+        {
+            if (substr_len == 1)
+            {
+                lua_pushnumber(L, offset + i);
+                return 1;
+            }
+
+            for (unsigned int j = 1; j < substr_len; j++)
+            {
+                if (*((const char*)lsd->ldp.data + i + j + offset) != *(substr + j))
+                    break;
+                else if (j == substr_len - 1)
+                {
+                    lua_pushnumber(L, offset + i);
+                    return 1;
+                }
+            }
+        }
+    }
+
+    return 0;
 }
 
 /**Performs a simple memory comparison.
@@ -944,9 +1023,10 @@ static int client_add_application(lua_State* L)
     unsigned int service_id = lua_tonumber(L, 2);
     unsigned int productId = lua_tonumber(L, 4);
     const char* version = lua_tostring(L, 5);
+    OdpContext& odp_ctxt = lsd->ldp.asd->get_odp_ctxt();
     ud->cd->add_app(*lsd->ldp.pkt, *lsd->ldp.asd, lsd->ldp.dir,
-        ud->get_odp_ctxt().get_app_info_mgr().get_appid_by_service_id(service_id),
-        ud->get_odp_ctxt().get_app_info_mgr().get_appid_by_client_id(productId), version,
+        odp_ctxt.get_app_info_mgr().get_appid_by_service_id(service_id),
+        odp_ctxt.get_app_info_mgr().get_appid_by_client_id(productId), version,
         *lsd->ldp.change_bits);
 
     lua_pushnumber(L, 0);
@@ -968,7 +1048,7 @@ static int client_add_user(lua_State* L)
     const char* userName = lua_tostring(L, 2);
     unsigned int service_id = lua_tonumber(L, 3);
     ud->cd->add_user(*lsd->ldp.asd, userName,
-        ud->get_odp_ctxt().get_app_info_mgr().get_appid_by_service_id(service_id), true,
+        lsd->ldp.asd->get_odp_ctxt().get_app_info_mgr().get_appid_by_service_id(service_id), true,
         *lsd->ldp.change_bits);
     lua_pushnumber(L, 0);
     return 1;
@@ -982,7 +1062,7 @@ static int client_add_payload(lua_State* L)
 
     unsigned int payloadId = lua_tonumber(L, 2);
     ud->cd->add_payload(*lsd->ldp.asd,
-        ud->get_odp_ctxt().get_app_info_mgr().get_appid_by_payload_id(payloadId));
+        lsd->ldp.asd->get_odp_ctxt().get_app_info_mgr().get_appid_by_payload_id(payloadId));
 
     lua_pushnumber(L, 0);
     return 1;
@@ -1236,14 +1316,90 @@ static int detector_add_host_first_pkt_application(lua_State* L)
     uint32_t client_appid = lua_tointeger(L, ++index);
     uint32_t web_appid = lua_tointeger(L, ++index);
     unsigned reinspect = lua_tointeger(L, ++index);
-
-    /* Extract IP, Port, protocol */
+   
+    /* Extract Network IP and netmask */
     size_t ipaddr_size = 0;
-    const char* ip_str = lua_tolstring(L, ++index, &ipaddr_size);
-    if (!ip_str or !ipaddr_size or !convert_string_to_address(ip_str, &ip_address))
+    uint32_t netmask32[4] = { 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu, 0xFFFFFFFFu };
+    bool netmask_parsed = false;
+    const char* cidr_str = lua_tolstring(L, ++index, &ipaddr_size);
+    vector<string> tokens; 
+
+    if (!cidr_str or !ipaddr_size)
     {
-        ErrorMessage("%s: Invalid IP address: %s\n",__func__, ip_str);
+        ErrorMessage("%s: No IP address provided\n", "First packet API");
         return 0;
+    }    
+
+    if (strchr(cidr_str, '/') == nullptr)
+    {
+        if (!convert_string_to_address(cidr_str, &ip_address))
+        {
+            ErrorMessage("%s: Invalid IP address: %s\n", "First packet API", cidr_str);
+            return 0;
+        }
+    }
+    else 
+    {
+        stringstream ss(cidr_str); 
+        string temp_str; 
+    
+        while (getline(ss, temp_str, '/'))
+        { 
+            tokens.push_back(temp_str); 
+        } 
+
+        const char* netip_str = tokens[0].c_str();
+        
+        if (!netip_str or !convert_string_to_address(netip_str, &ip_address))
+        {
+            ErrorMessage("%s: Invalid IP address: %s\n", "First packet API", netip_str);
+            return 0;
+        }
+
+        if (all_of(tokens[1].begin(), tokens[1].end(), ::isdigit)) 
+        {
+            int bits = stoi(tokens[1].c_str());
+            if (strchr(netip_str, '.'))
+            {
+                if (bits < 0 or bits > 32) 
+                {
+                    ErrorMessage("%s: Invalid IPv4 prefix range: %d\n","First packet API", bits);
+                    return 0;
+                }
+            }
+            else if (strchr(netip_str, ':'))
+            {
+                if (bits < 0 or bits > 128) {
+                    ErrorMessage("%s: Invalid IPv6 prefix range: %d\n","First packet API", bits);
+                    return 0;
+                }
+            }
+
+            if (bits < 32 and !strchr(netip_str, ':'))
+                netmask32[3] = bits > 0 ? (0xFFFFFFFFu << (32 - bits)) : 0xFFFFFFFFu;
+            else
+            {
+                for (int i = 3; i >= 0; --i)
+                {
+                    auto tmp_bits = 32 + (32 * i) - bits;
+                    
+                    if (tmp_bits > 0)
+                        netmask32[i] = tmp_bits >= 32 ? 0 : (0xFFFFFFFFu << tmp_bits);
+                }
+            }
+
+            for (int i = 0; i < 4; i++)
+            {
+                netmask32[i] = (uint32_t)htonl(netmask32[i]);
+            }
+
+            netmask_parsed = true;
+        }
+        else 
+        {
+            ErrorMessage("%s: Invalid prefix bit: %s\n", "First packet API", tokens[1].c_str());
+            return 0;
+        }
     }
 
     unsigned port = lua_tointeger(L, ++index);
@@ -1256,7 +1412,7 @@ static int detector_add_host_first_pkt_application(lua_State* L)
     lua_pop(L, 1);
 
     if (!ud->get_odp_ctxt().host_first_pkt_add(
-        sc, &ip_address, (uint16_t)port, proto, protocol_appid, client_appid, web_appid, reinspect))
+        sc, &ip_address, netmask_parsed ? netmask32 : nullptr, (uint16_t)port, proto, protocol_appid, client_appid, web_appid, reinspect))
         ErrorMessage("%s:Failed to backend call first pkt add\n",__func__);
 
     return 0;
@@ -1302,9 +1458,9 @@ static int detector_add_host_port_dynamic(lua_State* L)
 {
     auto& ud = *UserData<LuaClientObject>::check(L, DETECTOR, 1);
     // Verify detector user data and that we are in packet context
-    ud->validate_lua_state(true);
+    LuaStateDescriptor* lsd = ud->validate_lua_state(true);
 
-    if (!ud->get_odp_ctxt().is_host_port_app_cache_runtime)
+    if (!lsd->ldp.asd->get_odp_ctxt().is_host_port_app_cache_runtime)
         return 0;
 
     SfIp ip_address;
@@ -2635,16 +2791,16 @@ static int create_future_flow(lua_State* L)
     AppId client_id  = lua_tointeger(L, 8);
     AppId payload_id = lua_tointeger(L, 9);
     AppId app_id_to_snort = lua_tointeger(L, 10);
+    OdpContext& odp_ctxt = lsd->ldp.asd->get_odp_ctxt();
     if (app_id_to_snort > APP_ID_NONE)
     {
-        AppInfoTableEntry* entry = ud->get_odp_ctxt().get_app_info_mgr().get_app_info_entry(
+        AppInfoTableEntry* entry = odp_ctxt.get_app_info_mgr().get_app_info_entry(
             app_id_to_snort);
         if (!entry)
             return 0;
         snort_protocol_id = entry->snort_protocol_id;
     }
 
-    OdpContext& odp_ctxt = lsd->ldp.asd->get_odp_ctxt();
     AppIdSession* fp = AppIdSession::create_future_session(lsd->ldp.pkt,  &client_addr,
         client_port, &server_addr, server_port, proto, snort_protocol_id, odp_ctxt);
     if (fp)
@@ -2928,6 +3084,8 @@ static const luaL_Reg detector_methods[] =
     { "addDNSHostPattern",        detector_add_dns_host_pattern },
     { "registerClientDetectorCallback",   detector_register_client_callback },
     { "registerServiceDetectorCallback",  detector_register_service_callback },
+    { "getSubstr",                detector_get_substr },
+    { "substrIndex",              detector_find_substr },
 
     /*Obsolete - new detectors should not use this API */
     { "init",                     service_init },
@@ -2955,6 +3113,7 @@ static const luaL_Reg detector_methods[] =
     { "service_analyzePayload",     service_analyze_payload },
     { "service_addAppIdDataToFlow", service_add_data_id },
     { "service_addClient",          service_add_client },
+    { "service_addNetbiosDomain",   service_add_netbios_domain },
 
     /*client init API */
     { "client_init",              client_init },

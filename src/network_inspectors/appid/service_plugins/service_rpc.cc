@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2022 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -95,6 +95,8 @@ enum RPCReplyState
 
 #define PROGRAM_LENGTH 4
 #define VERSION_LENGTH 4
+
+#define RPCB_UNIVERSAL_ADDR_LENGTH 6
 
 #pragma pack(1)
 
@@ -322,6 +324,8 @@ static bool  validate_and_parse_universal_address(string& data, uint32_t &addres
     string tok;
     while (getline(tokenizer, tok, '.'))
     {
+        if (!all_of(tok.begin(), tok.end(), ::isdigit))
+            return false;
         int tmp = stoi(tok);
         if (tmp > 255)
             return false;
@@ -485,7 +489,8 @@ int RpcServiceDetector::validate_packet(const uint8_t* data, uint16_t size, Appi
                     uint16_t port = 0;
                     data += sizeof(UniversalAddress);
                     string uaddr(data, data + tmp);
-                    if (validate_and_parse_universal_address(uaddr, address, port))
+                    if ((count(uaddr.begin(), uaddr.end(), '.') == (RPCB_UNIVERSAL_ADDR_LENGTH - 1)) and
+                        validate_and_parse_universal_address(uaddr, address, port))
                     {
                         SfIp sip;
                         uint32_t addr = htonl(address);

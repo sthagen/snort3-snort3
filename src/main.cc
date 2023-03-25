@@ -44,6 +44,7 @@
 #include "managers/inspector_manager.h"
 #include "managers/module_manager.h"
 #include "managers/plugin_manager.h"
+#include "memory/memory_cap.h"
 #include "packet_io/sfdaq.h"
 #include "packet_io/sfdaq_config.h"
 #include "packet_io/sfdaq_instance.h"
@@ -336,6 +337,14 @@ int main_dump_stats(lua_State* L)
     return 0;
 }
 
+
+int main_dump_heap_stats(lua_State* L)
+{
+    ControlConn* ctrlcon = ControlConn::query_from_lua(L);
+    memory::MemoryCap::dump_mem_stats(ctrlcon);
+    return 0;
+}
+
 int main_reset_stats(lua_State* L)
 {
     ControlConn* ctrlcon = ControlConn::query_from_lua(L);
@@ -367,6 +376,25 @@ int main_set_watchdog_params(lua_State* L)
         send_response(ctrlcon, watchdog_timer_msg.str().c_str());
     }
 
+    return 0;
+}
+
+int main_log_command(lua_State* L)
+{
+    if (!L)
+        return 0;
+    
+    ControlConn* ctrlcon = ControlConn::query_from_lua(L);
+    if (lua_gettop(L) >= 2)
+    {
+        std::string command = luaL_optstring(L, 1, nullptr);
+        bool exclusion = luaL_opt(L,lua_toboolean, 2, true);
+        ctrlcon->log_command(command, exclusion);
+        LogRespond(ctrlcon, "Control: Logging %s for %s\n", exclusion ? "enabled" : "disabled" , command.c_str());
+    }
+    else
+        LogRespond(ctrlcon, "Usage: log_command(<command>,true|false)\n");
+    
     return 0;
 }
 

@@ -73,8 +73,8 @@ struct OtnState
     uint64_t latency_timeouts = 0;
     uint64_t latency_suspends = 0;
 
-    operator bool() const
-    { return elapsed > 0_ticks || checks > 0; }
+    bool is_active() const
+    { return elapsed > CLOCK_ZERO || checks > 0; }
 };
 
 /* function pointer list for rule head nodes */

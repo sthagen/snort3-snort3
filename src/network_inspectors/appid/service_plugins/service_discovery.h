@@ -68,6 +68,7 @@ public:
     void reload() override;
     void finalize_service_patterns();
     void reload_service_patterns();
+    unsigned get_pattern_count();
     int add_service_port(AppIdDetector*, const ServiceDetectorPort&) override;
 
     AppIdDetectorsIterator get_detector_iterator(IpProtocol);
@@ -81,7 +82,8 @@ public:
     int incompatible_data(AppIdSession&, const snort::Packet*, AppidSessionDirection dir, ServiceDetector*);
     static int add_ftp_service_state(AppIdSession&);
     static void clear_ftp_service_state();
-
+    static void set_thread_local_ftp_service();
+    static void reset_thread_local_ftp_service();
 private:
     void get_next_service(const snort::Packet*, const AppidSessionDirection dir, AppIdSession&);
     void get_port_based_services(IpProtocol, uint16_t port, AppIdSession&);

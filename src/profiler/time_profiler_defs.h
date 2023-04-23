@@ -61,8 +61,8 @@ struct SO_PUBLIC TimeProfilerStats
     void reset()
     { elapsed = 0_ticks; checks = 0; }
 
-    operator bool() const
-    { return ( elapsed > 0_ticks ) || checks; }
+    bool is_active() const
+    { return ( elapsed > CLOCK_ZERO ) || checks; }
 
     // reentrancy control
     bool enter() const { return ref_count++ == 0; }

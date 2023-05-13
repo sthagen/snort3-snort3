@@ -518,6 +518,9 @@ int SslServiceDetector::validate(AppIdDiscoveryArgs& args)
                     /* Start pulling out certificates. */
                     if (!ss->certs_data)
                     {
+                        if (size < sizeof(ServiceSSLV3CertsRecord))
+                            goto fail;
+
                         certs_rec = (const ServiceSSLV3CertsRecord*)data;
                         ss->certs_len = ntoh3(certs_rec->certs_len);
                         ss->certs_data = (uint8_t*)snort_alloc(ss->certs_len);
@@ -689,6 +692,7 @@ AppId getSslServiceAppId(short srcPort)
         return APP_ID_HTTPS;
     case 448:
         return APP_ID_DDM_SSL;
+    case 25:
     case 465:
         return APP_ID_SMTPS;
     case 563:

@@ -23,7 +23,7 @@
 
 #include "framework/module.h"
 
-#include "profiler/profiler.h"
+#include "profiler.h"
 
 class ProfilerModule : public snort::Module
 {

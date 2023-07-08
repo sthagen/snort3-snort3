@@ -21,11 +21,14 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-
+ 
 #include "analyzer.h"
 
 #include <daq.h>
 
+#if 0 // defined (__SANITIZE_ADDRESS__) && defined (REG_TEST)
+    #include <sanitizer/asan_interface.h>
+#endif
 #include <thread>
 
 #include "detection/context_switcher.h"
@@ -413,7 +416,18 @@ void Analyzer::process_daq_pkt_msg(DAQ_Msg_h msg, bool retry)
     p->daq_msg = msg;
     p->daq_instance = daq_instance;
 
-    PacketManager::decode(p, pkthdr, daq_msg_get_data(msg), daq_msg_get_data_len(msg), false, retry);
+    const uint8_t* data = daq_msg_get_data(msg);
+    const uint32_t data_len = daq_msg_get_data_len(msg);
+
+#if 0 // defined (__SANITIZE_ADDRESS__) && defined (REG_TEST)
+    auto data_end = msg->data + msg->data_len;
+    unsigned long dist = static_cast<uint8_t*>(msg->hdr) - data_end;
+    auto size = std::min(16UL, dist);
+
+    ASAN_POISON_MEMORY_REGION(data_end, size);
+#endif
+
+    PacketManager::decode(p, pkthdr, data, data_len, false, retry);
 
     if (process_packet(p))
     {
@@ -421,6 +435,9 @@ void Analyzer::process_daq_pkt_msg(DAQ_Msg_h msg, bool retry)
         switcher->stop();
     }
 
+#if 0 // defined (__SANITIZE_ADDRESS__) && defined (REG_TEST)
+    ASAN_UNPOISON_MEMORY_REGION(data_end, size);
+#endif
     // Beyond this point, we don't have an active context, but e.g. calls to
     // get_current_packet() or get_current_wire_packet() require a context.
     // We must ensure that a context is available when one is needed.
@@ -746,7 +763,7 @@ void Analyzer::operator()(Swapper* ps, uint16_t run_num)
     SnortConfig::get_conf()->thread_config->set_instance_tid(id);
     // Perform all packet thread initialization actions that need to be taken with escalated
     // privileges prior to starting the DAQ module.
-    SnortConfig::get_conf()->thread_config->implement_thread_affinity(
+    SnortConfig::get_conf()->thread_config->apply_thread_policy(
         STHREAD_TYPE_PACKET, get_instance_id());
 
     SFDAQ::set_local_instance(daq_instance);

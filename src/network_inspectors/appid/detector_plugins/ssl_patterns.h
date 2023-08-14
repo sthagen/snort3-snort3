@@ -33,11 +33,12 @@ struct SslPattern
     uint8_t* pattern;
     int pattern_size;
     bool is_cname;
+    bool is_literal; // is not regex pattern
 
     bool operator==(const SslPattern& v) const
     {
         return this->type == v.type and pattern_size == v.pattern_size
-            and (memcmp(pattern, v.pattern, (size_t)pattern_size) == 0); 
+            and (memcmp(pattern, v.pattern, (size_t)pattern_size) == 0);
     }
 };
 
@@ -68,7 +69,7 @@ class SslPatternMatchers
 {
 public:
     ~SslPatternMatchers();
-    void add_cert_pattern(uint8_t*, size_t, uint8_t, AppId, bool);
+    void add_cert_pattern(uint8_t*, size_t, uint8_t, AppId, bool, bool = true);
     void finalize_patterns();
     void reload_patterns();
     unsigned get_pattern_count();

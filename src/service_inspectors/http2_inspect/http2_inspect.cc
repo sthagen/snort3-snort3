@@ -53,13 +53,6 @@ Http2Inspect::Http2Inspect(const Http2ParaList* params_) : params(params_)
     {
         HttpTestManager::activate_test_output(HttpTestManager::IN_HTTP2);
     }
-    if ((params->test_input) || (params->test_output))
-    {
-        HttpTestManager::set_print_amount(params->print_amount);
-        HttpTestManager::set_print_hex(params->print_hex);
-        HttpTestManager::set_show_pegs(params->show_pegs);
-        HttpTestManager::set_show_scan(params->show_scan);
-    }
 #endif
 }
 
@@ -221,3 +214,20 @@ static void print_flow_issues(FILE* output, Http2Infractions* const infractions,
         infractions->get_raw(0), events->get_raw(0));
 }
 #endif
+
+const uint8_t* Http2Inspect::adjust_log_packet(Packet* p, uint16_t& length)
+{
+    auto* const session_data = (Http2FlowData*)p->flow->get_flow_data(Http2FlowData::inspector_id);
+    if (!session_data)
+        return nullptr;
+
+    auto* stream = session_data->find_processing_stream();
+    if (!stream)
+        return nullptr;
+
+    auto* frame = stream->get_current_frame();
+    if (!frame)
+        return nullptr;
+
+    return frame->get_frame_pdu(length);
+}

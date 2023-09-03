@@ -1,6 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
-// Copyright (C) 2005-2013 Sourcefire, Inc.
+// Copyright (C) 2015-2023 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -17,26 +16,20 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-#ifndef ASN1_DETECT_H
-#define ASN1_DETECT_H
+// dns_config.h author Serhii Vlasiuk <svlasiuk@cisco.com>
 
-#include <cstdint>
+#ifndef DNS_CONFIG_H
+#define DNS_CONFIG_H
 
-#define ABS_OFFSET 1
-#define REL_OFFSET 2
-
-typedef struct s_ASN1_CTXT
+class DnsConfig
 {
-    int bs_overflow;
-    int double_overflow;
-    int print;
-    int length;
-    unsigned int max_length;
-    int offset;
-    int offset_type;
-} ASN1_CTXT;
+public:
+    DnsConfig() = default;
+    ~DnsConfig() = default;
 
-int Asn1DoDetect(const uint8_t*, uint16_t, ASN1_CTXT*, const uint8_t*);
+    void show() const;
+
+    bool publish_response = false;
+};
 
 #endif
-

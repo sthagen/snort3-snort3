@@ -265,7 +265,7 @@ void TcpReassembler::dup_reassembly_segment(
 
 bool TcpReassembler::add_alert(TcpReassemblerState& trs, uint32_t gid, uint32_t sid)
 {
-    trs.alerts.emplace_back(gid, sid, 0, 0, 0);
+    trs.alerts.emplace_back(gid, sid);
     return true;
 }
 
@@ -300,7 +300,7 @@ void TcpReassembler::purge_alerts(TcpReassemblerState& trs)
     Flow* flow = trs.sos.session->flow;
 
     for ( auto& alert : trs.alerts )
-        Stream::log_extra_data(flow, trs.xtradata_mask, alert.event_id, alert.event_second);
+        Stream::log_extra_data(flow, trs.xtradata_mask, alert);
 
     if ( !flow->is_suspended() )
         trs.alerts.clear();
@@ -970,6 +970,26 @@ void TcpReassembler::fallback(TcpStreamTracker& tracker, bool server_side)
         flow->clear_gadget();
         tcpStats.inspector_fallbacks++;
     }
+}
+
+bool TcpReassembler::segment_within_seglist_window(TcpReassemblerState& trs, TcpSegmentDescriptor& tsd)
+{
+    uint32_t start, end = (trs.sos.seglist.tail->i_seq + trs.sos.seglist.tail->i_len);
+
+    if ( SEQ_LT(trs.sos.seglist_base_seq, trs.sos.seglist.head->i_seq) )
+        start = trs.sos.seglist_base_seq;
+    else
+        start = trs.sos.seglist.head->i_seq;
+
+    // Left side
+    if ( SEQ_LEQ(tsd.get_end_seq(), start) )
+        return false;
+
+    // Right side
+    if ( SEQ_GEQ(tsd.get_seq(), end) )
+        return false;
+
+    return true;
 }
 
 void TcpReassembler::check_first_segment_hole(TcpReassemblerState& trs)

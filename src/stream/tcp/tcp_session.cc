@@ -346,6 +346,9 @@ bool TcpSession::flow_exceeds_config_thresholds(TcpSegmentDescriptor& tsd)
                     (const_cast<tcp::TCPHdr*>(tsd.get_pkt()->ptrs.tcph))->set_seq(listener->max_queue_seq_nxt);
             }
 
+            if( listener->reassembler.segment_within_seglist_window(tsd) )
+                return false;
+
             if ( inline_mode || listener->normalizer.get_trim_win() == NORM_MODE_ON)
             {
                 tsd.get_pkt()->active->set_drop_reason("stream");
@@ -377,6 +380,9 @@ bool TcpSession::flow_exceeds_config_thresholds(TcpSegmentDescriptor& tsd)
                 else
                     (const_cast<tcp::TCPHdr*>(tsd.get_pkt()->ptrs.tcph))->set_seq(listener->max_queue_seq_nxt);
             }
+
+            if( listener->reassembler.segment_within_seglist_window(tsd) )
+                return false;
 
             if ( inline_mode || listener->normalizer.get_trim_win() == NORM_MODE_ON)
             {
@@ -475,7 +481,8 @@ int TcpSession::process_tcp_data(TcpSegmentDescriptor& tsd)
             }
             else
             {
-                listener->normalizer.trim_win_payload(tsd);
+                bool force = (tsd.is_nap_policy_inline() && listener->get_iss());
+                listener->normalizer.trim_win_payload(tsd, 0, force);
                 return STREAM_UNALIGNED;
             }
         }
@@ -506,7 +513,8 @@ int TcpSession::process_tcp_data(TcpSegmentDescriptor& tsd)
             if (tsd.get_len() == ZERO_WIN_PROBE_LEN)
                 tcpStats.zero_win_probes++;
 
-            listener->normalizer.trim_win_payload(tsd);
+            bool force = (tsd.is_nap_policy_inline() && listener->get_iss());
+            listener->normalizer.trim_win_payload(tsd, 0, force);
             return STREAM_UNALIGNED;
         }
         if ( tsd.is_data_segment() )

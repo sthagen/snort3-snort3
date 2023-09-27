@@ -164,6 +164,8 @@ public:
     virtual FlowData* get_stream_flow_data(const Flow* flow) = 0;
     virtual void set_stream_flow_data(Flow* flow, FlowData* flow_data) = 0;
     virtual void get_stream_id(const Flow* flow, int64_t& stream_id) = 0;
+    virtual void* get_hi_msg_section(const Flow* flow) = 0;
+    virtual void set_hi_msg_section(Flow* flow, void* section) = 0;
     virtual AppId get_appid_from_stream(const Flow*) { return APP_ID_NONE; }
     // Stream based flows should override this interface to return parent flow
     // when child flow is passed as input
@@ -496,6 +498,7 @@ public:  // FIXIT-M privatize if possible
         bool efd_flow : 1;  // Indicate that current flow is an elephant flow
         bool svc_event_generated : 1; // Set if FLOW_NO_SERVICE_EVENT was generated for this flow
         bool retry_queued : 1; // Set if a packet was queued for retry for this flow
+        bool ha_flow : 1; // Set if this flow was created by an HA message
     } flags = {};
 
     FlowState flow_state = FlowState::SETUP;

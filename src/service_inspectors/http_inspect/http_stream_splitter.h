@@ -63,9 +63,13 @@ private:
         uint32_t length, HttpEnums::CompressId& compression, z_stream*& compress_stream,
         bool at_start, HttpInfractions* infractions, HttpEventGen* events,
         HttpFlowData* session_data) const;
-    void process_gzip_header(const uint8_t* data,
+    uint8_t* process_gzip_header(const uint8_t* data,
         uint32_t length, HttpFlowData* session_data) const;
     bool gzip_header_check_done(HttpFlowData* session_data) const;
+    StreamSplitter::Status handle_zero_nine(snort::Flow*, HttpFlowData*, const uint8_t* data,
+        uint32_t length, uint32_t* flush_offset, HttpCommon::SectionType&, HttpCutter*&);
+    StreamSplitter::Status call_cutter(snort::Flow*, HttpFlowData*, const uint8_t* data,
+        uint32_t length, uint32_t* flush_offset, HttpCommon::SectionType&);
 
     HttpInspect* const my_inspector;
     const HttpCommon::SourceId source_id;

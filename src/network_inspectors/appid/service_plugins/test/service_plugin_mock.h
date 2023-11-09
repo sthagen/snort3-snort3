@@ -32,7 +32,8 @@ namespace snort
 void ParseWarning(WarningGroup, const char*, ...) { }
 
 // Stubs for appid sessions
-FlowData::FlowData(unsigned, Inspector*) { }
+FlowData::FlowData(unsigned, Inspector*) : next(nullptr), prev(nullptr), handler(nullptr), id(0)
+{ }
 FlowData::~FlowData() = default;
 
 // Stubs for packet
@@ -46,7 +47,7 @@ bool Inspector::get_buf(const char*, Packet*, InspectionBuffer&) { return true; 
 class StreamSplitter* Inspector::get_splitter(bool) { return nullptr; }
 
 // Stubs for search_tool.cc
-SearchTool::SearchTool(bool) { }
+SearchTool::SearchTool(bool, const char*) { }
 SearchTool::~SearchTool() = default;
 
 // Stubs for util.cc

@@ -80,7 +80,7 @@ bool HexBook::translate(const char* in, HexVector& out)
 //-------------------------------------------------------------------------
 
 void HexBook::add_spell(
-    const char* key, const char* val, HexVector& hv, unsigned i, MagicPage* p)
+    const char* key, const char* val, const HexVector& hv, unsigned i, MagicPage* p)
 {
     while ( i < hv.size() )
     {
@@ -132,8 +132,7 @@ bool HexBook::add_spell(const char* key, const char*& val, ArcaneType proto)
 
         if ( c == WILD and p->any )
             p = p->any;
-
-        else if ( p->next[c] )
+        else if ( c != WILD and p->next[c] )
             p = p->next[c];
 
         else

@@ -31,7 +31,7 @@ struct SnortConfig;
 
 struct dce2TcpProtoConf
 {
-    dce2CoProtoConf common;
+    dce2CoProtoConf common = {};
 };
 
 class Dce2TcpModule : public snort::Module
@@ -57,7 +57,7 @@ public:
     { return true; }
 
 private:
-    dce2TcpProtoConf config;
+    dce2TcpProtoConf config = {};
 };
 
 void print_dce2_tcp_conf(const dce2TcpProtoConf& config);

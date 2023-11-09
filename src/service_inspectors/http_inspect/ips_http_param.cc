@@ -80,7 +80,11 @@ uint32_t HttpParamIpsOption::hash() const
 bool HttpParamRuleOptModule::end(const char*, int, SnortConfig*)
 {
     if (param.length() == 0)
+    {
         ParseError("Specify parameter name");
+        return false;
+    }
+
     return true;
 }
 
@@ -104,6 +108,7 @@ bool HttpParamIpsOption::retry(Cursor& current_cursor, const Cursor&)
 
 IpsOption::EvalStatus HttpParamIpsOption::eval(Cursor& c, Packet* p)
 {
+    // cppcheck-suppress unreadVariable
     RuleProfile profile(HttpParamRuleOptModule::http_param_ps);
 
     const HttpInspect* const hi = eval_helper(p);

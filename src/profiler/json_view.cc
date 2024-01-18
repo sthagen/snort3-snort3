@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2023-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2023-2024 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -96,7 +96,8 @@ void print_json_entries(ControlConn* ctrlcon, std::vector<rule_stats::View>& ent
         std::partial_sort(entries.begin(), entries.begin() + count, entries.end(), sort);
 
     double total_time_usec =
-        RuleContext::get_total_time()->tv_sec * 1000000.0 + RuleContext::get_total_time()->tv_usec;
+        ( RuleContext::get_total_time()->tv_sec * 1000000.0 + RuleContext::get_total_time()->tv_usec )
+        * ThreadConfig::get_instance_max();
 
     for ( unsigned i = 0; i < count; ++i )
         print_single_entry(ctrlcon, entries[i], i + 1, count, total_time_usec);

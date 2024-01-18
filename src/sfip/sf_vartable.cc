@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -218,6 +218,11 @@ SfIpRet sfvt_add_str(vartable_t* table, const char* str, sfip_var_t** ipret)
 
     /* Creates the variable */
     var = sfvar_alloc(table, str, &status);
+
+    // If the alias is not available, return SFIP_LOOKUP_FAILURE to resolve the variable later
+    if (status == SFIP_LOOKUP_FAILURE)
+        return status;
+
     if ( var == nullptr )
     {
         return SFIP_FAILURE;

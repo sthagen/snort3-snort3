@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2024 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -404,6 +404,7 @@ static int reload_detectors(lua_State* L)
     ServiceDiscovery::clear_ftp_service_state();
     clear_dynamic_host_cache_services();
     AppIdPegCounts::cleanup_peg_info();
+    AppIdPegCounts::init_peg_info();
     LuaDetectorManager::clear_lua_detector_mgrs();
     ctxt.create_odp_ctxt();
     assert(odp_thread_local_ctxt);
@@ -474,14 +475,7 @@ static const PegInfo appid_pegs[] =
 };
 
 AppIdModule::AppIdModule() : Module(MOD_NAME, MOD_HELP, s_params)
-{
-    config = nullptr;
-}
-
-AppIdModule::~AppIdModule()
-{
-    AppIdPegCounts::cleanup_peg_info();
-}
+{ config = nullptr; }
 
 void AppIdModule::set_trace(const Trace* trace) const
 { appid_trace = trace; }
@@ -497,9 +491,9 @@ const TraceOption* AppIdModule::get_trace_options() const
 snort::ProfileStats* AppIdModule::get_profile(
         unsigned i, const char*& name, const char*& parent) const
 {
-    switch (i) 
+    switch (i)
     {
-    
+
         case 0:
             name = get_name();
             parent = nullptr;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -659,7 +659,6 @@ void Analyzer::init_unprivileged()
 
     // init filters hash tables that depend on alerts
     sfthreshold_alloc(sc->threshold_config->memcap, sc->threshold_config->memcap);
-    SFRF_Alloc(sc->rate_filter_config->memcap);
 }
 
 void Analyzer::reinit(const SnortConfig* sc)
@@ -727,8 +726,6 @@ void Analyzer::term()
     delete switcher;
 
     sfthreshold_free();
-    RateFilter_Cleanup();
-
     TraceApi::thread_term();
 }
 

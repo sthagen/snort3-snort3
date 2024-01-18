@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2024 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,11 +21,13 @@
 #ifndef APPID_MOCK_DEFINITIONS_H
 #define APPID_MOCK_DEFINITIONS_H
 
+#include "log/messages.h"
+#include "utils/stats.h"
+
 #include "appid_detector.h"
 #include "appid_module.h"
 #include "appid_peg_counts.h"
 #include "service_inspectors/http_inspect/http_msg_header.h"
-#include "utils/stats.h"
 
 class ThirdPartyAppIdContext;
 

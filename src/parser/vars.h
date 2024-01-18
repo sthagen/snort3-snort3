@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -48,7 +48,7 @@ struct VarEntry
 };
 
 void ParsePathVar(const char* name, const char* value);
-void ParsePortVar(const char* name, const char* value);
+bool ParsePortVar(const char* name, const char* value);
 
 VarEntry* VarAlloc();
 void DeleteVars(VarEntry* var_table);

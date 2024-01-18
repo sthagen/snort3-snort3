@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,6 +26,7 @@
 #include <sys/stat.h>
 
 #include <algorithm>
+#include <functional>
 
 #include "conversion_state.h"
 #include "data/data_types/dt_table.h"
@@ -102,15 +103,13 @@ Table* find_table(const std::vector<Table*>& vec, const std::string& name)
 
 std::string& ltrim(std::string& s)
 {
-    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not1(std::ptr_fun<int, int>(
-        std::isspace))));
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), std::not_fn(std::ptr_fun<int, int>(std::isspace))));
     return s;
 }
 
 std::string& rtrim(std::string& s)
 {
-    s.erase(std::find_if(s.rbegin(), s.rend(), std::not1(std::ptr_fun<int, int>(
-        std::isspace))).base(), s.end());
+    s.erase(std::find_if(s.rbegin(), s.rend(), std::not_fn(std::ptr_fun<int, int>(std::isspace))).base(), s.end());
     return s;
 }
 

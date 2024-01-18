@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -41,7 +41,7 @@ const char* get_config_file(const char* arg, std::string& file);
 void parse_rules_file(snort::SnortConfig*, const char* fname);
 void parse_rules_string(snort::SnortConfig*, const char* str, bool ips_policy = true);
 
-void ParseIpVar(const char* name, const char* value);
+bool ParseIpVar(const char* name, const char* value);
 void parse_include(snort::SnortConfig*, const char*);
 
 void add_service_to_otn(snort::SnortConfig*, OptTreeNode*, const char*);

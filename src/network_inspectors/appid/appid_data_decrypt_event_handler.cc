@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2023-2024 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,8 @@
 
 #include "appid_data_decrypt_event_handler.h"
 
+#include "detection/detection_engine.h"
+#include "log/messages.h"
 #include "pub_sub/data_decrypt_event.h"
 
 #include "app_info_table.h"
@@ -33,7 +35,6 @@
 #include "appid_inspector.h"
 #include "appid_session.h"
 #include "appid_session_api.h"
-#include "detection/detection_engine.h"
 
 using namespace snort;
 

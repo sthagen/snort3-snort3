@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -28,23 +28,25 @@
 #include <glob.h>
 #include <climits>
 
+#include "log/messages.h"
+#include "main/snort_config.h"
+#include "utils/util.h"
+#include "target_based/snort_protocols.h"
+
 #include "app_info_table.h"
 #include "appid_debug.h"
 #include "appid_discovery.h"
 #include "appid_http_session.h"
 #include "appid_inspector.h"
 #include "appid_session.h"
+#include "detector_plugins/detector_dns.h"
 #include "detector_plugins/detector_imap.h"
 #include "detector_plugins/detector_kerberos.h"
 #include "detector_plugins/detector_pattern.h"
 #include "detector_plugins/detector_pop3.h"
 #include "detector_plugins/detector_smtp.h"
 #include "host_port_app_cache.h"
-#include "main/snort_config.h"
-#include "utils/util.h"
 #include "service_plugins/service_ssl.h"
-#include "detector_plugins/detector_dns.h"
-#include "target_based/snort_protocols.h"
 #include "tp_appid_utils.h"
 #include "tp_lib_handler.h"
 

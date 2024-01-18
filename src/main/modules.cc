@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -55,6 +55,7 @@
 #include "parser/parse_conf.h"
 #include "parser/parse_ip.h"
 #include "parser/parser.h"
+#include "parser/var_dependency.h"
 #include "parser/vars.h"
 #include "payload_injector/payload_injector_module.h"
 #include "profiler/profiler_module.h"
@@ -1128,6 +1129,11 @@ bool IpsModule::end(const char* fqn, int idx, SnortConfig* sc)
         p->includer = ModuleManager::get_includer("ips");
         sc->policy_map->set_user_ips(p);
     }
+    else if (!idx and !strcmp(fqn, "ips.variables.nets"))
+        resolve_nets();
+    else if (!idx and !strcmp(fqn, "ips.variables.ports"))
+        resolve_ports();
+
     return true;
 }
 
@@ -1587,6 +1593,7 @@ class RateFilterModule : public Module
 public:
     RateFilterModule() : Module("rate_filter", rate_filter_help, rate_filter_params, true)
     { thdx.applyTo = nullptr; }
+
     ~RateFilterModule() override;
     bool set(const char*, Value&, SnortConfig*) override;
     bool begin(const char*, int, SnortConfig*) override;
@@ -1611,6 +1618,7 @@ private:
 
 RateFilterModule::~RateFilterModule()
 {
+    RateFilter_Cleanup();
     if ( thdx.applyTo )
         sfvar_free(thdx.applyTo);
 }
@@ -1650,8 +1658,9 @@ bool RateFilterModule::set(const char*, Value& v, SnortConfig*)
     return true;
 }
 
-bool RateFilterModule::begin(const char*, int, SnortConfig*)
+bool RateFilterModule::begin(const char*, int, SnortConfig* sc)
 {
+    SFRF_Alloc(sc->rate_filter_config->memcap);
     memset(&thdx, 0, sizeof(thdx));
     return true;
 }

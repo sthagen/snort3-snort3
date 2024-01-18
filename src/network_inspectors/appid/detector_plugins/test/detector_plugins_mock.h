@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2024 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -19,10 +19,13 @@
 
 #ifndef DETECTOR_PLUGINS_MOCK_H
 #define DETECTOR_PLUGINS_MOCK_H
+
+#include "log/messages.h"
+#include "utils/stats.h"
+
 #include "appid_detector.h"
 #include "appid_module.h"
 #include "appid_peg_counts.h"
-#include "utils/stats.h"
 
 namespace snort
 {
@@ -107,7 +110,6 @@ private:
 AppIdConfig::~AppIdConfig() = default;
 AppIdModule::AppIdModule()
     : Module("a", "b") { }
-AppIdModule::~AppIdModule() = default;
 
 // LCOV_EXCL_START
 bool AppIdModule::begin(const char*, int, snort::SnortConfig*)

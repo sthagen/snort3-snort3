@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2023 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,7 @@
 #include "utils/util_cstring.h"
 
 #include "parse_ports.h"
+#include "var_dependency.h"
 
 #ifdef UNIT_TEST
 #include "catch/snort_catch.h"
@@ -41,7 +42,7 @@ using namespace snort;
 // var table stuff
 //-------------------------------------------------------------------------
 
-void ParsePortVar(const char* name, const char* value)
+bool ParsePortVar(const char* name, const char* value)
 {
     PortObject* po;
     POParser pop;
@@ -67,9 +68,16 @@ void ParsePortVar(const char* name, const char* value)
         po = PortObjectParseString(portVarTable, &pop, name, value, 0);
         if (!po)
         {
-            const char* errstr = PortObjectParseError(&pop);
-            ParseAbort("PortVar Parse error: (pos=%d,error=%s)\n>>%s\n>>%*s.",
-                pop.pos,errstr,value,pop.pos,"^");
+            if (is_resolving_ports())
+            {
+                const char* errstr = PortObjectParseError(&pop);
+                ParseAbort("PortVar Parse error: (pos=%d,error=%s)\n>>%s\n>>%*s.",
+                    pop.pos,errstr,value,pop.pos,"^");
+            }
+            else
+                push_to_weak_ports(name, value);
+
+            return false;
         }
     }
 
@@ -85,6 +93,8 @@ void ParsePortVar(const char* name, const char* value)
         ParseWarning(WARN_VARS, "PortVar '%s', already defined.", po->name);
         PortObjectFree(po);
     }
+
+    return true;
 }
 
 VarEntry* VarAlloc()

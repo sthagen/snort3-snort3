@@ -58,7 +58,7 @@ SSLV3ServerCertData::~SSLV3ServerCertData()
 {
     snort_free(certs_data);
     snort_free(common_name);
-    snort_free(org_name);
+    snort_free(org_unit);
 }
 
 void SSLV3ServerCertData::clear()
@@ -69,8 +69,8 @@ void SSLV3ServerCertData::clear()
     snort_free(common_name);
     common_name = nullptr;
 
-    snort_free(org_name);
-    org_name = nullptr;
+    snort_free(org_unit);
+    org_unit = nullptr;
 }
 
 static uint32_t SSL_decode_version_v3(uint8_t major, uint8_t minor)
@@ -238,7 +238,7 @@ static uint32_t SSL_decode_handshake_v3(const uint8_t* pkt, int size,
 
 static uint32_t SSL_decode_v3(const uint8_t* pkt, int size, uint32_t pkt_flags,
     uint8_t* alert_flags, uint16_t* partial_rec_len, int max_hb_len, uint32_t* info_flags,
-    SSLV3ClientHelloData* client_hello_data, SSLV3ServerCertData* server_cert_data)
+    SSLV3ClientHelloData* client_hello_data, SSLV3ServerCertData* server_cert_data, uint32_t prev_flags)
 {
     uint32_t retval = 0;
     uint16_t hblen;
@@ -329,7 +329,7 @@ static uint32_t SSL_decode_v3(const uint8_t* pkt, int size, uint32_t pkt_flags,
         case SSL_HANDSHAKE_REC:
             /* If the CHANGE_CIPHER_FLAG is set, the following handshake
              * record should be encrypted */
-            if (!(retval & SSL_CHANGE_CIPHER_FLAG))
+            if (!(retval & SSL_CHANGE_CIPHER_FLAG) && !(prev_flags & SSL_CHANGE_CIPHER_FLAG))
             {
                 int hsize = size < (int)reclen ? size : (int)reclen;
                 retval |= SSL_decode_handshake_v3(pkt, hsize, retval, pkt_flags, client_hello_data, server_cert_data);
@@ -498,7 +498,7 @@ uint32_t SSL_decode(
          * indicate that it is truncated. */
         if (size == 5)
             return SSL_decode_v3(pkt, size, pkt_flags, alert_flags, partial_rec_len, max_hb_len, info_flags,
-                client_hello_data, server_cert_data);
+                client_hello_data, server_cert_data, prev_flags);
 
         /* At this point, 'size' has to be > 5 */
 
@@ -546,7 +546,7 @@ uint32_t SSL_decode(
     }
 
     return SSL_decode_v3(pkt, size, pkt_flags, alert_flags, partial_rec_len, max_hb_len, info_flags,
-        client_hello_data, server_cert_data);
+        client_hello_data, server_cert_data, prev_flags);
 }
 
 /* very simplistic - just enough to say this is binary data - the rules will make a final
@@ -699,13 +699,13 @@ bool parse_server_certificates(SSLV3ServerCertData* server_cert_data)
         return false;
 
     char* common_name = nullptr;
-    char* org_name = nullptr;
+    char* org_unit = nullptr;
     const uint8_t* data = server_cert_data->certs_data;
     int len = server_cert_data->certs_len;
     int common_name_len = 0;
-    int org_name_len  = 0;
+    int org_unit_len  = 0;
 
-    while (len > 0 and !(common_name and org_name))
+    while (len > 0 and !(common_name and org_unit))
     {
         X509* cert = nullptr;
         X509_NAME* cert_name = nullptr;
@@ -714,13 +714,13 @@ bool parse_server_certificates(SSLV3ServerCertData* server_cert_data)
         data += 3;
         len -= 3;
         if (len < cert_len)
-            return false;
+            break;
 
         /* d2i_X509() increments the data ptr for us. */
         cert = d2i_X509(nullptr, (const unsigned char**)&data, cert_len);
         len -= cert_len;
         if (!cert)
-            return false;
+            break;
 
         if (nullptr == (cert_name = X509_get_subject_name(cert)))
         {
@@ -744,9 +744,19 @@ bool parse_server_certificates(SSLV3ServerCertData* server_cert_data)
 
                 common_name_len = length;
                 common_name = snort_strndup((const char*)(str_data + (wildcard ? 2 : 0)), common_name_len);
+            }
+        }
 
-                org_name_len = length;
-                org_name = snort_strndup((const char*)(str_data + (wildcard ? 2 : 0)), org_name_len);
+        if (!org_unit)
+        {
+            int lastpos = -1;
+            lastpos = X509_NAME_get_index_by_NID(cert_name, NID_organizationalUnitName, lastpos);
+            if (lastpos != -1)
+            {
+                X509_NAME_ENTRY* e = X509_NAME_get_entry(cert_name, lastpos);
+                const unsigned char* str_data = ASN1_STRING_get0_data(X509_NAME_ENTRY_get_data(e));
+                org_unit_len = strlen((const char*)str_data);
+                org_unit = snort_strndup((const char*)(str_data), org_unit_len);
             }
         }
 
@@ -758,9 +768,12 @@ bool parse_server_certificates(SSLV3ServerCertData* server_cert_data)
     {
         server_cert_data->common_name = common_name;
         server_cert_data->common_name_strlen = common_name_len;
+    }
 
-        server_cert_data->org_name = org_name;
-        server_cert_data->org_name_strlen = org_name_len;
+    if (org_unit)
+    {
+        server_cert_data->org_unit = org_unit;
+        server_cert_data->org_unit_strlen = org_unit_len;
     }
 
     /* No longer need entire certificates. We have what we came for. */

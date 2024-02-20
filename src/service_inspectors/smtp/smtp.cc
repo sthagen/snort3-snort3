@@ -229,13 +229,18 @@ static SMTPData* get_session_data(Flow* flow)
 
 static inline PDFJSNorm* acquire_js_ctx(SMTPData& smtp_ssn, const void* data, size_t len)
 {
-    if (smtp_ssn.jsn)
+    auto reload_id = SnortConfig::get_conf()->get_reload_id();
+
+    if (smtp_ssn.jsn and smtp_ssn.jsn->get_generation_id() == reload_id)
         return smtp_ssn.jsn;
+
+    delete smtp_ssn.jsn;
+    smtp_ssn.jsn = nullptr;
 
     JSNormConfig* cfg = get_inspection_policy()->jsn_config;
     if (cfg and PDFJSNorm::is_pdf(data, len))
     {
-        smtp_ssn.jsn = new PDFJSNorm(cfg);
+        smtp_ssn.jsn = new PDFJSNorm(cfg, reload_id);
         ++smtpstats.js_pdf_scripts;
     }
 
@@ -541,11 +546,14 @@ void SmtpProtoConf::show() const
 static void SMTP_ResetState(Flow* ssn)
 {
     SMTPData* smtp_ssn = get_session_data(ssn);
-    smtp_ssn->state = STATE_COMMAND;
-    smtp_ssn->state_flags = (smtp_ssn->state_flags & SMTP_FLAG_ABANDON_EVT) ? SMTP_FLAG_ABANDON_EVT : 0;
+    if( smtp_ssn )
+    {
+        smtp_ssn->state = STATE_COMMAND;
+        smtp_ssn->state_flags = (smtp_ssn->state_flags & SMTP_FLAG_ABANDON_EVT) ? SMTP_FLAG_ABANDON_EVT : 0;
 
-    delete smtp_ssn->jsn;
-    smtp_ssn->jsn = nullptr;
+        delete smtp_ssn->jsn;
+        smtp_ssn->jsn = nullptr;
+    }
 }
 
 static inline int InspectPacket(Packet* p)
@@ -1068,7 +1076,7 @@ static void SMTP_ProcessClientPacket(SmtpProtoConf* config, Packet* p, SMTPData*
             break;
         case STATE_XEXCH50:
             if (smtp_normalizing)
-                SMTP_CopyToAltBuffer(p, ptr, end - ptr);
+                (void)SMTP_CopyToAltBuffer(p, ptr, end - ptr);
             if (smtp_is_data_end (p->flow))
                 smtp_ssn->state = STATE_COMMAND;
             return;

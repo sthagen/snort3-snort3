@@ -146,6 +146,12 @@ void TcpSession::restart(Packet* p)
         listener = &server;
     }
 
+    if ( talker->midstream_initial_ack_flush )
+    {
+        talker->midstream_initial_ack_flush = false;
+        talker->reassembler.flush_on_data_policy(p);
+    }
+
     if (p->dsize > 0)
         listener->reassembler.flush_on_data_policy(p);
 
@@ -171,9 +177,6 @@ void TcpSession::clear_session(bool free_flow_data, bool flush_segments, bool re
     lws_init = false;
     tcp_init = false;
     tcpStats.released++;
-
-    client.ooo_packet_seen = false;
-    server.ooo_packet_seen = false;
 
     if ( flush_segments )
     {
@@ -356,6 +359,7 @@ bool TcpSession::flow_exceeds_config_thresholds(TcpSegmentDescriptor& tsd)
             if ( inline_mode || listener->normalizer.get_trim_win() == NORM_MODE_ON)
             {
                 tsd.get_pkt()->active->set_drop_reason("stream");
+                tel.set_tcp_event(EVENT_MAX_QUEUED_BYTES_EXCEEDED);
                 if (PacketTracer::is_active())
                     PacketTracer::log("Stream: Flow exceeded the configured max byte threshold (%u)\n", tcp_config->max_queued_bytes);
             }
@@ -391,6 +395,7 @@ bool TcpSession::flow_exceeds_config_thresholds(TcpSegmentDescriptor& tsd)
             if ( inline_mode || listener->normalizer.get_trim_win() == NORM_MODE_ON)
             {
                 tsd.get_pkt()->active->set_drop_reason("stream");
+                tel.set_tcp_event(EVENT_MAX_QUEUED_SEGS_EXCEEDED);
                 if (PacketTracer::is_active())
                     PacketTracer::log("Stream: Flow exceeded the configured max segment threshold (%u)\n", tcp_config->max_queued_segs);
             }
@@ -431,34 +436,50 @@ void TcpSession::process_tcp_stream(TcpSegmentDescriptor& tsd)
 void TcpSession::update_stream_order(const TcpSegmentDescriptor& tsd, bool aligned)
 {
     TcpStreamTracker* listener = tsd.get_listener();
+    uint32_t seq = tsd.get_seq();
 
     switch ( listener->order )
     {
-    case 0:
-        if ( aligned )
-            tsd.set_packet_flags(PKT_STREAM_ORDER_OK);
-        else
-            listener->order = 1;
-        break;
+        case TcpStreamTracker::IN_SEQUENCE:
+            if ( aligned )
+                tsd.set_packet_flags(PKT_STREAM_ORDER_OK);
+            else if ( SEQ_GT(seq, listener->rcv_nxt) )
+            {
+                listener->order = TcpStreamTracker::NONE;
+			    listener->hole_left_edge = listener->rcv_nxt;
+			    listener->hole_right_edge = seq - 1;
+            }
+            break;
 
-    case 1:
-        if ( aligned )
-        {
-            tsd.set_packet_flags(PKT_STREAM_ORDER_OK);
-            listener->order = 2;
-        }
-        break;
+        case TcpStreamTracker::NONE:
+            if ( aligned )
+            {
+                tsd.set_packet_flags(PKT_STREAM_ORDER_OK);
+                if ( SEQ_GT(tsd.get_end_seq(), listener->hole_right_edge) )
+			        listener->order = TcpStreamTracker::OUT_OF_SEQUENCE;
+			    else
+			        listener->hole_left_edge = tsd.get_end_seq();
+            }
+            else
+            {
+                if ( SEQ_LEQ(seq, listener->hole_right_edge) )
+			    {
+			    	if ( SEQ_GT(seq, listener->hole_left_edge) )
+			       	    listener->hole_right_edge = seq - 1;
+                    else if ( SEQ_GT(tsd.get_end_seq(), listener->hole_left_edge) )
+                    {
+                        listener->hole_left_edge = tsd.get_end_seq();
+                        tsd.set_packet_flags(PKT_STREAM_ORDER_OK);
+                    }
+			    }
+                // accounting for overlaps when not aligned
+                if ( SEQ_GT(listener->hole_left_edge, listener->hole_right_edge) )
+                    listener->order = TcpStreamTracker::OUT_OF_SEQUENCE;
+            }
+            break;
 
-    default:
-        if ( aligned )
-            tsd.set_packet_flags(PKT_STREAM_ORDER_OK);
-
-        else
-        {
-            if ( !(flow->get_session_flags() & SSNFLAG_STREAM_ORDER_BAD) )
-                flow->set_session_flags(SSNFLAG_STREAM_ORDER_BAD);
+        case TcpStreamTracker::OUT_OF_SEQUENCE:
             tsd.set_packet_flags(PKT_STREAM_ORDER_BAD);
-        }
     }
 }
 
@@ -483,6 +504,7 @@ int TcpSession::process_tcp_data(TcpSegmentDescriptor& tsd)
                 listener->normalizer.trim_win_payload(tsd, 0, tsd.is_nap_policy_inline());
                 return STREAM_UNALIGNED;
             }
+
             if( listener->get_iss() )
             {
                 tcpStats.zero_win_probes++;
@@ -497,7 +519,7 @@ int TcpSession::process_tcp_data(TcpSegmentDescriptor& tsd)
 
         if ( tsd.is_data_segment() )
         {
-            update_stream_order(tsd, !listener->ooo_packet_seen);
+            update_stream_order(tsd, true);
             process_tcp_stream(tsd);
             return STREAM_ALIGNED;
         }
@@ -830,17 +852,10 @@ void TcpSession::mark_packet_for_drop(TcpSegmentDescriptor& tsd)
     set_pkt_action_flag(ACTION_BAD_PKT);
 }
 
-void TcpSession::handle_data_segment(TcpSegmentDescriptor& tsd)
+void TcpSession::handle_data_segment(TcpSegmentDescriptor& tsd, bool flush)
 {
     TcpStreamTracker* listener = tsd.get_listener();
     TcpStreamTracker* talker = tsd.get_talker();
-
-    // if this session started midstream we may need to init the listener's base seq #
-    if ( listener->reinit_seg_base )
-    {
-        listener->reassembler.set_seglist_base_seq(tsd.get_seq());
-        listener->reinit_seg_base = false;
-    }
 
     if ( TcpStreamTracker::TCP_CLOSED != talker->get_tcp_state() )
     {
@@ -879,7 +894,10 @@ void TcpSession::handle_data_segment(TcpSegmentDescriptor& tsd)
         process_tcp_data(tsd);
     }
 
-    listener->reassembler.flush_on_data_policy(tsd.get_pkt());
+    if ( flush )
+        listener->reassembler.flush_on_data_policy(tsd.get_pkt());
+    else
+        listener->reassembler.initialize_paf();
 }
 
 TcpStreamTracker::TcpState TcpSession::get_talker_state(TcpSegmentDescriptor& tsd)
@@ -1090,7 +1108,8 @@ void TcpSession::init_tcp_packet_analysis(TcpSegmentDescriptor& tsd)
     if ( !splitter_init and tsd.is_data_segment() and
         (tcp_init or is_midstream_allowed(tsd)) )
     {
-        if ( !(tcp_config->flags & STREAM_CONFIG_NO_REASSEMBLY) )
+        if ( !(tcp_config->flags & STREAM_CONFIG_NO_REASSEMBLY) and
+                !(tsd.get_flow()->flags.disable_reassembly_by_ips) )
         {
             client.set_splitter(tsd.get_flow());
             server.set_splitter(tsd.get_flow());

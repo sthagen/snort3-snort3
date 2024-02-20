@@ -1,3 +1,49 @@
+2024-02-20: 3.1.81.0
+
+* appid: check tenant_match() if required
+* appid: log error message instead of fatal error if appid stats logfile is not accessible
+* appid: Lowering max packet count before service fail
+* control: Adds counting to ctrlcon blocked to allow for nested commands
+* detection: add c'tors, use new instead of snort_calloc
+* detection: copy ip var name in dup_rtn
+* flow: added ips event suppression flags
+* host_cache: fixed update_stats to remove race_condition
+* http_inspect: recreate JSNorm if reload takes place inside transaction
+* ips_context: add lazy-allocation of alt buffer
+* kaizen: provide an option to enable Kaizen's mock
+* kaizen: remove redundant semicolon and add explicit cast
+* kaizen: rename modules
+* lua: improve spell of wizard for HTTP
+* memory: prevent data race between main and packet threads
+* service_inspectors: add check for JSNorm config actuality
+* stream_tcp: add alerts for exceeding thresholds for max queued bytes or segments
+* stream_tcp: add check to verify seglist head is not nullptr and only initialize PAF when it is not
+* utils: add macro for setting thread name
+
+2024-02-01: 3.1.79.0
+
+* appid: add tenants filter for appid debug
+* appid: process organization unit instead of organization name
+* appid: return false in is_appid_inspecting_session for quic if not decrypting
+* appid: update peg counts to be thread safe
+* coverity: fix for stream and hash
+* filters: make rate_filter multithreaded + some cleanup
+* kaizen: add dev_notes.txt
+* kaizen: change default value of uri_depth to -1
+* kaizen: change kaizen gid to 411
+* kaizen: extend mock object with simple matching mechanism
+* kaizen: make kaizen configurable per policy
+* kaizen: register module only when LibML present or REG_TEST defined
+* kaizen: update copyright
+* mercury: updating alpn info without sni in 7.6
+* network_inspectors: add kaizen ML based exploit detector
+* packet_tracer: add tenants to filters
+* profiler: improve multithread rule percentage calculation
+* ssl: heap overflow issue when processing handshake records
+* stream_tcp: correct labeling of in-sequence and out-of-sequence packets
+* stream_tcp: persist disable_reassembly in Flow
+* stream_tcp: set packet direction flag based on direction saved in reassembly state
+
 2024-01-16: 3.1.78.0
 
 * appid: print odp version and odp detector count on startup

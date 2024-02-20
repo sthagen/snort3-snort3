@@ -34,8 +34,27 @@
 #include <cstdlib>
 #include <cstring>
 #include <string>
+#include <vector>
 
 #include "main/snort_types.h"
+
+// Note: thread names > 15 chars aren't supported on most systems
+#if defined(__linux__)
+    #include <pthread.h>
+    #define SET_THREAD_NAME(thread, name) \
+    pthread_setname_np(thread, name)
+
+#elif defined(__OpenBSD__) || defined(__FreeBSD__)
+    #include <pthread_np.h>
+    #define SET_THREAD_NAME(thread, name) \
+    pthread_set_name_np(thread, name)
+
+#else
+    #define SET_THREAD_NAME(thread, name) \
+    UNUSED(thread);\
+    UNUSED(name);
+
+#endif
 
 #define TIMEBUF_SIZE 27
 
@@ -56,6 +75,8 @@ bool EnterChroot(std::string& root_dir, std::string& log_dir);
 void InitProtoNames();
 unsigned int get_random_seed();
 bool get_file_size(const std::string&, size_t&);
+void StrToIntVector(const std::string& s, char delim, std::vector<uint32_t>& elems);
+std::string IntVectorToStr(const std::vector<uint32_t>& elems, char delim = ',');
 
 #if defined(NOCOREFILE)
 void SetNoCores();

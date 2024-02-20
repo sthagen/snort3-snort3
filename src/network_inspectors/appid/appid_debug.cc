@@ -30,6 +30,7 @@
 #include "flow/flow_key.h"
 #include "log/messages.h"
 #include "trace/trace_api.h"
+#include "utils/util.h"
 
 #include "appid_config.h"
 #include "appid_module.h"
@@ -101,10 +102,13 @@ void AppIdDebug::activate(const uint32_t* ip1, const uint32_t* ip2, uint16_t por
     const AppIdSession* session, bool log_all_sessions, uint32_t tenant_id,
     int16_t group1, int16_t group2, bool inter_group_flow)
 {
-    if (!( log_all_sessions or
-           ( info.proto_match(protocol) and
+    bool match = info.proto_match(protocol) and
              ( (info.port_match(port1, port2) and info.ip_match(ip1, ip2)) or
-               (info.port_match(port2, port1) and info.ip_match(ip2, ip1)) ) ) ))
+               (info.port_match(port2, port1) and info.ip_match(ip2, ip1)) );
+    if (match)
+        match = info.tenant_match(tenant_id);
+
+    if (!(log_all_sessions or match))
     {
         active = false;
         return;
@@ -216,8 +220,10 @@ void AppIdDebug::set_constraints(const char *desc,
         info = *constraints;
         info.sip.ntop(sipstr, sizeof(sipstr));
         info.dip.ntop(dipstr, sizeof(dipstr));
-        appid_log(nullptr, TRACE_INFO_LEVEL, "Debugging %s with %s-%hu and %s-%hu %hhu\n", desc,
-            sipstr, info.sport, dipstr, info.dport, static_cast<uint8_t>(info.protocol));
+
+        appid_log(nullptr, TRACE_INFO_LEVEL, "Debugging %s with %s-%hu and %s-%hu %hhu and tenants:%s\n", desc,
+            sipstr, info.sport, dipstr, info.dport, static_cast<uint8_t>(info.protocol),
+            IntVectorToStr(info.tenants).c_str());
 
         enabled = true;
     }

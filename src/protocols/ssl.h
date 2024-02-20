@@ -218,8 +218,8 @@ struct SSLV3ServerCertData
     /* Data collected from certificates afterwards: */
     char* common_name = nullptr;
     int common_name_strlen;
-    char* org_name = nullptr;
-    int org_name_strlen;
+    char* org_unit = nullptr;
+    int org_unit_strlen;
 };
 
 enum class SSLV3RecordType : uint8_t
@@ -289,6 +289,7 @@ struct ServiceSSLV3ExtensionServerName
 #define SSL_IS_CHELLO(x) ((x) & SSL_CLIENT_HELLO_FLAG)
 #define SSL_IS_SHELLO(x) ((x) & SSL_SERVER_HELLO_FLAG)
 #define SSL_IS_CKEYX(x) ((x) & SSL_CLIENT_KEYX_FLAG)
+#define SSL_IS_CHANGE_CIPHER(x) ((x) & SSL_CHANGE_CIPHER_FLAG)
 #define SSL_IS_APP(x) (((x) & SSL_SAPP_FLAG) || ((x) & SSL_CAPP_FLAG))
 #define SSL_IS_ALERT(x) ((x) & SSL_ALERT_FLAG)
 #define SSL_CLEAR_TEMPORARY_FLAGS(x) (x) &= ~SSL_STATEFLAGS

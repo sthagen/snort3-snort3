@@ -3,7 +3,7 @@ project (snort CXX C)
 
 set (VERSION_MAJOR 3)
 set (VERSION_MINOR 1)
-set (VERSION_PATCH 78)
+set (VERSION_PATCH 81)
 set (VERSION_SUBLEVEL 0)
 set (VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_SUBLEVEL}")
 
@@ -202,6 +202,14 @@ if (HAVE_NUMA)
 else ()
     message("\
     NUMA:           OFF")
+endif ()
+
+if (HAVE_LIBML)
+    message("\
+    LibML:          ON")
+else ()
+    message("\
+    LibML:          OFF")
 endif ()
 
 message("-------------------------------------------------------\n")

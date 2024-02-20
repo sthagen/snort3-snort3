@@ -45,6 +45,10 @@
 #include <lzma.h>
 #endif
 
+#ifdef HAVE_LIBML
+#include <libml.h>
+#endif
+
 extern "C" {
 #include <daq.h>
 }
@@ -128,6 +132,9 @@ int DisplayBanner()
 #endif
 #ifdef HAVE_LZMA
     LogMessage("           Using LZMA version %s\n", lzma_version_string());
+#endif
+#ifdef HAVE_LIBML
+    LogMessage("           Using LibML version %s\n", libml_version());
 #endif
     LogMessage("\n");
 
@@ -505,6 +512,36 @@ bool get_file_size(const std::string& path, size_t& size)
 
     size = static_cast<size_t>(sb.st_size);
     return true;
+}
+
+void StrToIntVector(const std::string& s, char delim, std::vector<uint32_t>& elems)
+{
+    std::istringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, delim))
+    {
+        size_t pos;
+        uint32_t i = std::stoul(item, &pos);
+        elems.push_back(i);
+    }
+}
+
+std::string IntVectorToStr(const std::vector<uint32_t>& elems, char delim)
+{
+    std::string str = "none";
+    if (elems.size())
+    {
+        std::ostringstream oss;
+        for (size_t i = 0; i < elems.size(); ++i)
+        {
+            oss << elems[i];
+            if (i < elems.size() - 1)
+                oss << delim;
+        }
+        str = oss.str();
+    }
+
+    return str;
 }
 
 #if defined(NOCOREFILE)

@@ -32,6 +32,7 @@
 #include "main/snort_config.h"
 #include "profiler/profiler.h"
 #include "sfip/sf_ip.h"
+#include "utils/util.h"
 
 #include "packet_tracer.h"
 
@@ -58,6 +59,7 @@ static const Parameter enable_packet_tracer_params[] =
     {"src_port", Parameter::PT_INT, "0:65535", nullptr, "source port filter"},
     {"dst_ip", Parameter::PT_STRING, nullptr, nullptr, "destination IP address filter"},
     {"dst_port", Parameter::PT_INT, "0:65535", nullptr, "destination port filter"},
+    {"tenants", Parameter::PT_STRING, nullptr, nullptr, "tenants filter"},
     {nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr}
 };
 
@@ -71,7 +73,7 @@ static const Command packet_tracer_cmds[] =
 class PacketTracerDebug : public AnalyzerCommand
 {
   public:
-    PacketTracerDebug(PacketConstraints* cs);
+    PacketTracerDebug(const PacketConstraints* cs);
     bool execute(Analyzer&, void**) override;
     const char *stringify() override { return "PACKET_TRACER_DEBUG"; }
 
@@ -80,11 +82,11 @@ class PacketTracerDebug : public AnalyzerCommand
     bool enable = false;
 };
 
-PacketTracerDebug::PacketTracerDebug(PacketConstraints* cs)
+PacketTracerDebug::PacketTracerDebug(const PacketConstraints* cs)
 {
     if (cs)
     {
-        memcpy(&constraints, cs, sizeof(constraints));
+        constraints = *cs;
         enable = true;
     }
 }
@@ -107,6 +109,8 @@ static int enable(lua_State* L)
     const char *dipstr = luaL_optstring(L, 4, nullptr);
     int dport = luaL_optint(L, 5, 0);
 
+    const char *tenantsstr = luaL_optstring(L, 6, nullptr);
+
     SfIp sip, dip;
     sip.clear();
     dip.clear();
@@ -124,6 +128,9 @@ static int enable(lua_State* L)
     }
 
     PacketConstraints constraints = {};
+
+    if (tenantsstr)
+        StrToIntVector(tenantsstr, ',', constraints.tenants);
 
     if (proto and (IpProtocol)proto < IpProtocol::PROTO_NOT_SET)
     {

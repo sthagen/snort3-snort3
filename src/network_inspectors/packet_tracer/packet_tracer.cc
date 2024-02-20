@@ -464,9 +464,10 @@ void PacketTracer::update_constraints(const PacketConstraints* cs)
     constraints = *cs;
     constraints.src_ip.ntop(sipstr, sizeof(sipstr));
     constraints.dst_ip.ntop(dipstr, sizeof(dipstr));
-    LogMessage("Debugging packet tracer with %s-%hu and %s-%hu %hhu\n",
+
+    LogMessage("Debugging packet tracer with %s-%hu and %s-%hu %hhu and tenants:%s\n",
         sipstr, constraints.src_port, dipstr, constraints.dst_port,
-        static_cast<uint8_t>(constraints.ip_proto));
+        static_cast<uint8_t>(constraints.ip_proto), IntVectorToStr(constraints.tenants).c_str());
 
     shell_enabled = true;
 

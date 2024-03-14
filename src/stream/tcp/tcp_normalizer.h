@@ -61,10 +61,14 @@ class TcpNormalizer
 {
 public:
     using State = TcpNormalizerState;
+    enum NormStatus { NORM_BAD_SEQ = -1, NORM_TRIMMED = 0, NORM_OK = 1 };
 
     virtual ~TcpNormalizer() = default;
 
     virtual void init(State&) { }
+
+    virtual NormStatus apply_normalizations(
+        State&, TcpSegmentDescriptor&, uint32_t seq, bool stream_is_inorder);
     virtual void session_blocker(State&, TcpSegmentDescriptor&);
     virtual bool packet_dropper(State&, TcpSegmentDescriptor&, NormFlags);
     virtual bool trim_syn_payload(State&, TcpSegmentDescriptor&, uint32_t max = 0);
@@ -83,8 +87,12 @@ public:
     virtual int handle_repeated_syn(State&, TcpSegmentDescriptor&) = 0;
     virtual uint16_t set_urg_offset(State&, const snort::tcp::TCPHdr* tcph, uint16_t dsize);
     virtual void set_zwp_seq(State&, uint32_t seq);
+    virtual void log_drop_reason(State&, const TcpSegmentDescriptor&, bool inline_mode, const char *issuer, const std::string& log);
 
     static void reset_stats();
+
+    std::string& get_name()
+    { return my_name; }
 
 protected:
     TcpNormalizer() = default;
@@ -101,6 +109,8 @@ protected:
     virtual bool is_paws_ts_checked_required(State&, TcpSegmentDescriptor&);
     virtual int validate_paws(State&, TcpSegmentDescriptor&);
     virtual int handle_paws_no_timestamps(State&, TcpSegmentDescriptor&);
+
+    std::string my_name;
 };
 
 #endif

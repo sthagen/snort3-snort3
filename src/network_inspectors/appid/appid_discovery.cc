@@ -27,7 +27,8 @@
 #include "host_tracker/host_cache.h"
 #include "host_tracker/host_cache_segmented.h"
 
-#include "packet_tracer/packet_tracer.h"
+#include "log/messages.h"
+#include "packet_io/packet_tracer.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
@@ -39,6 +40,7 @@
 #include "appid_http_session.h"
 #include "appid_inspector.h"
 #include "appid_session.h"
+#include "app_cpu_profile_table.h"
 #include "appid_utils/ip_funcs.h"
 #include "client_plugins/client_discovery.h"
 #include "detector_plugins/detector_dns.h"
@@ -66,7 +68,7 @@ static void populate_trace_data(AppIdSession& session)
 
     PacketTracer::daq_log("AppID+%" PRId64"++service: %s(%d), "
         "client: %s(%d), payload: %s(%d), misc: %s(%d)$",
-        TO_NSECS(pt_timer->get()),
+        PacketTracer::get_time(),
         (service_app_name ? service_app_name : ""), service_id,
         (client_app_name ? client_app_name : ""), client_id,
         (payload_app_name ? payload_app_name : ""), payload_id,
@@ -140,6 +142,12 @@ void AppIdDiscovery::do_application_discovery(Packet* p, AppIdInspector& inspect
     if (!do_pre_discovery(p, asd, inspector, protocol, outer_protocol, direction, odp_ctxt))
         return;
 
+    bool is_appid_cpu_profiling_running = (odp_ctxt.is_appid_cpu_profiler_running());
+    Stopwatch<SnortClock> per_appid_cpu_timer;
+
+    if (is_appid_cpu_profiling_running)
+        per_appid_cpu_timer.start();
+    
     AppId service_id = APP_ID_NONE;
     AppId client_id = APP_ID_NONE;
     AppId payload_id = APP_ID_NONE;
@@ -150,6 +158,12 @@ void AppIdDiscovery::do_application_discovery(Packet* p, AppIdInspector& inspect
 
     do_post_discovery(p, *asd, is_discovery_done, service_id, client_id, payload_id, misc_id,
         change_bits);
+
+    if (is_appid_cpu_profiling_running)
+    {
+        per_appid_cpu_timer.stop();
+        asd->stats.processing_time += TO_USECS(per_appid_cpu_timer.get());
+    }
 }
 
 static bool set_network_attributes(AppIdSession* asd, Packet* p, IpProtocol& protocol,
@@ -260,6 +274,7 @@ bool AppIdDiscovery::do_pre_discovery(Packet* p, AppIdSession*& asd, AppIdInspec
     //           refactor to pass this as ref and delete any checks for null
     appid_stats.processed_packets++;
     asd->session_packet_count++;
+    asd->stats.cpu_profiler_pkt_count++;
 
     if (direction == APP_ID_FROM_INITIATOR)
     {

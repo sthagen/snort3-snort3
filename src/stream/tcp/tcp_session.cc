@@ -51,10 +51,10 @@
 #include "detection/detection_engine.h"
 #include "detection/rules.h"
 #include "log/log.h"
+#include "packet_io/packet_tracer.h"
 #include "profiler/profiler.h"
 #include "protocols/eth.h"
 #include "pub_sub/intrinsic_event_ids.h"
-#include "packet_tracer/packet_tracer.h"
 
 #include "stream_tcp.h"
 #include "tcp_ha.h"
@@ -177,6 +177,9 @@ void TcpSession::clear_session(bool free_flow_data, bool flush_segments, bool re
     lws_init = false;
     tcp_init = false;
     tcpStats.released++;
+
+    if ( !flow->two_way_traffic() and free_flow_data )
+        tcpStats.asymmetric_flows++;
 
     if ( flush_segments )
     {
@@ -304,112 +307,17 @@ void TcpSession::update_perf_base_state(char newState)
         DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::FLOW_STATE_CHANGE, nullptr, flow);
 }
 
-bool TcpSession::flow_exceeds_config_thresholds(TcpSegmentDescriptor& tsd)
+void TcpSession::check_flow_missed_3whs()
 {
-    TcpStreamTracker* listener = tsd.get_listener();
+    if ( flow->two_way_traffic() )
+        return;
 
-    if ( listener->get_flush_policy() == STREAM_FLPOLICY_IGNORE )
-        return true;
+    if ( PacketTracer::is_active() )
+        PacketTracer::log("Stream TCP did not see the complete 3-Way Handshake. "
+        "Not all normalizations will be in effect\n");
 
-    // FIXIT-M any discards must be counted and in many cases alerted as well
-    // (count all but alert at most once per flow)
-    // three cases in this function; look for others
-    if ( ( tcp_config->flags & STREAM_CONFIG_NO_ASYNC_REASSEMBLY ) && !flow->two_way_traffic() )
-        return true;
-
-    if ( tcp_config->max_consec_small_segs )
-    {
-        if ( tsd.get_len() >= tcp_config->max_consec_small_seg_size )
-            listener->small_seg_count = 0;
-
-        else if ( ++listener->small_seg_count == tcp_config->max_consec_small_segs )
-            tel.set_tcp_event(EVENT_MAX_SMALL_SEGS_EXCEEDED);
-    }
-
-    if ( tcp_config->max_queued_bytes )
-    {
-        int32_t space_left =
-            tcp_config->max_queued_bytes - listener->reassembler.get_seg_bytes_total();
-
-        if ( space_left < (int32_t)tsd.get_len() )
-        {
-            tcpStats.exceeded_max_bytes++;
-            bool inline_mode = tsd.is_nap_policy_inline();
-            bool ret_val = true;
-
-            if ( space_left > 0 )
-                ret_val = !inline_mode; // For partial trim, reassemble only if we can force an inject
-            else
-                space_left = 0;
-
-            if ( inline_mode )
-            {
-                if ( listener->max_queue_exceeded == MQ_NONE )
-                {
-                    listener->max_queue_seq_nxt = tsd.get_seq() + space_left;
-                    listener->max_queue_exceeded = MQ_BYTES;
-                }
-                else
-                    (const_cast<tcp::TCPHdr*>(tsd.get_pkt()->ptrs.tcph))->set_seq(listener->max_queue_seq_nxt);
-            }
-
-            if( listener->reassembler.segment_within_seglist_window(tsd) )
-                return false;
-
-            if ( inline_mode || listener->normalizer.get_trim_win() == NORM_MODE_ON)
-            {
-                tel.set_tcp_event(EVENT_MAX_QUEUED_BYTES_EXCEEDED);
-                listener->normalizer.log_drop_reason(tsd, inline_mode, "stream", 
-                "Stream: Flow exceeded the configured max byte threshold (" + std::to_string(tcp_config->max_queued_bytes) +
-                "). You may want to adjust the 'max_bytes' parameter in the NAP policy" 
-                " to a higher value, or '0' for unlimited.\n");
-            }
-
-            listener->normalizer.trim_win_payload(tsd, space_left, inline_mode);
-            return ret_val;
-        }
-        else if ( listener->max_queue_exceeded == MQ_BYTES )
-            listener->max_queue_exceeded = MQ_NONE;
-    }
-
-    if ( tcp_config->max_queued_segs )
-    {
-        if ( listener->reassembler.get_seg_count() + 1 > tcp_config->max_queued_segs )
-        {
-            tcpStats.exceeded_max_segs++;
-            bool inline_mode = tsd.is_nap_policy_inline();
-
-            if ( inline_mode )
-            {
-                if ( listener->max_queue_exceeded == MQ_NONE )
-                {
-                    listener->max_queue_seq_nxt = tsd.get_seq();
-                    listener->max_queue_exceeded = MQ_SEGS;
-                }
-                else
-                    (const_cast<tcp::TCPHdr*>(tsd.get_pkt()->ptrs.tcph))->set_seq(listener->max_queue_seq_nxt);
-            }
-
-            if( listener->reassembler.segment_within_seglist_window(tsd) )
-                return false;
-
-            if ( inline_mode || listener->normalizer.get_trim_win() == NORM_MODE_ON)
-            {
-                tel.set_tcp_event(EVENT_MAX_QUEUED_SEGS_EXCEEDED);
-                listener->normalizer.log_drop_reason(tsd, inline_mode, "stream",
-                "Stream: Flow exceeded the configured max segment threshold (" + std::to_string(tcp_config->max_queued_segs) + 
-                "). You may want to adjust the 'max_segments' parameter in the NAP policy" 
-                " to a higher value, or '0' for unlimited.\n");
-            }
-
-            listener->normalizer.trim_win_payload(tsd, 0, inline_mode);
-            return true;
-        }
-        else if ( listener->max_queue_exceeded == MQ_SEGS )
-            listener->max_queue_exceeded = MQ_NONE;
-    }
-
-    return false;
+    client.normalizer.init(StreamPolicy::MISSED_3WHS, this, &client, &server);
+    server.normalizer.init(StreamPolicy::MISSED_3WHS, this, &server, &client);
 }
 
 void TcpSession::update_stream_order(const TcpSegmentDescriptor& tsd, bool aligned)
@@ -472,6 +380,12 @@ void TcpSession::set_os_policy()
 
     client.normalizer.init(client_os_policy, this, &client, &server);
     server.normalizer.init(server_os_policy, this, &server, &client);
+
+    if (Normalize_GetMode(NORM_TCP_IPS) == NORM_MODE_ON)
+    {
+        client_os_policy = StreamPolicy::OS_FIRST;
+        server_os_policy = StreamPolicy::OS_FIRST;
+    }
 
     client.reassembler.init(this, &client, client_os_policy, false);
     server.reassembler.init(this, &server, server_os_policy, true);
@@ -640,6 +554,8 @@ void TcpSession::handle_data_on_syn(TcpSegmentDescriptor& tsd)
 
     if ( !listener->normalizer.trim_syn_payload(tsd) )
     {
+        // skip the byte in sequence space for SYN...data starts at the next byte
+        tsd.update_seq(1);
         handle_data_segment(tsd);
         tel.set_tcp_event(EVENT_DATA_ON_SYN);
     }
@@ -726,6 +642,9 @@ void TcpSession::check_for_session_hijack(TcpSegmentDescriptor& tsd)
 
 bool TcpSession::check_for_window_slam(TcpSegmentDescriptor& tsd)
 {
+    if (Stream::is_midstream(tsd.get_flow()) or !flow->two_way_traffic())
+        return false;
+
     TcpStreamTracker* listener = tsd.get_listener();
 
     if ( tcp_config->max_window && (tsd.get_wnd() > tcp_config->max_window) )
@@ -738,8 +657,7 @@ bool TcpSession::check_for_window_slam(TcpSegmentDescriptor& tsd)
     }
     else if ( tsd.is_packet_from_client() && (tsd.get_wnd() <= SLAM_MAX)
         && (tsd.get_ack() == listener->get_iss() + 1)
-        && !(tsd.get_tcph()->is_fin() || tsd.get_tcph()->is_rst())
-        && !(flow->get_session_flags() & SSNFLAG_MIDSTREAM))
+        && !(tsd.get_tcph()->is_fin() || tsd.get_tcph()->is_rst()))
     {
         /* got a window slam alert! */
         tel.set_tcp_event(EVENT_WINDOW_SLAM);
@@ -757,6 +675,133 @@ void TcpSession::mark_packet_for_drop(TcpSegmentDescriptor& tsd)
     set_pkt_action_flag(ACTION_BAD_PKT);
 }
 
+int32_t TcpSession::kickstart_asymmetric_flow(const TcpSegmentDescriptor& tsd, TcpStreamTracker* listener)
+{
+    listener->reassembler.reset_asymmetric_flow_reassembly();
+    listener->reassembler.flush_on_data_policy(tsd.get_pkt());
+
+    int32_t space_left =
+        tcp_config->max_queued_bytes - listener->reassembler.get_seg_bytes_total();
+
+    if ( listener->get_tcp_state() == TcpStreamTracker::TCP_MID_STREAM_RECV )
+    {
+        listener->set_tcp_state(TcpStreamTracker::TCP_ESTABLISHED);
+        if (PacketTracer::is_active())
+            PacketTracer::log("Stream: Kickstart of midstream asymmetric flow! Seglist queue space: %u\n",
+                space_left );
+    }
+    else
+    {
+        if (PacketTracer::is_active())
+            PacketTracer::log("Stream: Kickstart of asymmetric flow! Seglist queue space: %u\n",
+                space_left );
+    }
+
+    return space_left;
+}
+
+bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, TcpStreamTracker* listener)
+{
+    // if this packet fits within the current queue limit window then it's good
+    if( listener->reassembler.segment_within_seglist_window(tsd) )
+        return false;
+
+    bool inline_mode = tsd.is_nap_policy_inline();
+
+    if ( tcp_config->max_queued_bytes )
+    {
+        int32_t space_left =
+            tcp_config->max_queued_bytes - listener->reassembler.get_seg_bytes_total();
+
+        if ( space_left < (int32_t)tsd.get_len() )
+        {
+            tcpStats.exceeded_max_bytes++;
+            bool ret_val = true;
+
+            // if inline and this is an asymmetric flow then skip over any seglist holes
+            // and flush to free up seglist space
+            if ( tsd.is_ips_policy_inline()  && !tsd.get_pkt()->flow->two_way_traffic() )
+            {
+                space_left = kickstart_asymmetric_flow(tsd, listener);
+                if ( space_left >= (int32_t)tsd.get_len() )
+                    return false;
+            }
+
+            if ( space_left > 0 )
+                ret_val = !inline_mode; // For partial trim, reassemble only if we can force an inject
+            else
+                space_left = 0;
+
+            if ( inline_mode || listener->normalizer.get_trim_win() == NORM_MODE_ON)
+            {
+                // FIXIT-M - only alert once per threshold exceeded event
+                tel.set_tcp_event(EVENT_MAX_QUEUED_BYTES_EXCEEDED);
+                listener->normalizer.log_drop_reason(tsd, inline_mode, "stream",
+                    "Stream: Flow exceeded the configured max byte threshold (" + std::to_string(tcp_config->max_queued_bytes) +
+                    "). You may want to adjust the 'max_bytes' parameter in the NAP policy"
+                    " to a higher value, or '0' for unlimited.\n");
+            }
+
+            listener->normalizer.trim_win_payload(tsd, space_left, inline_mode);
+            return ret_val;
+        }
+    }
+
+    if ( tcp_config->max_queued_segs )
+    {
+        if ( listener->reassembler.get_seg_count() + 1 > tcp_config->max_queued_segs )
+        {
+            tcpStats.exceeded_max_segs++;
+
+            // if inline and this is an asymmetric flow then skip over any seglist holes
+            // and flush to free up seglist space
+            if ( tsd.is_ips_policy_inline() && !tsd.get_pkt()->flow->two_way_traffic() )
+            {
+                kickstart_asymmetric_flow(tsd, listener);
+                if ( listener->reassembler.get_seg_count() + 1 <= tcp_config->max_queued_segs )
+                    return false;
+            }
+
+            if ( inline_mode || listener->normalizer.get_trim_win() == NORM_MODE_ON)
+            {
+                // FIXIT-M - only alert once per threshold exceeded event
+                tel.set_tcp_event(EVENT_MAX_QUEUED_SEGS_EXCEEDED);
+                listener->normalizer.log_drop_reason(tsd, inline_mode, "stream",
+                    "Stream: Flow exceeded the configured max segment threshold (" + std::to_string(tcp_config->max_queued_segs) +
+                    "). You may want to adjust the 'max_segments' parameter in the NAP policy"
+                    " to a higher value, or '0' for unlimited.\n");
+            }
+
+            listener->normalizer.trim_win_payload(tsd, 0, inline_mode);
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool TcpSession::filter_packet_for_reassembly(TcpSegmentDescriptor& tsd, TcpStreamTracker* listener)
+{
+    if ( tsd.are_packet_flags_set(PKT_IGNORE)
+        or listener->get_flush_policy() == STREAM_FLPOLICY_IGNORE
+        or ( ( tcp_config->flags & STREAM_CONFIG_NO_ASYNC_REASSEMBLY ) && !flow->two_way_traffic() ) )
+        return false;
+
+    return !check_reassembly_queue_thresholds(tsd, listener);
+}
+
+void TcpSession::check_small_segment_threshold(const TcpSegmentDescriptor &tsd, TcpStreamTracker *listener)
+{
+    // alert if small segments threshold is exceeded
+    if (tcp_config->max_consec_small_segs)
+    {
+        if (tsd.get_len() >= tcp_config->max_consec_small_seg_size)
+            listener->small_seg_count = 0;
+        else if (++listener->small_seg_count == tcp_config->max_consec_small_segs)
+            tel.set_tcp_event(EVENT_MAX_SMALL_SEGS_EXCEEDED);
+    }
+}
+
 void TcpSession::handle_data_segment(TcpSegmentDescriptor& tsd, bool flush)
 {
     TcpStreamTracker* listener = tsd.get_listener();
@@ -770,10 +815,9 @@ void TcpSession::handle_data_segment(TcpSegmentDescriptor& tsd, bool flush)
         else
             server.set_tcp_options_len(tcp_options_len);
 
-        uint32_t seq = tsd.get_tcph()->is_syn() ? tsd.get_seq() + 1 : tsd.get_seq();
-        bool stream_is_inorder = ( seq == listener->rcv_nxt );
+        bool stream_is_inorder = ( tsd.get_seq() == listener->rcv_nxt );
 
-        int rc =  listener->normalizer.apply_normalizations(tsd, seq, stream_is_inorder);
+        int rc =  listener->normalizer.apply_normalizations(tsd, tsd.get_seq(), stream_is_inorder);
         switch ( rc )
         {
         case TcpNormalizer::NORM_OK:
@@ -781,9 +825,10 @@ void TcpSession::handle_data_segment(TcpSegmentDescriptor& tsd, bool flush)
                 listener->rcv_nxt = tsd.get_end_seq();
 
             update_stream_order(tsd, stream_is_inorder);
+            check_small_segment_threshold(tsd, listener);
 
             // don't queue data if we are ignoring or queue thresholds are exceeded
-            if ( !tsd.are_packet_flags_set(PKT_IGNORE) and !flow_exceeds_config_thresholds(tsd) )
+            if ( filter_packet_for_reassembly(tsd, listener) )
             {
                 set_packet_header_foo(tsd);
                 listener->reassembler.queue_packet_for_reassembly(tsd);
@@ -1033,6 +1078,13 @@ void TcpSession::init_tcp_packet_analysis(TcpSegmentDescriptor& tsd)
 
             client.init_flush_policy();
             server.init_flush_policy();
+
+            if ( tsd.is_packet_from_client() ) // Important if the 3-way handshake's ACK contains data
+                flow->set_session_flags(SSNFLAG_SEEN_CLIENT);
+            else
+                flow->set_session_flags(SSNFLAG_SEEN_SERVER);
+
+            check_flow_missed_3whs();
 
             set_no_ack(tcp_config->no_ack);
         }

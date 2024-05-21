@@ -252,8 +252,7 @@ const AppIdSessionApi* AppIdApi::get_appid_session_api(const Flow& flow) const
 
 bool AppIdApi::is_inspection_needed(const Inspector& inspector) const
 {
-    AppIdInspector* appid_inspector = (AppIdInspector*) InspectorManager::get_inspector(MOD_NAME,
-        true);
+    AppIdInspector* appid_inspector = (AppIdInspector*)InspectorManager::get_inspector(MOD_NAME, true);
 
     if (!appid_inspector)
         return false;
@@ -269,9 +268,19 @@ bool AppIdApi::is_inspection_needed(const Inspector& inspector) const
 
 const char* AppIdApi::get_appid_detector_directory() const
 {
-    AppIdInspector* inspector = (AppIdInspector*) InspectorManager::get_inspector(MOD_NAME, true);
+    AppIdInspector* inspector = (AppIdInspector*)InspectorManager::get_inspector(MOD_NAME, true);
     if (!inspector)
         return "";
 
     return inspector->get_config().app_detector_dir;
+}
+
+void AppIdApi::reset_appid_cpu_profiler_stats()
+{
+    AppIdInspector* inspector = (AppIdInspector*) InspectorManager::get_inspector(MOD_NAME);
+    if (!inspector)
+        return;
+    const AppIdContext& ctxt = inspector->get_ctxt();
+    OdpContext& odp_ctxt = ctxt.get_odp_ctxt();
+    odp_ctxt.get_appid_cpu_profiler_mgr().cleanup_appid_cpu_profiler_table();
 }

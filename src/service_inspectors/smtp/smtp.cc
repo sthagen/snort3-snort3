@@ -25,7 +25,6 @@
 #include <string>
 
 #include "detection/detection_engine.h"
-#include "detection/detection_util.h"
 #include "js_norm/js_pdf_norm.h"
 #include "log/messages.h"
 #include "log/unified2.h"
@@ -49,6 +48,13 @@
 #endif
 
 using namespace snort;
+
+// Indices in the buffer array exposed by InspectApi
+// Must remain synchronized with smtp_bufs
+enum SmtpBufId
+{
+    SMTP_FILE_DATA_ID = 1, SMTP_VBA_DATA_ID, SMTP_JS_DATA_ID
+};
 
 THREAD_LOCAL ProfileStats smtpPerfStats;
 THREAD_LOCAL SmtpStats smtpstats;
@@ -1532,7 +1538,8 @@ public:
 
     void ProcessSmtpCmdsList(const SmtpCmd*);
 
-    bool get_fp_buf(snort::InspectionBuffer::Type, snort::Packet*, snort::InspectionBuffer&) override;
+    bool get_buf(snort::InspectionBuffer::Type, snort::Packet*, snort::InspectionBuffer&) override;
+    bool get_buf(unsigned id, snort::Packet* p, snort::InspectionBuffer& b) override;
 
 private:
     SmtpProtoConf* config;
@@ -1624,7 +1631,7 @@ void Smtp::ProcessSmtpCmdsList(const SmtpCmd* sc)
         config->cmd_config[id].max_line_len = sc->number;
 }
 
-bool Smtp::get_fp_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)
+bool Smtp::get_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b)
 {
     SMTPData* smtp_ssn = get_session_data(p->flow);
 
@@ -1666,6 +1673,21 @@ bool Smtp::get_fp_buf(InspectionBuffer::Type ibt, Packet* p, InspectionBuffer& b
     b.len = dst_len;
 
     return dst && dst_len;
+}
+
+bool Smtp::get_buf(unsigned id, snort::Packet* p, snort::InspectionBuffer& b)
+{
+    switch (id)
+    {
+    case SMTP_FILE_DATA_ID:
+        return false;
+    case SMTP_VBA_DATA_ID:
+        return get_buf(InspectionBuffer::IBT_VBA, p, b);
+    case SMTP_JS_DATA_ID:
+        return get_buf(InspectionBuffer::IBT_JS_DATA, p, b);
+    default:
+        return false;
+    }
 }
 
 //-------------------------------------------------------------------------

@@ -25,7 +25,6 @@
 
 #include "tcp_segment_node.h"
 
-#include "main/thread.h"
 #include "utils/util.h"
 
 #include "segment_overlap_editor.h"
@@ -93,7 +92,7 @@ TcpSegmentNode* TcpSegmentNode::create(
 
     tsn->prev = tsn->next = nullptr;
     tsn->i_seq = tsn->c_seq = 0;
-    tsn->offset = 0;
+    tsn->offset = tsn->o_offset = 0;
     tsn->ts = 0;
 
     return tsn;

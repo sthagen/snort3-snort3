@@ -34,27 +34,28 @@
 #include <iostream>
 #include <iomanip>
 
-#include "hash/hashes.h"
+#include "detection/fp_detect.h"
 #include "framework/data_bus.h"
-#include "main/snort_config.h"
 #include "managers/inspector_manager.h"
-#include "packet_tracer/packet_tracer.h"
+#include "hash/hashes.h"
+#include "helpers/utf.h"
+#include "main/snort_config.h"
+#include "packet_io/packet_tracer.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
 #include "pub_sub/intrinsic_event_ids.h"
 #include "utils/util.h"
-#include "utils/util_utf.h"
 
 #include "file_api.h"
+#include "file_cache.h"
 #include "file_capture.h"
 #include "file_config.h"
-#include "file_cache.h"
 #include "file_flows.h"
-#include "file_service.h"
-#include "file_segment.h"
-#include "file_stats.h"
+#include "file_inspect.h"
 #include "file_module.h"
-#include "detection/fp_detect.h"
+#include "file_segment.h"
+#include "file_service.h"
+#include "file_stats.h"
 
 using namespace snort;
 
@@ -336,10 +337,11 @@ FileContext::~FileContext ()
 {
     if (file_signature_context)
         snort_free(file_signature_context);
+
     if (file_capture)
         stop_file_capture();
-    if (file_segments)
-        delete file_segments;
+
+    delete file_segments;
     InspectorManager::release(inspector);
 }
 
@@ -641,7 +643,8 @@ void FileContext::find_file_type_from_ips(Packet* pkt, const uint8_t* file_data,
     if ((int64_t)processed_bytes + data_size >= config->file_type_depth)
     {
         data_size = config->file_type_depth - processed_bytes;
-        assert(data_size > 0);
+        if (data_size < 0)
+	        return;
         depth_exhausted = true;
     }
     const FileConfig* const conf = get_file_config();
@@ -679,7 +682,8 @@ void FileContext::process_file_type(Packet* pkt,const uint8_t* file_data, int da
     FilePosition position)
 {
     /* file type already found and no magics to continue */
-    find_file_type_from_ips(pkt, file_data, data_size, position);
+    if (SNORT_FILE_TYPE_CONTINUE == file_type_id)
+        find_file_type_from_ips(pkt, file_data, data_size, position);
 }
 
 void FileContext::process_file_signature_sha256(const uint8_t* file_data, int data_size,

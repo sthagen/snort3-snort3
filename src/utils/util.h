@@ -27,6 +27,7 @@
 #if defined(__linux__)
 #include <sys/syscall.h>
 #endif
+#include <sys/stat.h>
 #include <sys/time.h>
 #include <unistd.h>
 
@@ -62,23 +63,8 @@
 #define SECONDS_PER_HOUR  3600  /* number of seconds in a hour */
 #define SECONDS_PER_MIN     60     /* number of seconds in a minute */
 
-void StoreSnortInfoStrings();
-int DisplayBanner();
-int gmt2local(time_t);
-std::string read_infile(const char* key, const char* fname);
-void CleanupProtoNames();
-void CreatePidFile(pid_t);
-void ClosePidFile();
-bool SetUidGid(int, int);
-void InitGroups(int, int);
-bool EnterChroot(std::string& root_dir, std::string& log_dir);
-void InitProtoNames();
 unsigned int get_random_seed();
 bool get_file_size(const std::string&, size_t&);
-
-#if defined(NOCOREFILE)
-void SetNoCores();
-#endif
 
 namespace
 {
@@ -122,9 +108,6 @@ inline pid_t gettid()
 
 namespace snort
 {
-// FIXIT-M provide getter function to for standardized access into the protocol_names array
-SO_PUBLIC extern char** protocol_names;
-
 SO_PUBLIC const char* get_error(int errnum);
 SO_PUBLIC char* snort_strdup(const char*);
 SO_PUBLIC char* snort_strndup(const char*, size_t);
@@ -132,6 +115,9 @@ SO_PUBLIC void ts_print(const struct timeval*, char*, bool yyyymmdd = false);
 void uint8_to_printable_str(const uint8_t* buff, unsigned len, std::string& print_str);
 SO_PUBLIC void str_to_int_vector(const std::string& s, char delim, std::vector<uint32_t>& elems);
 SO_PUBLIC std::string int_vector_to_str(const std::vector<uint32_t>& elems, char delim = ',');
+SO_PUBLIC bool rotate_file_for_max_size(const char* file_owner, const char* old_file,
+    FILE* old_fh, uint32_t max_file_size);
+SO_PUBLIC bool check_file_size(FILE* fh, uint64_t max_file_size);
 }
 
 #endif

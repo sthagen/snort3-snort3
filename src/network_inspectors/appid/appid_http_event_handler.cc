@@ -30,7 +30,10 @@
 #include <cassert>
 
 #include "detection/detection_engine.h"
+#include "flow/stream_flow.h"
+
 #include "app_info_table.h"
+#include "app_cpu_profile_table.h"
 #include "appid_debug.h"
 #include "appid_discovery.h"
 #include "appid_http_session.h"
@@ -80,6 +83,12 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
         !http_event->get_is_httpx())
         return;
 
+    bool is_appid_cpu_profiling_running = (asd->get_odp_ctxt().is_appid_cpu_profiler_running());
+    Stopwatch<SnortClock> per_appid_event_cpu_timer;
+
+    if (is_appid_cpu_profiling_running)
+        per_appid_event_cpu_timer.start();
+    
     if (appidDebug->is_enabled() and !is_debug_active)
         appidDebug->activate(flow, asd, inspector.get_ctxt().config.log_all_sessions);
 
@@ -199,5 +208,10 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
 
     asd->publish_appid_event(change_bits, *p, http_event->get_is_httpx(),
         asd->get_api().get_hsessions_size() - 1);
-}
 
+    if (is_appid_cpu_profiling_running)
+    {
+        per_appid_event_cpu_timer.stop();
+        asd->stats.processing_time += TO_USECS(per_appid_event_cpu_timer.get());
+    }
+}

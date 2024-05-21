@@ -31,11 +31,14 @@
 #include "detection/detection_engine.h"
 #include "log/text_log.h"
 #include "main/snort_config.h"
+#include "managers/codec_manager.h"
 #include "packet_io/active.h"
+#include "packet_io/packet_tracer.h"
 #include "packet_io/sfdaq.h"
 #include "profiler/profiler_defs.h"
 #include "stream/stream.h"
 #include "trace/trace_api.h"
+#include "utils/stats.h"
 
 #include "eth.h"
 #include "icmp4.h"
@@ -44,17 +47,17 @@
 using namespace snort;
 
 THREAD_LOCAL ProfileStats decodePerfStats;
+uint8_t PacketManager::max_layers = DEFAULT_LAYERMAX;
+
+ProtocolIndex PacketManager::proto_idx(ProtocolId prot_id)
+{ return CodecManager::s_proto_map[to_utype(prot_id)]; }
 
 // Decoding statistics
 
-// this may be my longer member declaration ... ever
-THREAD_LOCAL std::array<PegCount,PacketManager::stat_offset +
-CodecManager::s_protocols.size()> PacketManager::s_stats {
-    { 0 }
-};
+static THREAD_LOCAL std::array<PegCount, PacketManager::stat_offset + num_protocol_idx> s_stats
+{ { 0 } };
 
-//PacketManager::s_stats{{0}};
-std::array<PegCount, PacketManager::s_stats.size()> PacketManager::g_stats;
+static std::array<PegCount, s_stats.size()> g_stats;
 
 // names which will be printed for the first three statistics
 // in s_stats/g_stats
@@ -71,15 +74,14 @@ const std::array<const char*, PacketManager::stat_offset> PacketManager::stat_na
 // Encoder Foo
 static THREAD_LOCAL std::array<uint8_t, Codec::PKT_MAX>* s_pkt;
 
+void PacketManager::global_init(uint8_t max)
+{ max_layers = max; }
+
 void PacketManager::thread_init()
-{
-    s_pkt = new std::array<uint8_t, Codec::PKT_MAX>{ {0} };
-}
+{ s_pkt = new std::array<uint8_t, Codec::PKT_MAX>{ {0} }; }
 
 void PacketManager::thread_term()
-{
-    delete s_pkt;
-}
+{ delete s_pkt; }
 
 //-------------------------------------------------------------------------
 // Private helper functions
@@ -88,7 +90,7 @@ void PacketManager::thread_term()
 inline bool PacketManager::push_layer(Packet* p, CodecData& codec_data, ProtocolId prot_id,
     const uint8_t* hdr_start, uint32_t len)
 {
-    if ( p->num_layers == CodecManager::get_max_layers() )
+    if ( p->num_layers == max_layers )
     {
         if (!(codec_data.codec_flags & CODEC_LAYERS_EXCEEDED))
         {
@@ -171,6 +173,7 @@ void PacketManager::handle_decode_failure(Packet* p, RawData& raw, const CodecDa
     // if the codec exists, it failed
     if (CodecManager::s_proto_map[to_utype(prev_prot_id)])
     {
+        PacketTracer::log_msg_only("Packet %" PRIu64": decoding error\n", p->context->packet_number);
         s_stats[discards]++;
     }
     else
@@ -345,7 +348,13 @@ void PacketManager::decode(
 
         // Shrink the buffer of undecoded data
         const uint16_t curr_lyr_len = codec_data.lyr_len + codec_data.invalid_bytes;
-        assert(curr_lyr_len <= raw.len);
+        if (curr_lyr_len > raw.len)
+        {
+            p->ptrs.decode_flags |= DECODE_ERR_LEN;
+            PacketTracer::log("Packet %" PRIu64": current layer len %d > raw length %d\n", p->context->packet_number,
+                curr_lyr_len, raw.len);
+            return;
+        }
         raw.len -= curr_lyr_len;
         raw.data += curr_lyr_len;
 

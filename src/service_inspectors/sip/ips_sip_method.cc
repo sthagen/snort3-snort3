@@ -102,7 +102,7 @@ IpsOption::EvalStatus SipMethodOption::eval(Cursor&, Packet* p)
 {
     RuleProfile profile(sipMethodRuleOptionPerfStats);  // cppcheck-suppress unreadVariable
 
-    if ( !p->flow )
+    if ((!p->has_tcp_data() && !p->is_udp()) || !p->flow || !p->dsize)
         return NO_MATCH;
 
     SIPData* sd = get_sip_session_data(p->flow);
@@ -210,7 +210,7 @@ static void mod_dtor(Module* m)
     delete m;
 }
 
-static IpsOption* sip_method_ctor(Module* p, OptTreeNode*)
+static IpsOption* sip_method_ctor(Module* p, IpsInfo&)
 {
     SipMethodModule* m = (SipMethodModule*)p;
     return new SipMethodOption(m->methods);

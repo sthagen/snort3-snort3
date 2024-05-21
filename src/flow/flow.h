@@ -39,10 +39,10 @@
 #include "framework/data_bus.h"
 #include "framework/decode_data.h"
 #include "framework/inspector.h"
-#include "network_inspectors/appid/application_ids.h"
 #include "protocols/layer.h"
 #include "sfip/sf_ip.h"
 #include "target_based/snort_protocols.h"
+#include "time/clock_defs.h"
 
 #define SSNFLAG_SEEN_CLIENT         0x00000001
 #define SSNFLAG_SEEN_SENDER         0x00000001
@@ -109,7 +109,6 @@ namespace snort
 {
 class FlowHAState;
 struct FlowKey;
-class IpsContext;
 struct Packet;
 
 typedef void (* StreamAppDataFree)(void*);
@@ -156,20 +155,6 @@ struct LwState
 
     char direction;
     char ignore_direction;
-};
-
-class SO_PUBLIC StreamFlowIntf
-{
-public:
-    virtual FlowData* get_stream_flow_data(const Flow* flow) = 0;
-    virtual void set_stream_flow_data(Flow* flow, FlowData* flow_data) = 0;
-    virtual void get_stream_id(const Flow* flow, int64_t& stream_id) = 0;
-    virtual void* get_hi_msg_section(const Flow* flow) = 0;
-    virtual void set_hi_msg_section(Flow* flow, void* section) = 0;
-    virtual AppId get_appid_from_stream(const Flow*) { return APP_ID_NONE; }
-    // Stream based flows should override this interface to return parent flow
-    // when child flow is passed as input
-    virtual Flow* get_stream_parent_flow(Flow* cflow) { return cflow; }
 };
 
 // this struct is organized by member size for compactness
@@ -293,7 +278,13 @@ public:
     { return (flow_state <= FlowState::INSPECT) and !is_inspection_disabled(); }
 
     void set_state(FlowState fs)
-    { flow_state = fs; }
+    { 
+        flow_state = fs;
+        if (fs > FlowState::INSPECT)
+        {
+            inspected_packet_count = flowstats.client_pkts + flowstats.server_pkts;
+        }
+    }
 
     void set_client(Inspector* ins)
     {
@@ -410,9 +401,31 @@ public:
 
     bool trust_is_deferred() const
     { return deferred_trust.is_deferred(); }
- 
+
     void set_idle_timeout(unsigned timeout)
-    { idle_timeout = timeout; }  
+    { idle_timeout = timeout; }
+
+    uint16_t get_inspected_packet_count() const
+    { return inspected_packet_count ? inspected_packet_count : (flowstats.client_pkts + flowstats.server_pkts); }
+
+    void add_inspection_duration(const uint64_t& duration)
+    {
+        if (inspected_packet_count != 0)
+            return;
+
+        inspection_duration += duration;
+    }
+
+    uint64_t get_inspection_duration() const
+    {
+#ifdef USE_TSC_CLOCK
+        return clock_usecs(inspection_duration.load());
+#else
+        return inspection_duration.load();
+#endif
+    }
+
+    uint64_t fetch_add_inspection_duration();
 
 public:  // FIXIT-M privatize if possible
     // fields are organized by initialization and size to minimize
@@ -445,7 +458,7 @@ public:  // FIXIT-M privatize if possible
     IpsContextChain context_chain;
     FlowData* current_flow_data = nullptr;
     FlowStats flowstats = {};
-    StreamFlowIntf* stream_intf = nullptr;
+    class StreamFlowIntf* stream_intf = nullptr;
 
     SfIp client_ip = {};
     SfIp server_ip = {};
@@ -518,6 +531,8 @@ public:  // FIXIT-M privatize if possible
 
 private:
     void clean();
+    std::atomic_ullong inspection_duration{0};
+    uint16_t inspected_packet_count{0};
 };
 
 inline void Flow::set_to_client_detection(bool enable)

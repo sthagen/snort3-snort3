@@ -144,6 +144,8 @@ static const char GOOGLE_TB_PATTERN[] = "toolbarqueries.google.com";
 
 #define COMPATIBLE_BROWSER_STRING " (Compat)"
 
+namespace
+{
 struct MatchedPatterns
 {
     DetectorHTTPPattern* mpattern;
@@ -152,6 +154,7 @@ struct MatchedPatterns
                           // matching character.
     MatchedPatterns* next;
 };
+}
 
 static DetectorHTTPPatterns static_content_type_patterns =
 {
@@ -491,7 +494,7 @@ int HttpPatternMatchers::add_mlmp_pattern(tMlmpTree* matcher, DetectorHTTPPatter
 
     tMlmpPattern patterns[PATTERN_PART_MAX];
     int num_patterns = parse_multiple_http_patterns((const char*)pattern.pattern, patterns,
-        PATTERN_PART_MAX, 0);
+        PATTERN_PART_MAX, 0, true);
     patterns[num_patterns].pattern = nullptr;
     return mlmpAddPattern(matcher, patterns, detector);
 }
@@ -531,10 +534,10 @@ int HttpPatternMatchers::add_mlmp_pattern(tMlmpTree* matcher, DetectorAppUrlPatt
 
     tMlmpPattern patterns[PATTERN_PART_MAX];
     int num_patterns = parse_multiple_http_patterns((const char*)pattern.patterns.host.pattern,
-        patterns, PATTERN_PART_MAX, 0);
+        patterns, PATTERN_PART_MAX, 0, pattern.is_literal);
     if (pattern.patterns.path.pattern)
         num_patterns += parse_multiple_http_patterns((const char*)pattern.patterns.path.pattern,
-            patterns + num_patterns, PATTERN_PART_MAX - num_patterns, 1);
+            patterns + num_patterns, PATTERN_PART_MAX - num_patterns, 1, pattern.is_literal);
 
     patterns[num_patterns].pattern = nullptr;
     return mlmpAddPattern(matcher, patterns, detector);
@@ -1655,7 +1658,7 @@ void HttpPatternMatchers::get_server_vendor_version(const char* data, int len, c
 }
 
 uint32_t HttpPatternMatchers::parse_multiple_http_patterns(const char* pattern,
-    tMlmpPattern* parts, uint32_t numPartLimit, int level)
+    tMlmpPattern* parts, uint32_t numPartLimit, int level, bool is_literal)
 {
     uint32_t partNum = 0;
 
@@ -1679,6 +1682,7 @@ uint32_t HttpPatternMatchers::parse_multiple_http_patterns(const char* pattern,
             tmp = nullptr;
         }
         parts[partNum].level = level;
+        parts[partNum].is_literal = is_literal;
 
         if ( !parts[partNum].pattern )
         {

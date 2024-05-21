@@ -24,11 +24,12 @@
 #include "packet.h"
 
 #include "detection/ips_context.h"
-#include "flow/expect_cache.h"
+#include "flow/expect_flow.h"
+#include "flow/flow_key.h"
 #include "framework/endianness.h"
 #include "log/obfuscator.h"
+#include "main/snort_config.h"
 #include "packet_io/active.h"
-#include "managers/codec_manager.h"
 
 #include "packet_manager.h"
 #include "vlan.h"
@@ -38,7 +39,7 @@ namespace snort
 {
 Packet::Packet(bool packet_data)
 {
-    layers = new Layer[CodecManager::get_max_layers()];
+    layers = new Layer[PacketManager::get_max_layers()];
     allocated = packet_data;
 
     if (!packet_data)
@@ -91,6 +92,7 @@ void Packet::reset()
     vlan_idx = 0;
     filtering_state.clear();
     sect = PS_NONE;
+    inspection_started_timestamp = 0;
 }
 
 void Packet::release_helpers()

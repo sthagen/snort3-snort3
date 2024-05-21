@@ -21,35 +21,80 @@
 #include "config.h"
 #endif
 
+#include <cassert>
+
 #include "framework/ips_action.h"
 #include "framework/module.h"
 #include "protocols/packet.h"
 
-#include "actions.h"
+#include "actions_module.h"
 
 using namespace snort;
 
-#define s_name "log"
-
-#define s_help \
+#define action_name "log"
+#define action_help \
     "log the current packet"
+
+#define module_name "log"
+#define module_help \
+    "manage the counters for the log action"
+
+static THREAD_LOCAL struct LogStats
+{
+    PegCount log;
+} log_stats;
+
+const PegInfo log_pegs[] =
+{
+    { CountType::SUM, "log", "number of packets that matched an IPS log rule" },
+    { CountType::END, nullptr, nullptr }
+};
 
 //-------------------------------------------------------------------------
 class LogAction : public IpsAction
 {
 public:
-    LogAction() : IpsAction(s_name, nullptr) { }
+    LogAction() : IpsAction(action_name, nullptr) { }
 
-    void exec(Packet*, const OptTreeNode* otn) override;
+    void exec(Packet*, const ActInfo&) override;
 };
 
-void LogAction::exec(Packet* p, const OptTreeNode* otn)
+void LogAction::exec(Packet* p, const ActInfo& ai)
 {
-    if ( otn )
-        Actions::log(p, otn);
+    if ( log_it(ai) )
+    {
+        log(p, ai);
+        ++log_stats.log;
+    }
 }
 
 //-------------------------------------------------------------------------
+
+class LogActionModule : public Module
+{
+public:
+    LogActionModule() : Module(module_name, module_help)
+    { ActionsModule::add_action(module_name, log_pegs); }
+
+    bool stats_are_aggregated() const override
+    { return true; }
+
+    void show_stats() override
+    { /* These stats are shown by ActionsModule. */ }
+
+    const PegInfo* get_pegs() const override
+    { return log_pegs; }
+
+    PegCount* get_counts() const override
+    { return (PegCount*)&log_stats; }
+};
+
+//-------------------------------------------------------------------------
+static Module* mod_ctor()
+{ return new LogActionModule; }
+
+static void mod_dtor(Module* m)
+{ delete m; }
 
 static IpsAction* log_ctor(Module*)
 { return new LogAction; }
@@ -66,10 +111,10 @@ static ActionApi log_api
         0,
         API_RESERVED,
         API_OPTIONS,
-        s_name,
-        s_help,
-        nullptr,  // mod_ctor
-        nullptr,  // mod_dtor
+        action_name,
+        action_help,
+        mod_ctor,
+        mod_dtor,
     },
     IpsAction::IAP_LOG,
     nullptr,
@@ -80,7 +125,11 @@ static ActionApi log_api
     log_dtor
 };
 
+#ifdef BUILDING_SO
+SO_PUBLIC const BaseApi* snort_plugins[] =
+#else
 const BaseApi* act_log[] =
+#endif
 {
     &log_api.base,
     nullptr

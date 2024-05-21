@@ -28,6 +28,7 @@
 #include "main/snort_config.h"
 #include "profiler/profiler_defs.h"
 #include "stream/paf.h"
+#include "stream/paf_stats.h"
 #include "trace/trace.h"
 
 #include "tcp_trace.h"
@@ -118,6 +119,8 @@ const PegInfo tcp_pegs[] =
     { CountType::SUM, "zero_win_probes", "number of tcp zero window probes" },
     { CountType::SUM, "proxy_mode_flows", "number of flows set to proxy normalization policy" },
     { CountType::SUM, "full_retransmits", "number of fully retransmitted segments" },
+    { CountType::SUM, "flush_on_asymmetric_flow", "number of flushes on asymmetric flows" },
+    { CountType::SUM, "asymmetric_flows", "number of completed flows having one-way traffic only" },
     { CountType::END, nullptr, nullptr }
 };
 
@@ -131,8 +134,6 @@ THREAD_LOCAL TcpStats tcpStats;
     "data sent on stream not accepting data"
 #define STREAM_TCP_BAD_TIMESTAMP_STR \
     "TCP timestamp is outside of PAWS window"
-#define STREAM_TCP_BAD_SEGMENT_STR \
-    "bad segment, adjusted size <= 0 (deprecated)"
 #define STREAM_TCP_WINDOW_TOO_LARGE_STR \
     "window size (after scaling) larger than policy allows"
 #define STREAM_TCP_EXCESSIVE_TCP_OVERLAPS_STR \
@@ -246,7 +247,6 @@ static const RuleMap stream_tcp_rules[] =
     { STREAM_TCP_DATA_ON_SYN, STREAM_TCP_DATA_ON_SYN_STR },
     { STREAM_TCP_DATA_ON_CLOSED, STREAM_TCP_DATA_ON_CLOSED_STR },
     { STREAM_TCP_BAD_TIMESTAMP, STREAM_TCP_BAD_TIMESTAMP_STR },
-    { STREAM_TCP_BAD_SEGMENT, STREAM_TCP_BAD_SEGMENT_STR },
     { STREAM_TCP_WINDOW_TOO_LARGE, STREAM_TCP_WINDOW_TOO_LARGE_STR },
     { STREAM_TCP_EXCESSIVE_TCP_OVERLAPS, STREAM_TCP_EXCESSIVE_TCP_OVERLAPS_STR },
     { STREAM_TCP_DATA_AFTER_RESET, STREAM_TCP_DATA_AFTER_RESET_STR },
@@ -362,10 +362,12 @@ bool StreamTcpModule::set(const char*, Value& v, SnortConfig*)
         else
             config->flags |= STREAM_CONFIG_NO_ASYNC_REASSEMBLY;
     }
+
     else if ( v.is("require_3whs") )
     {
         config->hs_timeout = v.get_int32();
     }
+
     else if ( v.is("show_rebuilt_packets") )
     {
         if ( v.get_bool() )
@@ -373,6 +375,7 @@ bool StreamTcpModule::set(const char*, Value& v, SnortConfig*)
         else
             config->flags &= ~STREAM_CONFIG_SHOW_PACKETS;
     }
+
     else if ( v.is("track_only") )
     {
         if ( v.get_bool() )

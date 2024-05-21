@@ -22,7 +22,7 @@
 #include "config.h"
 #endif
 
-#include "profiler.h"
+#include "profiler_impl.h"
 
 #include <cassert>
 #include <numeric>
@@ -31,12 +31,14 @@
 #include "main/snort_config.h"
 #include "main/thread_config.h"
 #include "time/stopwatch.h"
+#include "utils/stats.h"
 
 #include "memory_context.h"
 #include "memory_profiler.h"
 #include "profiler_nodes.h"
 #include "rule_profiler.h"
 #include "time_profiler.h"
+#include <network_inspectors/appid/appid_api.h>
 
 #ifdef UNIT_TEST
 #include "catch/snort_catch.h"
@@ -44,15 +46,32 @@
 
 using namespace snort;
 
-THREAD_LOCAL ProfileStats totalPerfStats;
-THREAD_LOCAL ProfileStats otherPerfStats;
+static THREAD_LOCAL ProfileStats totalPerfStats;
+static THREAD_LOCAL ProfileStats otherPerfStats;
 
-THREAD_LOCAL TimeContext* ProfileContext::curr_time = nullptr;
 THREAD_LOCAL Stopwatch<SnortClock>* run_timer = nullptr;
 THREAD_LOCAL uint64_t first_pkt_num = 0;
 THREAD_LOCAL bool consolidated_once = false;
 
 static ProfilerNodeMap s_profiler_nodes;
+
+#ifndef _WIN64
+THREAD_LOCAL TimeContext* ProfileContext::curr_time = nullptr;
+#else
+static THREAD_LOCAL TimeContext* curr_time = nullptr;
+
+TimeContext* ProfileContext::get_curr_time()
+{ return curr_time; }
+
+void ProfileContext::set_curr_time(TimeContext* t)
+{ curr_time = t; }
+#endif
+
+ProfileStats* Profiler::get_total_perf_stats()
+{ return &totalPerfStats; }
+
+ProfileStats* Profiler::get_other_perf_stats()
+{ return &otherPerfStats; }
 
 void Profiler::register_module(Module* m)
 {
@@ -77,7 +96,7 @@ void Profiler::register_module(const char* n, const char* pn, Module* m)
 
 void Profiler::start()
 {
-    first_pkt_num = (uint64_t)get_packet_number();
+    first_pkt_num = pc.analyzed_pkts;
     run_timer = new Stopwatch<SnortClock>;
     run_timer->start();
     consolidated_once = false;
@@ -131,6 +150,7 @@ void Profiler::reset_stats(snort::ProfilerType type)
     }
 
     s_profiler_nodes.reset_nodes(type);
+    appid_api.reset_appid_cpu_profiler_stats();
 }
 
 void Profiler::prepare_stats()

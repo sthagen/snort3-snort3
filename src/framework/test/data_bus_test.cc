@@ -23,7 +23,6 @@
 
 #include "framework/data_bus.h"
 #include "main/snort_config.h"
-#include "main/thread.h"
 #include "utils/stats.h"
 
 #include <CppUTest/CommandLineTestRunner.h>
@@ -68,6 +67,10 @@ InspectionPolicy* get_inspection_policy()
         (InspectionPolicy*)mock().getData("my_inspection_policy").getObjectPointer();
     return my_inspection_policy;
 }
+void set_network_policy(NetworkPolicy*)
+{ }
+void set_inspection_policy(InspectionPolicy*)
+{ }
 
 THREAD_LOCAL PacketCount pc;
 }

@@ -28,6 +28,7 @@
 #include "appid_debug.h"
 #include "appid_detector.h"
 #include "appid_inspector.h"
+#include "profiler/profiler_defs.h"
 
 using namespace snort;
 using namespace std;
@@ -162,6 +163,12 @@ void SshEventHandler::handle(DataEvent& event, Flow* flow)
     if (!asd->get_session_flags(APPID_SESSION_DISCOVER_APP | APPID_SESSION_SPECIAL_MONITORED))
         return;
 
+    bool is_appid_cpu_profiling_running = (asd->get_odp_ctxt().is_appid_cpu_profiler_running());
+    Stopwatch<SnortClock> per_appid_event_cpu_timer;
+
+    if (is_appid_cpu_profiling_running)
+        per_appid_event_cpu_timer.start();
+    
     SshEventFlowData* data = (SshEventFlowData* )asd->get_flow_data(id);
     Packet* p = DetectionEngine::get_current_packet();
 
@@ -238,5 +245,11 @@ void SshEventHandler::handle(DataEvent& event, Flow* flow)
         // Don't generate an event in case of failure. We want to give third-party a chance
 
         break;
+    }
+
+    if (is_appid_cpu_profiling_running)
+    {
+        per_appid_event_cpu_timer.stop();
+        asd->stats.processing_time += TO_USECS(per_appid_event_cpu_timer.get());
     }
 }

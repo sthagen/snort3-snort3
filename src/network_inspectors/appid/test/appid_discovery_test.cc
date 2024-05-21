@@ -28,7 +28,7 @@
 #include "host_tracker/host_cache.h"
 #include "network_inspectors/appid/appid_discovery.cc"
 #include "network_inspectors/appid/appid_peg_counts.h"
-#include "network_inspectors/packet_tracer/packet_tracer.h"
+#include "packet_io/packet_tracer.h"
 #include "pub_sub/appid_event_ids.h"
 #include "search_engines/search_tool.h"
 #include "utils/sflsq.cc"
@@ -43,6 +43,7 @@
 #include <CppUTestExt/MockSupport.h>
 
 uint32_t ThirdPartyAppIdContext::next_version = 0;
+THREAD_LOCAL bool TimeProfilerStats::enabled = false;
 
 namespace snort
 {
@@ -51,11 +52,9 @@ AppIdApi appid_api;
 const char* AppIdApi::get_application_name(AppId, OdpContext&) { return NULL; }
 
 // Stubs for packet tracer
-THREAD_LOCAL PacketTracer* s_pkt_trace = nullptr;
-THREAD_LOCAL Stopwatch<SnortClock>* pt_timer = nullptr;
 void PacketTracer::daq_log(const char*, ...) { }
-void FatalError(const char* fmt, ...) { (void)fmt; exit(1); }
-void WarningMessage(const char*,...) { }
+uint64_t PacketTracer::get_time() { return 0; }
+THREAD_LOCAL PacketTracer* PacketTracer::s_pkt_trace = nullptr;
 
 // Stubs for packet
 Packet::Packet(bool) {}
@@ -85,6 +84,9 @@ PegCount Module::get_global_count(char const*) const { return 0; }
 // Stubs for logs
 void LogLabel(const char*, FILE*) {}
 void LogText(const char*, FILE*) {}
+
+void FatalError(const char* fmt, ...) { (void)fmt; exit(1); }
+void WarningMessage(const char*,...) { }
 
 // Stubs for utils
 char* snort_strdup(const char* str)
@@ -183,6 +185,9 @@ AppId OdpContext::get_port_service_id(IpProtocol, uint16_t)
 {
     return APP_ID_NONE;
 }
+
+bool OdpContext::is_appid_cpu_profiler_enabled() { return false; }
+bool OdpContext::is_appid_cpu_profiler_running() { return false; }
 
 AppId OdpContext::get_protocol_service_id(IpProtocol)
 {

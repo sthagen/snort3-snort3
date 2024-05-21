@@ -28,6 +28,7 @@
 
 #include "framework/data_bus.h"
 #include "protocols/protocol_ids.h"
+#include "profiler/profiler_impl.h"
 #include "service_inspectors/http_inspect/http_msg_header.h"
 #include "tp_appid_module_api.h"
 #include "tp_appid_session_api.h"
@@ -46,6 +47,7 @@
 #include <CppUTest/TestHarness.h>
 
 using namespace snort;
+THREAD_LOCAL bool TimeProfilerStats::enabled = false;
 
 namespace snort
 {
@@ -174,6 +176,7 @@ void Profiler::reset_stats(snort::ProfilerType) { }
 void Profiler::show_stats() { }
 
 OdpContext::OdpContext(const AppIdConfig&, snort::SnortConfig*) { }
+AppidCPUProfilingManager::AppidCPUProfilingManager() { }
 
 AppIdConfig::~AppIdConfig() = default;
 

@@ -31,7 +31,7 @@
 #define STREAM_TCP_DATA_ON_SYN                     2
 #define STREAM_TCP_DATA_ON_CLOSED                  3
 #define STREAM_TCP_BAD_TIMESTAMP                   4
-#define STREAM_TCP_BAD_SEGMENT                     5
+//#define STREAM_TCP_BAD_SEGMENT                   5   deleted
 #define STREAM_TCP_WINDOW_TOO_LARGE                6
 #define STREAM_TCP_EXCESSIVE_TCP_OVERLAPS          7
 #define STREAM_TCP_DATA_AFTER_RESET                8
@@ -118,6 +118,8 @@ struct TcpStats
     PegCount zero_win_probes;
     PegCount proxy_mode_flows;
     PegCount full_retransmits;
+    PegCount flush_on_asymmetric_flow;
+    PegCount asymmetric_flows;
 };
 
 extern THREAD_LOCAL struct TcpStats tcpStats;

@@ -28,6 +28,9 @@
 #define TP_SUPPORTED 1
 
 #include "tp_lib_handler.h"
+
+#include "profiler/profiler.h"
+
 #include "appid_config.h"
 #include "log_message_mock.h"
 
@@ -65,6 +68,7 @@ SslPatternMatchers::~SslPatternMatchers() = default;
 AlpnPatternMatchers::~AlpnPatternMatchers() = default;
 CipPatternMatchers::~CipPatternMatchers() = default;
 AppIdConfig::~AppIdConfig() = default;
+AppidCPUProfilingManager::AppidCPUProfilingManager() = default;
 OdpContext::OdpContext(const AppIdConfig&, snort::SnortConfig*) { }
 void ServiceDiscovery::initialize(AppIdInspector&) { }
 void ServiceDiscovery::reload() { }
@@ -72,13 +76,8 @@ int ServiceDiscovery::add_service_port(AppIdDetector*, const ServiceDetectorPort
 { return 0; }
 void appid_log(const snort::Packet*, unsigned char, char const*, ...) { }
 
-
 THREAD_LOCAL ProfileStats tp_appid_perf_stats;
 THREAD_LOCAL bool TimeProfilerStats::enabled = false;
-MemoryContext::MemoryContext(MemoryTracker&) { }
-MemoryContext::~MemoryContext() = default;
-THREAD_LOCAL TimeContext* ProfileContext::curr_time = nullptr;
-
 
 TEST_GROUP(tp_lib_handler)
 {

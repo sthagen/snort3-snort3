@@ -21,20 +21,33 @@
 #include "config.h"
 #endif
 
+#include "actions/actions_module.h"
 #include "detection/detection_engine.h"
 #include "framework/ips_action.h"
 #include "framework/module.h"
 #include "packet_io/active.h"
 #include "protocols/packet.h"
 
-#include "actions.h"
-
 using namespace snort;
 
-#define s_name "rewrite"
-
-#define s_help \
+#define action_name "rewrite"
+#define action_help \
     "overwrite packet contents with the \"replace\" option content"
+
+#define module_name "rewrite"
+#define module_help \
+    "manage the counters for the rewrite action"
+
+static THREAD_LOCAL struct ReplaceStats
+{
+    PegCount replace;
+} replace_stats;
+
+const PegInfo replace_pegs[] =
+{
+    { CountType::SUM, "rewrite", "number of packets that matched an IPS rewrite rule" },
+    { CountType::END, nullptr, nullptr }
+};
 
 //--------------------------------------------------------------------------
 // queue foo
@@ -96,22 +109,49 @@ void ReplaceActiveAction::delayed_exec(Packet* p)
 class ReplaceAction : public IpsAction
 {
 public:
-    ReplaceAction() : IpsAction(s_name, &rep_act_action) { }
+    ReplaceAction() : IpsAction(action_name, &rep_act_action) { }
 
-    void exec(Packet*, const OptTreeNode* otn) override;
+    void exec(Packet*, const ActInfo&) override;
 
 private:
     ReplaceActiveAction rep_act_action;
 };
 
-void ReplaceAction::exec(Packet* p, const OptTreeNode* otn)
+void ReplaceAction::exec(Packet* p, const ActInfo& ai)
 {
     p->active->rewrite_packet(p);
 
-    Actions::alert(p, otn);
+    alert(p, ai);
+    ++replace_stats.replace;
 }
 
 //-------------------------------------------------------------------------
+
+class ReplaceActionModule : public Module
+{
+public:
+    ReplaceActionModule() : Module(module_name, module_help)
+    { ActionsModule::add_action(module_name, replace_pegs); }
+
+    bool stats_are_aggregated() const override
+    { return true; }
+
+    void show_stats() override
+    { /* These stats are shown by ActionsModule. */ }
+
+    const PegInfo* get_pegs() const override
+    { return replace_pegs; }
+
+    PegCount* get_counts() const override
+    { return (PegCount*)&replace_stats; }
+};
+
+//-------------------------------------------------------------------------
+static Module* mod_ctor()
+{ return new ReplaceActionModule; }
+
+static void mod_dtor(Module* m)
+{ delete m; }
 
 static IpsAction* rep_ctor(Module*)
 { return new ReplaceAction; }
@@ -128,10 +168,10 @@ static ActionApi rep_api
         0,
         API_RESERVED,
         API_OPTIONS,
-        s_name,
-        s_help,
-        nullptr,  // mod_ctor
-        nullptr,  // mod_dtor
+        action_name,
+        action_help,
+        mod_ctor,
+        mod_dtor,
     },
     IpsAction::IAP_REWRITE,
     nullptr,
@@ -142,7 +182,11 @@ static ActionApi rep_api
     rep_dtor
 };
 
+#ifdef BUILDING_SO
+SO_PUBLIC const BaseApi* snort_plugins[] =
+#else
 const BaseApi* act_replace[] =
+#endif
 {
     &rep_api.base,
     nullptr

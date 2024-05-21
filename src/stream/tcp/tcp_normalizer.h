@@ -24,7 +24,8 @@
 
 #include "tcp_defs.h"
 
-#include "main/thread.h"
+#include <string>
+
 #include "normalize/normalize.h"
 #include "normalize/norm_stats.h"
 #include "protocols/tcp_options.h"
@@ -66,6 +67,7 @@ public:
     virtual ~TcpNormalizer() = default;
 
     virtual void init(State&) { }
+    virtual void init(TcpNormalizer*) { }
 
     virtual NormStatus apply_normalizations(
         State&, TcpSegmentDescriptor&, uint32_t seq, bool stream_is_inorder);
@@ -111,6 +113,7 @@ protected:
     virtual int handle_paws_no_timestamps(State&, TcpSegmentDescriptor&);
 
     std::string my_name;
+    TcpNormalizer* prev_norm = nullptr;
 };
 
 #endif

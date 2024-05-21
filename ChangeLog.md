@@ -1,3 +1,89 @@
+2024-05-16: 3.2.1.0
+
+* framework: supply directories to system headers to plug_gen.sh
+* main: updates for types used by Alpine.
+* memory: fix unit test
+
+2024-05-08: 3.2.0.0
+
+* actions: add action counters and aggregate them under ips_actions
+* active, host_tracker, profiler, stats, stream: refactor installed headers to exclude implementation like counts and perf stats
+* api: refactor base API
+* build: eliminate SO_PUBLIC THREAD_LOCALs
+* build: fix cppcheck warnings
+* build: fix coverity warnings
+* build: fix LTO ODR issues with anonymous namespaces
+* codecs: PacketManager::max_layers is not THREAD_LOCAL
+* detection: introduce re-evaluation of ips content in next packet
+* detection: refactor detection_util.\*
+* detection: refactor headers
+* doc: add versioning information to the developer guide
+* event_filter, suppress:  keep antiquated dynamic array support private (use std::vector instead)
+* extract: move extract methods to detection
+* file: do not install internal headers
+* flow: move StreamFlowIntf to stream_flow.h
+* flow: split ExpectFlow into a separate header
+* framework: bump api version to 18
+* framework: bump api version tp 19
+* framework: bump api version to 20
+* framework: expand decode flags
+* framework: generate preprocessor output for validation
+* framework: improve exported header comments
+* host_cache: do not install private header
+* inspector: eval override is optional for passive inspectors
+* inspectors: remove redundant slot variable
+* inspector: use thread local slot for best perf on Linux
+* ips_options: fix dynamic build of some options
+* ips: tweak check for offload enable
+* log: refactor out app implementation stuff into log_errors.h
+* mpse: add modules for pegs and perf profiling; remove \_search
+* numa: do not install implementation (private) header
+* packet_tracer: eliminate SO_PUBLIC THREAD_LOCALs
+* pig_pen: use Module::usage directly
+* plugins: add missing error messages when an so fails to load
+* plugins: add warning for invalid plugin types
+* plugins: bump base API and all plugin API version numbers
+* profiler: eliminate SO_PUBLIC THREAD_LOCALs for \_WIN64
+* profiler: move implementation class to profiler_impl.h
+* protocols: defensive fix for malformed packets, discard log
+* reputation: move private defines out of installed header
+* rna: refactor headers for better encapsulation
+* snort: remove deprecated features:
+** string binder[].when.zones: deprecated alias for groups
+** string binder[].when.src_zone: deprecated alias for src_groups
+** string binder[].when.dst_zone: deprecated alias for dst_groups
+** enum dce_smb.smb_file_inspection: deprecated (not used): file inspection controlled by smb_file_depth { 'off' | 'on' | 'only' }
+* ssl: support dynamic build of inspector and ips options
+* stats: change shutdown Mbits/sec from mebibits to megabits
+* stats: stats.h is for internal use only, do not install
+* stream: delete obsolete / unused methods
+* style: miscellaneous cleanup
+* style: remove trailing spaces
+* tag: tweak enable toggle
+* tcp: move SEQ_* macros to tcp header
+* thread: move THREAD_LOCAL definition to snort_types.h
+* utils: refactor out non-public code
+
+2024-05-06: 3.1.85.0
+
+* anaylzer, framework: add a data bus method to publish to all network policies and use it for idle
+* appid: add http url regex patterns
+* appid: appid CPU Profiler Table and CLI
+* appid: disable appid cpu profiler
+* detection: clear inspector data before flow_data
+* detection: fix postponed rule evaluation with recall presence
+* file_api: fix incorrect data size being passed to IPS engine for file type detection
+* flow: connection profiling feature
+* flow: fix unit test for debian
+* main: update usage of a deprecated hwloc macro. Thanks to teicors for reporting the issue!
+* stream_tcp: add reassembler class for missed_3whs
+* stream_tcp: change drop reason issuer to stream
+* stream_tcp: drop packet with invalid sequence number if inspection policy is inline and fix sequence number comparisons
+* stream_tcp: implement an asymmetric flow (one-way traffic) mode for reassembly that purges flushed segments immediately (no waiting for ack that will never come)
+* stream_tcp: support for asymmetric normalization
+* stream_tcp: track offset into data buffer due to overlaps with state variable on the TCP segment node
+* utils: move file specific functions from perfmonitor to utils
+
 2024-04-08: 3.1.84.0
 
 * appid: enhanced appid config parsing

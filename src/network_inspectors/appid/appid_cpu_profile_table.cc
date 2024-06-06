@@ -27,17 +27,18 @@
 #include <iomanip>
 #include <sstream>
 #include <queue>
+#include <algorithm>
 
 #include "appid_session.h"
-#include "app_cpu_profile_table.h"
+#include "appid_cpu_profile_table.h"
 
 using namespace snort;
 
-const char* table_header = "AppId Performance Statistics (all)\n========================================================================================================================\n";
-const char* columns = " AppId   App Name                             Microsecs        Packets        Avg/Packet       Sessions     Avg/Session \n";
-const char* partition = "------------------------------------------------------------------------------------------------------------------------\n";
+#define TABLE_HEADER(num_rows) "AppId Performance Statistics (top %d appids)\n===================================================================================================================================================\n", num_rows
+static const char* columns = " AppId   App Name                   Usecs       Pkts     AvgUsecs/Pkt     Sessions     AvgUsecs/Sess     MaxPkts/Sess     MaxUsecs/Sess     %%/Total\n";
+static const char* partition = "---------------------------------------------------------------------------------------------------------------------------------------------------\n";
 
-std::string FormatWithCommas(uint64_t value) 
+static std::string FormatWithCommas(uint64_t value)
 {
     std::string numStr = std::to_string(value);
     int insertPosition = numStr.length() - 3;
@@ -52,82 +53,112 @@ std::string FormatWithCommas(uint64_t value)
 // Comparator for priority queue based on avg_processing_time/session
 struct CompareByAvgProcessingTime {
     bool operator()(const std::pair<AppId, AppidCPUProfilerStats>& a, const std::pair<AppId, AppidCPUProfilerStats>& b) const {
-        if (a.second.processed_packets == 0 or b.second.processed_packets == 0) {
+        if (!a.second.per_appid_sessions or !b.second.per_appid_sessions)
             return false;
-        }
-        return a.second.processing_time/a.second.per_appid_sessions < b.second.processing_time/b.second.per_appid_sessions ; 
+
+        return a.second.processing_time/a.second.per_appid_sessions < b.second.processing_time/b.second.per_appid_sessions;
     }
 };
 
-void AppidCPUProfilingManager::display_appid_cpu_profiler_table(AppId appid)
+AppidCpuTableDisplayStatus AppidCPUProfilingManager::display_appid_cpu_profiler_table(AppId appid, OdpContext& odp_ctxt)
 {
-    if (appid_cpu_profiling_table.empty())
-    {
-        appid_log(nullptr, TRACE_INFO_LEVEL,"Appid CPU Profiler Table is empty\n", appid);
-        return;
-    }
+    if (odp_ctxt.is_appid_cpu_profiler_running())
+        return DISPLAY_ERROR_APPID_PROFILER_RUNNING;
+    else if (appid_cpu_profiling_table.empty())
+        return DISPLAY_ERROR_TABLE_EMPTY;
+
     auto bucket = appid_cpu_profiling_table.find(appid);
 
     if (bucket != appid_cpu_profiling_table.end())
     {
-        appid_log(nullptr, TRACE_INFO_LEVEL, table_header);
+        appid_log(nullptr, TRACE_INFO_LEVEL, TABLE_HEADER(1));
         appid_log(nullptr, TRACE_INFO_LEVEL, columns);
         appid_log(nullptr, TRACE_INFO_LEVEL, partition);
 
-        appid_log(nullptr, TRACE_INFO_LEVEL, " %5d   %-25.25s   %18s   %12s   %15s   %12s    %12s\n",
-                        appid, bucket->second.app_name.c_str(), FormatWithCommas(bucket->second.processing_time).c_str(), FormatWithCommas(bucket->second.processed_packets).c_str(), FormatWithCommas(bucket->second.processing_time/bucket->second.processed_packets).c_str(),
-                                                                                            FormatWithCommas(bucket->second.per_appid_sessions).c_str(), FormatWithCommas(bucket->second.processing_time/bucket->second.per_appid_sessions).c_str());
+        appid_log(nullptr, TRACE_INFO_LEVEL, " %5d   %-15.15s   %14.14s %10.10s  %15.14s  %11.11s  %16.14s  %15.14s   %15.14s  %10.2f\n",
+                appid, bucket->second.app_name.c_str(), FormatWithCommas(bucket->second.processing_time).c_str(), FormatWithCommas(bucket->second.processed_packets).c_str(), 
+                FormatWithCommas(bucket->second.processing_time/bucket->second.processed_packets).c_str(), FormatWithCommas(bucket->second.per_appid_sessions).c_str(), 
+                FormatWithCommas(bucket->second.processing_time/bucket->second.per_appid_sessions).c_str(), FormatWithCommas(bucket->second.max_processed_pkts_per_session).c_str(), 
+                FormatWithCommas(bucket->second.max_processing_time_per_session).c_str(), (static_cast<float>(bucket->second.processing_time)/total_processing_time)*100);
     }
     else
     {
         appid_log(nullptr, TRACE_INFO_LEVEL,"Appid %d not found in the table\n", appid);
     }
+    return DISPLAY_SUCCESS;
 }
 
-void AppidCPUProfilingManager::display_appid_cpu_profiler_table()
+AppidCpuTableDisplayStatus AppidCPUProfilingManager::display_appid_cpu_profiler_table(OdpContext& odp_ctxt, uint32_t display_rows_limit, bool override_running_flag)
 {
-    if (appid_cpu_profiling_table.empty())
-    {
-        appid_log(nullptr, TRACE_INFO_LEVEL,"Appid CPU Profiler Table is empty\n");
-        return;
-    }
+    if (odp_ctxt.is_appid_cpu_profiler_running() and !override_running_flag)
+        return DISPLAY_ERROR_APPID_PROFILER_RUNNING;
+    else if (appid_cpu_profiling_table.empty())
+        return DISPLAY_ERROR_TABLE_EMPTY;
 
     std::priority_queue<std::pair<AppId, AppidCPUProfilerStats>, std::vector<std::pair<AppId, AppidCPUProfilerStats>>, CompareByAvgProcessingTime> sorted_appid_cpu_profiler_table;
 
     for (const auto& entry : appid_cpu_profiling_table) 
-    {
-        sorted_appid_cpu_profiler_table.push(entry); // Push the pair (AppId, AppidCPUProfilerStats)
-    }
+        sorted_appid_cpu_profiler_table.push(entry);
 
-    appid_log(nullptr, TRACE_INFO_LEVEL, table_header);
+    display_rows_limit = static_cast<uint32_t>(std::min({static_cast<size_t>(display_rows_limit), sorted_appid_cpu_profiler_table.size(), static_cast<size_t>(APPID_CPU_PROFILER_MAX_DISPLAY_ROWS)}));
+    appid_log(nullptr, TRACE_INFO_LEVEL, TABLE_HEADER(display_rows_limit));
     appid_log(nullptr, TRACE_INFO_LEVEL, columns);
     appid_log(nullptr, TRACE_INFO_LEVEL, partition);
     
-    while (!sorted_appid_cpu_profiler_table.empty()) 
+    uint32_t rows_displayed = 0;
+
+    while (!sorted_appid_cpu_profiler_table.empty() and rows_displayed < display_rows_limit)
     {
         auto entry = sorted_appid_cpu_profiler_table.top();
         sorted_appid_cpu_profiler_table.pop();
-        if (!entry.second.processed_packets) 
+        if (!entry.second.processed_packets or !entry.second.per_appid_sessions)
             continue;
             
-        appid_log(nullptr, TRACE_INFO_LEVEL, " %5d   %-25.25s   %18s   %12s   %15s   %12s    %12s\n",
-                    entry.first, entry.second.app_name.c_str(), FormatWithCommas(entry.second.processing_time).c_str(), FormatWithCommas(entry.second.processed_packets).c_str(), FormatWithCommas(entry.second.processing_time/entry.second.processed_packets).c_str(),
-                                                                               FormatWithCommas(entry.second.per_appid_sessions).c_str(), FormatWithCommas(entry.second.processing_time/entry.second.per_appid_sessions).c_str());
-    } 
-}
+        appid_log(nullptr, TRACE_INFO_LEVEL, " %5d   %-15.15s   %14.14s %10.10s  %15.14s  %11.11s  %16.14s  %15.14s   %15.14s  %10.2f\n",
+                entry.first, entry.second.app_name.c_str(), FormatWithCommas(entry.second.processing_time).c_str(), FormatWithCommas(entry.second.processed_packets).c_str(), 
+                FormatWithCommas(entry.second.processing_time/entry.second.processed_packets).c_str(), FormatWithCommas(entry.second.per_appid_sessions).c_str(), 
+                FormatWithCommas(entry.second.processing_time/entry.second.per_appid_sessions).c_str(), FormatWithCommas(entry.second.max_processed_pkts_per_session).c_str(),
+                FormatWithCommas(entry.second.max_processing_time_per_session).c_str(), (static_cast<float>(entry.second.processing_time)/total_processing_time)*100);
 
-AppidCPUProfilingManager::AppidCPUProfilingManager()
-{
-    appid_cpu_profiling_table.clear();
+        rows_displayed += 1;
+    } 
+
+    appid_log(nullptr, TRACE_INFO_LEVEL, partition);
+
+    appid_log(nullptr, TRACE_INFO_LEVEL, "Totals(all_sessions)    : %15.15s %10.10s  %15.14s   %10.10s   %15.15s  %15.14s  %16.15s   %9d\n",
+            FormatWithCommas(total_processing_time).c_str(), FormatWithCommas(total_processed_packets).c_str(),  FormatWithCommas(total_processing_time/total_processed_packets).c_str(),
+            FormatWithCommas(total_per_appid_sessions).c_str(), FormatWithCommas(total_processing_time/total_per_appid_sessions).c_str(),
+            FormatWithCommas(max_processed_pkts_per_session).c_str(), FormatWithCommas(max_processing_time_per_session).c_str(), 100);
+
+    return DISPLAY_SUCCESS;
 }
 
 void AppidCPUProfilingManager::cleanup_appid_cpu_profiler_table()
 { 
+    std::lock_guard<std::mutex> lock(appid_cpu_profiler_mutex);
     appid_cpu_profiling_table.clear();
+    total_processing_time = 0;
+    total_processed_packets = 0;
+    total_per_appid_sessions = 0;
+    max_processing_time_per_session = 0;
+    max_processed_pkts_per_session = 0;
+}
+
+void AppidCPUProfilingManager::update_totals(const AppidCPUProfilerStats& stats)
+{
+    total_processing_time += stats.processing_time;
+    total_processed_packets += stats.processed_packets;
+    total_per_appid_sessions += stats.per_appid_sessions;
+    if (stats.max_processed_pkts_per_session >= max_processed_pkts_per_session)
+        max_processed_pkts_per_session = stats.max_processed_pkts_per_session;
+    if (stats.max_processing_time_per_session >= max_processing_time_per_session)
+        max_processing_time_per_session = stats.max_processing_time_per_session;
 }
 
 void AppidCPUProfilingManager::insert_appid_cpu_profiler_record(AppId appId, const AppidCPUProfilerStats& stats)
 {
+    std::lock_guard<std::mutex> lock(appid_cpu_profiler_mutex);
+
     auto it = appid_cpu_profiling_table.find(appId);
     if (it == appid_cpu_profiling_table.end()) 
     {
@@ -138,7 +169,13 @@ void AppidCPUProfilingManager::insert_appid_cpu_profiler_record(AppId appId, con
         it->second.processing_time += stats.processing_time;
         it->second.processed_packets += stats.processed_packets;
         it->second.per_appid_sessions += 1;
+        if (stats.processed_packets > it->second.max_processed_pkts_per_session)
+            it->second.max_processed_pkts_per_session = stats.processed_packets;
+
+        if (stats.processing_time > it->second.max_processing_time_per_session)
+            it->second.max_processing_time_per_session = stats.processing_time;
     }
+    update_totals(stats);
 }
 
 void AppidCPUProfilingManager::check_appid_cpu_profiler_table_entry(const AppIdSession* asd, AppId payload_id)

@@ -64,6 +64,7 @@
 #include "tcp_segment_node.h"
 #include "tcp_state_machine.h"
 #include "tcp_trace.h"
+#include "trace/trace_api.h"
 
 using namespace snort;
 
@@ -1141,7 +1142,8 @@ int TcpSession::process_tcp_packet(TcpSegmentDescriptor& tsd, const Packet* p)
     tsm->eval(tsd);
     check_events_and_actions(tsd);
 
-    S5TraceTCP(tsd, p);
+    if ( stream_tcp_trace_enabled )
+        S5TraceTCP(tsd, p);
 
     return ACTION_NOTHING;
 }
@@ -1163,6 +1165,8 @@ int TcpSession::process(Packet* p)
     if ( tcp_mack )
     {
         TcpSegmentDescriptor ma_tsd(flow, p, tcp_mack->tcp_ack_seq_num, tcp_mack->tcp_window_size);
+        assert( ma_tsd.get_pkt()->daq_msg && ma_tsd.get_pkt()->daq_msg == p->daq_msg );
+
         init_tcp_packet_analysis(ma_tsd);
         process_tcp_packet(ma_tsd, p);
         tcpStats.meta_acks++;

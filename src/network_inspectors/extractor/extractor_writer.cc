@@ -23,6 +23,8 @@
 
 #include "extractor_writer.h"
 
+using namespace snort;
+
 ExtractorWriter* ExtractorWriter::make_writer(OutputType o_type)
 {
     switch (o_type)
@@ -33,6 +35,40 @@ ExtractorWriter* ExtractorWriter::make_writer(OutputType o_type)
     default:
         return nullptr;
     }
+}
+
+StdExtractorWriter::StdExtractorWriter() : ExtractorWriter(), extr_std_log(TextLog_Init("stdout"))
+{}
+
+StdExtractorWriter::~StdExtractorWriter()
+{
+    TextLog_Term(extr_std_log);
+}
+
+void StdExtractorWriter::write(const char* ss)
+{
+    TextLog_Print(extr_std_log, "%s", ss);
+}
+
+void StdExtractorWriter::write(const char* ss, size_t len)
+{
+    TextLog_Print(extr_std_log, "%.*s", (int)len, ss);
+}
+
+void StdExtractorWriter::write(uint64_t n)
+{
+    TextLog_Print(extr_std_log, STDu64, n);
+}
+
+void StdExtractorWriter::lock()
+{
+    write_mutex.lock();
+}
+
+void StdExtractorWriter::unlock()
+{
+    TextLog_Flush(extr_std_log); // FIXIT-L: should be a part of API and have a well-defined point in the pipeline
+    write_mutex.unlock();
 }
 
 #ifdef UNIT_TEST

@@ -23,6 +23,9 @@
 #include <mutex>
 #include <string>
 
+#include "log/text_log.h"
+#include "main/snort_types.h"
+
 class OutputType
 {
 public:
@@ -67,6 +70,8 @@ public:
     virtual ~ExtractorWriter() = default;
 
     virtual void write(const char*) = 0;
+    virtual void write(const char*, size_t) = 0;
+    virtual void write(uint64_t) = 0;
     virtual void lock() { }
     virtual void unlock() { }
 
@@ -77,19 +82,18 @@ protected:
 class StdExtractorWriter : public ExtractorWriter
 {
 public:
-    StdExtractorWriter() = default;
+    StdExtractorWriter();
+    ~StdExtractorWriter() override;
 
-    void write(const char* ss) override
-    { fprintf(stdout, "%s", ss); }
-
-    void lock() override
-    { write_mutex.lock(); }
-
-    void unlock() override
-    { write_mutex.unlock(); }
+    void write(const char* ss) override;
+    void write(const char* ss, size_t len) override;
+    void write(uint64_t n) override;
+    void lock() override;
+    void unlock() override;
 
 private:
     std::mutex write_mutex;
+    TextLog* extr_std_log;
 };
 
 #endif

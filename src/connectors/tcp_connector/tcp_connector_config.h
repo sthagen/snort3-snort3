@@ -21,6 +21,7 @@
 #ifndef TCP_CONNECTOR_CONFIG_H
 #define TCP_CONNECTOR_CONFIG_H
 
+#include <string>
 #include <vector>
 
 #include "framework/connector.h"
@@ -29,10 +30,11 @@ class TcpConnectorConfig : public snort::ConnectorConfig
 {
 public:
     enum Setup { CALL, ANSWER };
+
     TcpConnectorConfig()
     { direction = snort::Connector::CONN_DUPLEX; async_receive = true; }
 
-    uint16_t base_port = 0;
+    std::vector<std::string> ports;
     std::string address;
     Setup setup = {};
     bool async_receive;

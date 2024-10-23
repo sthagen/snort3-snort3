@@ -38,7 +38,7 @@ class TcpReassemblerIds : public TcpReassembler
 public:
 
 
-    TcpReassemblerIds(TcpStreamTracker& trk, TcpReassemblySegments& sl)
+    TcpReassemblerIds(TcpStreamTracker* trk, TcpReassemblySegments* sl)
         : TcpReassembler(trk, sl)
     { }
 
@@ -47,6 +47,7 @@ public:
 
     int eval_flush_policy_on_ack(snort::Packet*) override;
     int eval_flush_policy_on_data(snort::Packet*) override;
+    int eval_asymmetric_flush(snort::Packet*) override;
     int flush_stream(snort::Packet*, uint32_t dir, bool final_flush = false) override;
 
     FlushPolicy get_flush_policy() const override

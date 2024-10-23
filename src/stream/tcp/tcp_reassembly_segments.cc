@@ -60,6 +60,11 @@ void TcpReassemblySegments::reset()
     seglist_base_seq = 0;
 }
 
+void TcpReassemblySegments::purge_segment_list()
+{
+    purge();
+}
+
 void TcpReassemblySegments::update_next(TcpSegmentNode* tsn)
 {
     cur_rseg = tsn->next_no_gap() ?  tsn->next : nullptr;
@@ -362,7 +367,7 @@ void TcpReassemblySegments::purge_segments_left_of_hole(const TcpSegmentNode* en
     tracker->set_order(TcpStreamTracker::OUT_OF_SEQUENCE);
 
     if (PacketTracer::is_active())
-        PacketTracer::log("Stream: Skipped %u packets before seglist hole)\n", packets_skipped);
+        PacketTracer::log("Stream: Skipped %u packets before seglist hole\n", packets_skipped);
 }
 
 void TcpReassemblySegments::advance_rcv_nxt(TcpSegmentNode *tsn)
@@ -442,9 +447,4 @@ void TcpReassemblySegments::skip_midstream_pickup_seglist_hole(TcpSegmentDescrip
     }
     else
         tracker->set_rcv_nxt(ack);
-}
-
-void TcpReassemblySegments::purge_segment_list()
-{
-    purge();
 }

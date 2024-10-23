@@ -426,10 +426,6 @@ void SnortConfig::merge(const SnortConfig* cmd_line_conf)
     if (cmd_line_conf->dirty_pig)
         dirty_pig = cmd_line_conf->dirty_pig;
 
-    // --dump-rule-databases
-    if (!cmd_line_conf->rule_db_dir.empty())
-        rule_db_dir = cmd_line_conf->rule_db_dir;
-
     // --id-offset
     id_offset = cmd_line_conf->id_offset;
     // --id-subdir
@@ -679,12 +675,6 @@ void SnortConfig::set_obfuscation_mask(const char* mask)
     obfuscation_net.set(mask);
 }
 
-void SnortConfig::set_rule_db_dir(const char* directory)
-{
-    assert(directory);
-    rule_db_dir = directory;
-}
-
 void SnortConfig::set_gid(const char* args)
 {
     struct group* gr;
@@ -799,37 +789,14 @@ void SnortConfig::set_overlay_trace_config(TraceConfig* tc)
     overlay_trace_config = tc;
 }
 
-bool SnortConfig::set_packet_latency(bool is_enabled) const
+// cppcheck-suppress unusedFunction
+bool SnortConfig::set_packet_latency() const
 {
     if ( latency )
     {
-        latency->packet_latency.force_enable = is_enabled;
-        return is_enabled;
-    }
-    return false;
-}
-
-bool SnortConfig::get_packet_latency() const
-{
-    if ( latency->packet_latency.force_enabled() )
+        latency->packet_latency.plugin_forced = true;
         return true;
-    return false;
-}
-
-bool SnortConfig::set_rule_latency(bool is_enabled) const
-{
-    if ( latency )
-    {
-        latency->rule_latency.force_enable = is_enabled;
-        return is_enabled;
     }
-    return false;
-}
-
-bool SnortConfig::get_rule_latency() const
-{
-    if ( latency->rule_latency.force_enabled() )
-        return true;
     return false;
 }
 
@@ -1110,6 +1077,7 @@ const char* SnortConfig::get_static_name(const char* name)
     return static_names[name].c_str();
 }
 
+// cppcheck-suppress unusedFunction
 int SnortConfig::get_classification_id(const char* name)
 {
     auto& cls = get_conf()->classifications;

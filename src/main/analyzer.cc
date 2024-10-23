@@ -47,10 +47,12 @@
 #include "framework/data_bus.h"
 #include "latency/packet_latency.h"
 #include "latency/rule_latency.h"
+#include "latency/latency_config.h"
 #include "log/messages.h"
 #include "main/swapper.h"
 #include "main.h"
 #include "managers/action_manager.h"
+#include "managers/connector_manager.h"
 #include "managers/codec_manager.h"
 #include "managers/inspector_manager.h"
 #include "managers/ips_manager.h"
@@ -641,6 +643,7 @@ void Analyzer::init_unprivileged()
     IpsManager::setup_options(sc);
     ActionManager::thread_init(sc);
     FileService::thread_init();
+    ConnectorManager::thread_init();
     SideChannelManager::thread_init();
     HighAvailabilityManager::thread_init(); // must be before InspectorManager::thread_init();
     InspectorManager::thread_init(sc);
@@ -648,6 +651,9 @@ void Analyzer::init_unprivileged()
     HostAttributesManager::initialize();
     RuleContext::set_enabled(sc->profiler->rule.show);
     TimeProfilerStats::set_enabled(sc->profiler->time.show);
+    packet_latency::set_force_enable(sc->latency->packet_latency.enabled() ||
+        sc->latency->packet_latency.plugin_forced);
+    rule_latency::set_force_enable(sc->latency->rule_latency.enabled());
 
     // in case there are HA messages waiting, process them first
     HighAvailabilityManager::process_receive();
@@ -663,6 +669,7 @@ void Analyzer::reinit(const SnortConfig* sc)
     ActionManager::thread_reinit(sc);
     TraceApi::thread_reinit(sc->trace_config);
     EventManager::reload_outputs();
+    ConnectorManager::thread_reinit();
 }
 
 void Analyzer::stop_removed(const SnortConfig* sc)
@@ -700,6 +707,7 @@ void Analyzer::term()
     CodecManager::thread_term();
     HighAvailabilityManager::thread_term();
     SideChannelManager::thread_term();
+    ConnectorManager::thread_term();
 
     oops_handler->set_current_message(nullptr, nullptr);
 

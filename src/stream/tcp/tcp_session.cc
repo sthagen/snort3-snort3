@@ -102,7 +102,6 @@ bool TcpSession::setup(Packet*)
     client.init_tcp_state(this);
     server.init_tcp_state(this);
     tcp_init = false;
-    generate_3whs_alert = true;
     cleaning = false;
     splitter_init = false;
 
@@ -151,14 +150,14 @@ void TcpSession::restart(Packet* p)
     if ( talker->midstream_initial_ack_flush )
     {
         talker->midstream_initial_ack_flush = false;
-        talker->eval_flush_policy_on_data(p);
+        talker->reassembler->eval_flush_policy_on_data(p);
     }
 
     if (p->dsize > 0)
-        listener->eval_flush_policy_on_data(p);
+        listener->reassembler->eval_flush_policy_on_data(p);
 
     if (p->ptrs.tcph->is_ack())
-        talker->eval_flush_policy_on_ack(p);
+        talker->reassembler->eval_flush_policy_on_ack(p);
 
     tcpStats.restarts++;
 }
@@ -415,20 +414,17 @@ bool TcpSession::handle_syn_on_reset_session(TcpSegmentDescriptor& tsd)
             flow->set_ttl(tsd.get_pkt(), true);
             init_session_on_syn(tsd);
             tcpStats.resyns++;
-            listener->normalizer.ecn_tracker(tcph, tcp_config->require_3whs());
+            listener->normalizer.ecn_tracker(tcph);
             flow->update_session_flags(SSNFLAG_SEEN_CLIENT);
         }
         else if ( tcph->is_syn_ack() )
         {
-            if ( tcp_config->midstream_allowed(tsd.get_pkt()) )
-            {
-                flow->ssn_state.direction = FROM_SERVER;
-                flow->set_ttl(tsd.get_pkt(), false);
-                init_session_on_synack(tsd);
-                tcpStats.resyns++;
-            }
+            flow->ssn_state.direction = FROM_SERVER;
+            flow->set_ttl(tsd.get_pkt(), false);
+            init_session_on_synack(tsd);
+            tcpStats.resyns++;
 
-            listener->normalizer.ecn_tracker(tcph, tcp_config->require_3whs());
+            listener->normalizer.ecn_tracker(tcph);
             flow->update_session_flags(SSNFLAG_SEEN_SERVER);
         }
     }
@@ -612,9 +608,9 @@ bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, Tc
             tcpStats.exceeded_max_bytes++;
             bool ret_val = true;
 
-            // if inline and this is an asymmetric flow then skip over any seglist holes
+            // if this is an asymmetric flow then skip over any seglist holes
             // and flush to free up seglist space
-            if ( tsd.is_ips_policy_inline()  && !tsd.get_pkt()->flow->two_way_traffic() )
+            if ( !tsd.get_pkt()->flow->two_way_traffic() )
             {
                 space_left = listener->kickstart_asymmetric_flow(tsd, tcp_config->max_queued_bytes);
                 if ( space_left >= (int32_t)tsd.get_len() )
@@ -647,9 +643,9 @@ bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, Tc
         {
             tcpStats.exceeded_max_segs++;
 
-            // if inline and this is an asymmetric flow then skip over any seglist holes
+            // if this is an asymmetric flow then skip over any seglist holes
             // and flush to free up seglist space
-            if ( tsd.is_ips_policy_inline() && !tsd.get_pkt()->flow->two_way_traffic() )
+            if ( !tsd.get_pkt()->flow->two_way_traffic() )
             {
                 listener->kickstart_asymmetric_flow(tsd, tcp_config->max_queued_bytes);
                 if ( listener->seglist.get_seg_count() + 1 <= tcp_config->max_queued_segs )
@@ -751,7 +747,7 @@ void TcpSession::handle_data_segment(TcpSegmentDescriptor& tsd, bool flush)
     }
 
     if ( flush )
-        listener->eval_flush_policy_on_data(tsd.get_pkt());
+        listener->reassembler->eval_flush_policy_on_data(tsd.get_pkt());
     else
         listener->reassembler->initialize_paf();
 }
@@ -933,7 +929,7 @@ bool TcpSession::ignore_this_packet(Packet* p)
     return false;
 }
 
-void TcpSession::cleanup_session_if_expired(Packet* p)
+bool TcpSession::cleanup_session_if_expired(Packet* p)
 {
     // Check if the session is expired. Should be done before we do something with
     // the packet...Insert a packet, or handle state change SYN, FIN, RST, etc.
@@ -947,20 +943,22 @@ void TcpSession::cleanup_session_if_expired(Packet* p)
 
         tcpStats.timeouts++;
         TcpHAManager::process_deletion(*flow);
+
+        return true;
     }
+    return false;
 }
 
-void TcpSession::precheck(Packet* p)
+bool TcpSession::precheck(Packet* p)
 {
     // Check if the session is expired. Should be done before we do something with
     // the packet...Insert a packet, or handle state change SYN, FIN, RST, etc.
-    cleanup_session_if_expired(p);
+    return !cleanup_session_if_expired(p);
 }
 
 void TcpSession::init_tcp_packet_analysis(TcpSegmentDescriptor& tsd)
 {
-    if ( !splitter_init and tsd.is_data_segment() and
-        (tcp_init or is_midstream_allowed(tsd)) )
+    if ( !splitter_init and tsd.is_data_segment() )
     {
         if ( !(tcp_config->flags & STREAM_CONFIG_NO_REASSEMBLY) and
                 !(tsd.get_flow()->flags.disable_reassembly_by_ips) )

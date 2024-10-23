@@ -95,8 +95,6 @@ public:
     void reset();
     void clear_tracker(snort::Flow*, snort::Packet*, bool flush_segments, bool restart);
 
-    int eval_flush_policy_on_ack(snort::Packet*);
-    int eval_flush_policy_on_data(snort::Packet*);
     void update_stream_order(const TcpSegmentDescriptor&, bool aligned);
 
     void fallback();
@@ -337,7 +335,6 @@ public:
     TcpEvent tcp_event = TCP_MAX_EVENTS;
 
     bool client_tracker;
-    bool require_3whs = false;
     bool rst_pkt_sent = false;
     bool midstream_initial_ack_flush = false;
 

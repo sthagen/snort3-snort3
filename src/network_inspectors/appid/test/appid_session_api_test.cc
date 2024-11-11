@@ -118,6 +118,24 @@ TEST(appid_session_api, get_client_app_id)
     CHECK_EQUAL(APP_ID_NONE, id);
 }
 
+TEST(appid_session_api, is_service_over_quic)
+{
+    SfIp ip{};
+    AppIdSession asd(IpProtocol::UDP, &ip, 1492, dummy_appid_inspector, odpctxt, 0
+    #ifndef DISABLE_TENANT_ID
+    ,0
+    #endif
+    );
+    asd.flow = &flow;
+    AppidChangeBits change_bits;
+    asd.set_ss_application_ids(APP_ID_QUIC, APPID_UT_ID, APPID_UT_ID, APPID_UT_ID, APPID_UT_ID, change_bits);
+    CHECK_EQUAL(asd.get_api().is_service_over_quic(), true);
+
+    asd.set_ss_application_ids(APP_ID_DNS, APPID_UT_ID, APPID_UT_ID, APPID_UT_ID, APPID_UT_ID, change_bits);
+    CHECK_EQUAL(asd.get_api().is_service_over_quic(), false);
+    delete &asd.get_api();
+}
+
 TEST(appid_session_api, get_client_app_id_with_eve_for_http2)
 {
     SfIp ip{};
@@ -366,6 +384,18 @@ TEST(appid_session_api, get_tls_host)
     mock_session->set_tls_host(change_bits);
     val = mock_session->get_api().get_tls_host();
     STRCMP_EQUAL(val, APPID_UT_TLS_HOST);
+}
+
+TEST(appid_session_api, get_tls_version)
+{
+    AppidChangeBits change_bits;
+    mock_session->tsession->set_tls_version(nullptr, 0, change_bits);
+    CHECK_EQUAL(mock_session->get_api().get_tls_version(), 0);
+    CHECK_FALSE(change_bits.test(AppidChangeBit::APPID_TLS_VERSION_BIT));
+    const char tls_version[] = {0x03, 0x02};
+    mock_session->tsession->set_tls_version(tls_version, sizeof(tls_version), change_bits);
+    CHECK_EQUAL(mock_session->get_api().get_tls_version(), 0x0203);
+    CHECK_TRUE(change_bits.test(AppidChangeBit::APPID_TLS_VERSION_BIT));
 }
 
 TEST(appid_session_api, get_initiator_ip)

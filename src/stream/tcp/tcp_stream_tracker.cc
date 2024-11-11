@@ -47,7 +47,6 @@
 using namespace snort;
 
 THREAD_LOCAL HeldPacketQueue* hpq = nullptr;
-TcpReassemblerIgnore* tcp_ignore_reassembler = new TcpReassemblerIgnore(nullptr, nullptr);
 
 const std::list<HeldPacket>::iterator TcpStreamTracker::null_iterator { };
 
@@ -380,7 +379,7 @@ void TcpStreamTracker::update_flush_policy(StreamSplitter* splitter)
             assert( reassembler->get_flush_policy() != STREAM_FLPOLICY_ON_ACK );
         }
 
-        reassembler = new  TcpReassemblerIps(this, &seglist);
+        reassembler = new TcpReassemblerIps(*this, seglist);
         reassembler->init(!client_tracker, splitter);
     }
     else
@@ -391,7 +390,7 @@ void TcpStreamTracker::update_flush_policy(StreamSplitter* splitter)
             assert( reassembler->get_flush_policy() != STREAM_FLPOLICY_ON_DATA );
         }
 
-        reassembler = new  TcpReassemblerIds(this, &seglist);
+        reassembler = new TcpReassemblerIds(*this, seglist);
         reassembler->init(!client_tracker, splitter);
     }
 }
@@ -448,7 +447,7 @@ void TcpStreamTracker::fallback()
 #endif
 
     if (PacketTracer::is_active())
-        PacketTracer::log("Stream: %s tracker fallback to the Atom splitter.\n",
+        PacketTracer::log("stream_tcp: %s tracker fallback to the Atom splitter.\n",
             client_tracker ? "client" : "server");
 
     set_splitter(new AtomSplitter(!client_tracker));
@@ -850,13 +849,13 @@ int32_t TcpStreamTracker::kickstart_asymmetric_flow(const TcpSegmentDescriptor& 
     {
         set_tcp_state(TcpStreamTracker::TCP_ESTABLISHED);
         if (PacketTracer::is_active())
-            PacketTracer::log("Stream: Kickstart of midstream asymmetric flow! Seglist queue space: %u\n",
+            PacketTracer::log("stream_tcp: Kickstart of midstream asymmetric flow! Seglist queue space: %u\n",
                 space_left );
     }
     else
     {
         if (PacketTracer::is_active())
-            PacketTracer::log("Stream: Kickstart of asymmetric flow! Seglist queue space: %u\n",
+            PacketTracer::log("stream_tcp: Kickstart of asymmetric flow! Seglist queue space: %u\n",
                 space_left );
     }
 

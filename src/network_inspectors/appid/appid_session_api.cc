@@ -225,6 +225,19 @@ void AppIdSessionApi::get_app_id(AppId* service, AppId* client,
         *referred = get_referred_app_id();
 }
 
+bool AppIdSessionApi::is_service_over_quic() const
+{
+    switch (get_service_app_id())
+    {
+        case APP_ID_HTTP3:
+        case APP_ID_QUIC:
+        case APP_ID_SMB_OVER_QUIC:
+        case APP_ID_DNS_OVER_QUIC:
+            return true;
+    }
+    return false;
+}
+
 bool AppIdSessionApi::is_appid_inspecting_session() const
 {
     if (!asd)
@@ -323,6 +336,15 @@ uint64_t AppIdSessionApi::get_appid_session_attribute(uint64_t flags) const
 const char* AppIdSessionApi::get_tls_host() const
 {
     return tls_host;
+}
+
+uint16_t AppIdSessionApi::get_tls_version() const
+{
+    if (asd and asd->tsession)
+    {
+        return asd->tsession->get_tls_version();
+    }
+    return 0;
 }
 
 const SfIp* AppIdSessionApi::get_initiator_ip() const

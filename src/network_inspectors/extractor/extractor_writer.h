@@ -21,42 +21,11 @@
 #define EXTRACTOR_WRITER_H
 
 #include <mutex>
-#include <string>
 
 #include "log/text_log.h"
 #include "main/snort_types.h"
 
-class OutputType
-{
-public:
-    enum Value : uint8_t
-    {
-        STD,
-        MAX
-    };
-
-    OutputType() = default;
-    constexpr OutputType(Value a) : v(a) {}
-    template<typename T> constexpr OutputType(T a) : v((Value)a) {}
-
-    constexpr operator Value() const { return v; }
-    explicit operator bool() const = delete;
-
-    const char* c_str() const
-    {
-        switch (v)
-        {
-        case STD:
-            return "stdout";
-        case MAX: // fallthrough
-        default:
-            return "(not set)";
-        }
-    }
-
-private:
-    Value v = STD;
-};
+#include "extractor_enums.h"
 
 class ExtractorWriter
 {

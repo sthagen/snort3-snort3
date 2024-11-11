@@ -128,10 +128,12 @@ public:
     const AppIdHttpSession* get_http_session(uint32_t stream_index = 0) const;
     const AppIdHttpSession* get_matching_http_session(int64_t stream_id) const;
     const char* get_tls_host() const;
+    uint16_t get_tls_version() const;
     bool is_http_inspection_done() const;
     const char* get_netbios_name() const;
     const char* get_netbios_domain() const;
     ClientAppDetectType get_client_app_detect_type() const;
+    bool is_service_over_quic() const;
 
     // For protocols such as HTTP2/HTTP3 which can have multiple streams within a single flow,
     // get_first_stream_* methods return the appids in the first stream seen in a packet.

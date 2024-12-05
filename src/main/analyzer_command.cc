@@ -24,15 +24,17 @@
 #include "analyzer_command.h"
 
 #include <cassert>
+#include <sys/time.h>
 
 #include "control/control.h"
 #include "framework/module.h"
 #include "log/messages.h"
 #include "managers/module_manager.h"
+#include "packet_io/sfdaq_instance.h"
 #include "protocols/packet_manager.h"
 #include "target_based/host_attributes.h"
+#include "time/packet_time.h"
 #include "utils/stats.h"
-#include "packet_io/sfdaq_instance.h"
 
 #include "analyzer.h"
 #include "reload_tracker.h"
@@ -43,6 +45,29 @@
 #include "swapper.h"
 
 using namespace snort;
+
+static THREAD_LOCAL timeval report_time{};
+static const timeval report_period = {10, 0};
+
+static void tuner_next(ReloadResourceTuner* tuner)
+{
+    LogMessage("ReloadResourceTuner[%u] running %s\n", get_instance_id(), tuner->name());
+
+    timeval now;
+    packet_gettimeofday(&now);
+    timeradd(&now, &report_period, &report_time);
+}
+
+static void tuner_update(ReloadResourceTuner* tuner)
+{
+    timeval now;
+    packet_gettimeofday(&now);
+    if (timercmp(&now, &report_time, >))
+    {
+        timeradd(&now, &report_period, &report_time);
+        tuner->report_progress();
+    }
+}
 
 void AnalyzerCommand::log_message(ControlConn* ctrlcon, const char* format, va_list& ap)
 {
@@ -168,6 +193,7 @@ bool ACSwap::execute(Analyzer& analyzer, void** ac_state)
 
             if ( !*ac_state )
             {
+                LogMessage("ReloadResourceTuner[%u] start\n", get_instance_id());
                 reload_tuners = new std::list<ReloadResourceTuner*>(sc->get_reload_resource_tuners());
                 std::list<ReloadResourceTuner*>::iterator rtt = reload_tuners->begin();
                 while ( rtt != reload_tuners->end() )
@@ -178,6 +204,8 @@ bool ACSwap::execute(Analyzer& analyzer, void** ac_state)
                         rtt = reload_tuners->erase(rtt);
                 }
                 *ac_state = reload_tuners;
+                if (!reload_tuners->empty())
+                    tuner_next(reload_tuners->front());
             }
             else
                 reload_tuners = (std::list<ReloadResourceTuner*>*)*ac_state;
@@ -185,21 +213,21 @@ bool ACSwap::execute(Analyzer& analyzer, void** ac_state)
             if ( !reload_tuners->empty() )
             {
                 auto rrt = reload_tuners->front();
-                if ( analyzer.is_idling() )
+                bool tuning_complete = analyzer.is_idling() ? rrt->tune_idle_context() : rrt->tune_packet_context();
+                if (tuning_complete)
                 {
-                    if ( rrt->tune_idle_context() )
-                        reload_tuners->pop_front();
+                    reload_tuners->pop_front();
+                    if (!reload_tuners->empty())
+                        tuner_next(reload_tuners->front());
                 }
                 else
-                {
-                    if ( rrt->tune_packet_context() )
-                        reload_tuners->pop_front();
-                }
+                    tuner_update(rrt);
             }
 
             // check for empty again and free list instance if we are done
             if ( reload_tuners->empty() )
             {
+                LogMessage("ReloadResourceTuner[%d] complete\n", get_instance_id());
                 delete reload_tuners;
                 ps->finish(analyzer);
                 return true;
@@ -276,9 +304,27 @@ ACShowSnortCPU::~ACShowSnortCPU()
 {
     if (DAQ_SUCCESS == status)
     {
-        LogRespond(ctrlcon, "\nSummary \t%.1f%% \t%.1f%% \t%.1f%%\n",
-            cpu_usage_30s/instance_num, cpu_usage_120s/instance_num,
-            cpu_usage_300s/instance_num);
+        double cpu_usage_30s = 0.0;
+        double cpu_usage_120s = 0.0;
+        double cpu_usage_300s = 0.0;
+        int instance = 0;
+
+        for (const auto& cu : cpu_usage) 
+        {
+             log_message("%-3d \t%-6d \t%.1f%% \t%.1f%% \t%.1f%%\n",
+                 instance, ThreadConfig::get_instance_tid(instance), cu.cpu_usage_30s,
+                 cu.cpu_usage_120s, cu.cpu_usage_300s);
+
+             cpu_usage_30s += cu.cpu_usage_30s;
+             cpu_usage_120s += cu.cpu_usage_120s;
+             cpu_usage_300s += cu.cpu_usage_300s;
+             instance++;
+        }
+
+        if (instance)
+            log_message("\nSummary \t%.1f%% \t%.1f%% \t%.1f%%\n",
+                cpu_usage_30s/instance, cpu_usage_120s/instance,
+                cpu_usage_300s/instance);
     }
 }
 
@@ -286,40 +332,21 @@ bool ACShowSnortCPU::execute(Analyzer& analyzer, void**)
 {
     DIOCTL_GetCpuProfileData get_data = {};
 
+    SFDAQInstance* instance = get_daq_instance(analyzer);
+
+    status = instance->ioctl((DAQ_IoctlCmd)DIOCTL_GET_CPU_PROFILE_DATA,
+        (void *)(&get_data), sizeof(DIOCTL_GetCpuProfileData));
+
+    if (DAQ_SUCCESS != status)
     {
-        std::lock_guard<std::mutex> lock(cpu_usage_mutex);
-        assert(DAQ_SUCCESS == status);
-
-        SFDAQInstance* instance = get_daq_instance(analyzer);
-        ThreadConfig *thread_config = SnortConfig::get_conf()->thread_config;
-        int tid = thread_config->get_instance_tid(get_instance_id());
-
-        status = instance->ioctl(
-                     (DAQ_IoctlCmd)DIOCTL_GET_CPU_PROFILE_DATA,
-                     (void *)(&get_data),
-                     sizeof(DIOCTL_GetCpuProfileData));
-
-        if (DAQ_SUCCESS != status)
-        {
-            LogRespond(ctrlcon, "Fetching profile data failed from DAQ instance\n");
-            return true; 
-        }
-
-        double cpu_30s = static_cast<double> (get_data.cpu_usage_percent_30s);
-        double cpu_120s = static_cast<double> (get_data.cpu_usage_percent_120s);
-        double cpu_300s = static_cast<double> (get_data.cpu_usage_percent_300s);
-
-        // Print CPU usage
-        LogRespond(ctrlcon, "%-3d \t%-6d \t%.1f%% \t%.1f%% \t%.1f%%\n",
-            instance_num, tid, cpu_30s, cpu_120s, cpu_300s);
-
-        // Add CPU usage data
-        cpu_usage_30s += cpu_30s;
-        cpu_usage_120s += cpu_120s;
-        cpu_usage_300s += cpu_300s;
-        instance_num++;
-
+        LogRespond(ctrlcon, "Fetching profile data failed from DAQ instance %d\n", get_instance_id());
+        return true; 
     }
 
+    auto& stat = cpu_usage[get_instance_id()];
+    stat.cpu_usage_30s = static_cast<double>(get_data.cpu_usage_percent_30s);
+    stat.cpu_usage_120s = static_cast<double>(get_data.cpu_usage_percent_120s);
+    stat.cpu_usage_300s = static_cast<double>(get_data.cpu_usage_percent_300s); 
+ 
     return true;
 }

@@ -15,7 +15,7 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
-// json_logger.h author Cisco
+// extractor_json_logger.h author Cisco
 
 #ifndef EXTRACTOR_JSON_LOGGER_H
 #define EXTRACTOR_JSON_LOGGER_H

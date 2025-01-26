@@ -29,7 +29,6 @@
 #include <fstream>
 #include <openssl/crypto.h>
 #include <pcap.h>
-#include <pcre.h>
 #include <stdexcept>
 #include <vector>
 #include <zlib.h>
@@ -58,6 +57,7 @@ extern "C" {
 #include "managers/module_manager.h"
 #include "parser/parse_conf.h"
 #include "parser/parser.h"
+#include "utils/snort_pcre.h"
 #include "utils/stats.h"
 
 #include "lua_bootstrap.h"
@@ -140,6 +140,12 @@ static void install_dependencies_strings(Shell* sh, lua_State* L)
 {
     assert(dep_versions[0]);
 
+    char pcre2_version[64] { };
+    int pcre2_version_size = pcre2_config(PCRE2_CONFIG_VERSION, pcre2_version);
+
+    if (pcre2_version_size <= 0 or static_cast<size_t>(pcre2_version_size) > sizeof(pcre2_version))
+        abort();
+
     std::vector<const char*> vs;
     const char* ljv = LUAJIT_VERSION;
     const char* osv = OpenSSL_version(SSLEAY_VERSION);
@@ -156,7 +162,7 @@ static void install_dependencies_strings(Shell* sh, lua_State* L)
     vs.push_back(ljv);
     vs.push_back(osv);
     vs.push_back(lpv);
-    vs.push_back(pcre_version());
+    vs.push_back(pcre2_version);
     vs.push_back(zlib_version);
 #ifdef HAVE_HYPERSCAN
     vs.push_back(hs_version());
@@ -253,7 +259,7 @@ void Shell::allowlist_append(const char* keyword, bool is_prefix)
 void Shell::config_open_table(bool is_root_node, bool is_list, int idx,
     const std::string& table_name, const Parameter* p)
 {
-    if ( !s_config_output )
+    if ( !dump_enabled() )
         return;
 
     Parameter::Type node_type = is_list ? Parameter::PT_LIST : Parameter::PT_TABLE;
@@ -285,7 +291,7 @@ void Shell::config_open_table(bool is_root_node, bool is_list, int idx,
 void Shell::add_config_child_node(const std::string& node_name, snort::Parameter::Type type,
     bool is_root_list_item)
 {
-    if ( !s_config_output || !s_current_node )
+    if ( !dump_enabled() or !s_current_node )
         return;
 
     // element of the top-level list is anonymous
@@ -299,7 +305,7 @@ void Shell::add_config_child_node(const std::string& node_name, snort::Parameter
 
 void Shell::add_config_root_node(const std::string& root_name, snort::Parameter::Type node_type)
 {
-    if ( !s_config_output )
+    if ( !dump_enabled() )
         return;
 
     Shell* sh = Shell::get_current_shell();
@@ -308,12 +314,12 @@ void Shell::add_config_root_node(const std::string& root_name, snort::Parameter:
         return;
 
     sh->s_current_node = new TreeConfigNode(nullptr, root_name, node_type);
-    sh->config_data.add_config_tree(sh->s_current_node);
+    sh->config_data->add_config_tree(sh->s_current_node);
 }
 
 void Shell::update_current_config_node(const std::string& node_name)
 {
-    if ( !s_config_output || !s_current_node )
+    if ( !dump_enabled() or !s_current_node )
         return;
 
     // node has been added during setting default options
@@ -329,7 +335,7 @@ void Shell::update_current_config_node(const std::string& node_name)
 
 void Shell::config_close_table()
 {
-    if ( !s_config_output )
+    if ( !dump_enabled() )
         return;
 
     if ( !s_close_table )
@@ -346,7 +352,7 @@ void Shell::config_close_table()
 
 void Shell::set_config_value(const std::string& fqn, const snort::Value& value)
 {
-    if ( !s_config_output || !s_current_node )
+    if ( !dump_enabled() or !s_current_node )
         return;
 
     // don't give names to list elements
@@ -480,6 +486,11 @@ bool Shell::load_string(const char* s, bool load_in_sandbox, const char* message
     return true;
 }
 
+bool Shell::dump_enabled()
+{
+    return s_config_output or snort::SnortConfig::get_conf()->gen_dump_config();
+}
+
 bool Shell::load_config(const char* file, bool load_in_sandbox)
 {
     if ( load_in_sandbox )
@@ -517,7 +528,7 @@ bool Shell::load_config(const char* file, bool load_in_sandbox)
 //-------------------------------------------------------------------------
 
 Shell::Shell(const char* s, bool load_defaults) :
-    config_data(s), load_defaults(load_defaults)
+    config_data(new ConfigData(s)), load_defaults(load_defaults)
 {
     // FIXIT-M should wrap in Lua::State
     lua = luaL_newstate();
@@ -550,12 +561,14 @@ Shell::Shell(const char* s, bool load_defaults) :
 Shell::~Shell()
 {
     lua_close(lua);
+    if (config_data)
+        delete config_data;
 }
 
 void Shell::set_file(const char* s)
 {
     file = s;
-    config_data.file_name = file;
+    config_data->file_name = file;
 }
 
 void Shell::set_overrides(const char* s)
@@ -568,7 +581,7 @@ void Shell::set_overrides(Shell* sh)
     overrides += sh->overrides;
 }
 
-bool Shell::configure(SnortConfig* sc, bool is_root)
+bool Shell::configure(SnortConfig* sc, bool is_root, std::list<ConfigData*> *config_data_to_dump)
 {
     assert(file.size());
     ModuleManager::set_config(sc);
@@ -642,7 +655,16 @@ bool Shell::configure(SnortConfig* sc, bool is_root)
 
     auto config_output = Shell::get_current_shell()->s_config_output;
     if ( config_output )
-        config_output->dump_config(config_data);
+    {
+        bool to_clear = sc->gen_dump_config() ? false : true;
+        config_output->dump_config(*config_data, to_clear);
+    }
+
+    if ( sc->gen_dump_config() )
+    {
+        config_data_to_dump->push_back(config_data);
+        config_data = nullptr;
+    }
 
     current_shells.pop();
 

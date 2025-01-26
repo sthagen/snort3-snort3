@@ -135,10 +135,10 @@ bool AppIdInspector::configure(SnortConfig* sc)
     {
     #endif
         if ( prev_maxrss == -1 or getrusage(RUSAGE_SELF, &ru) == -1 )
-            appid_log(nullptr, TRACE_ERROR_LEVEL, "appid: fetching memory usage failed\n");
+            APPID_LOG(nullptr, TRACE_ERROR_LEVEL, "appid: fetching memory usage failed\n");
         else
-            appid_log(nullptr, TRACE_INFO_LEVEL, "appid: MaxRss diff: %li\n", ru.ru_maxrss - prev_maxrss);
-        appid_log(nullptr, TRACE_INFO_LEVEL, "appid: patterns loaded: %u\n", ctxt.get_odp_ctxt().get_pattern_count());
+            APPID_LOG(nullptr, TRACE_INFO_LEVEL, "appid: MaxRss diff: %li\n", ru.ru_maxrss - prev_maxrss);
+        APPID_LOG(nullptr, TRACE_INFO_LEVEL, "appid: patterns loaded: %u\n", ctxt.get_odp_ctxt().get_pattern_count());
     #ifdef REG_TEST
     }
     #endif
@@ -165,7 +165,9 @@ bool AppIdInspector::configure(SnortConfig* sc)
     DataBus::subscribe_global(intrinsic_pub_key, IntrinsicEventIds::FLOW_NO_SERVICE,
          new AppIdServiceEventHandler(*this), *sc);
 
-    cached_global_pub_id = DataBus::get_id(appid_pub_key);
+    if (!cached_global_pub_id)
+        cached_global_pub_id = DataBus::get_id(appid_pub_key);
+
     appid_pub_id = cached_global_pub_id;
     return true;
 }
@@ -190,6 +192,7 @@ void AppIdInspector::tinit()
     odp_thread_local_ctxt->initialize(SnortConfig::get_conf());
 
     AppIdServiceState::initialize(config->memcap);
+    AppIdServiceState::set_service_thresholds(pkt_thread_odp_ctxt->failed_state_expiration_secs, pkt_thread_odp_ctxt->brute_force_inprocess_threshold);
     assert(!pkt_thread_tp_appid_ctxt);
     pkt_thread_tp_appid_ctxt = ctxt.get_tp_appid_ctxt();
     if (pkt_thread_tp_appid_ctxt)

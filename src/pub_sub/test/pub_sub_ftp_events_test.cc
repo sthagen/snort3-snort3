@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2024-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -89,12 +89,6 @@ TEST(pub_sub_ftp_events_test, ftp_request_event)
     CHECK(event.get_request().cmd_size == 4);
     CHECK(param == "file.txt");
     CHECK(event.get_request().param_size == 8);
-
-    InetBuf src;
-    sfip_ntop(&event.get_client_ip(), src, sizeof(src));
-    std::string client = src;
-    CHECK(client == "10.10.10.1");
-    CHECK(event.get_client_port() == 40000);
 }
 
 TEST(pub_sub_ftp_events_test, ftp_response_event)

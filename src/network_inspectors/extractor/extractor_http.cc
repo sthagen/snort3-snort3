@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2024-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2024-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -37,37 +37,37 @@
 using namespace snort;
 using namespace std;
 
-static const Field& get_method(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_method(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_method();
 }
 
-static const Field& get_host(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_host(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_host_hdr();
 }
 
-static const Field& get_user_agent(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_user_agent(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_user_agent();
 }
 
-static const Field& get_uri(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_uri(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_uri();
 }
 
-static const Field& get_referrer(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_referrer(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_referer_hdr();
 }
 
-static const Field& get_origin(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_origin(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_origin_hdr();
 }
 
-static const char* get_version(const DataEvent* event, const Packet*, const Flow*)
+static const char* get_version(const DataEvent* event, const Flow*)
 {
     HttpEnums::VersionId version = ((const HttpTransactionEndEvent*)event)->get_version();
     const auto& iter = HttpEnums::VersionEnumToStr.find(version);
@@ -75,54 +75,64 @@ static const char* get_version(const DataEvent* event, const Packet*, const Flow
     return iter != HttpEnums::VersionEnumToStr.end() ? iter->second : "";
 }
 
-static const Field& get_stat_code(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_stat_code(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_stat_code();
 }
 
-static const Field& get_stat_msg(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_stat_msg(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_stat_msg();
 }
 
-static uint64_t get_trans_depth(const DataEvent* event, const Packet*, const Flow*)
+static uint64_t get_trans_depth(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_trans_depth();
 }
 
-static uint64_t get_request_body_len(const DataEvent* event, const Packet*, const Flow*)
+static uint64_t get_request_body_len(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_request_body_len();
 }
 
-static uint64_t get_response_body_len(const DataEvent* event, const Packet*, const Flow*)
+static uint64_t get_response_body_len(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_response_body_len();
 }
 
-static uint64_t get_info_code(const DataEvent* event, const Packet*, const Flow*)
+static uint64_t get_info_code(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_info_code();
 }
 
-static const Field& get_info_msg(const DataEvent* event, const Packet*, const Flow*)
+static const Field& get_info_msg(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_info_msg();
 }
 
-static const char* get_proxied(const DataEvent* event, const Packet*, const Flow*)
+static const char* get_proxied(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_proxied().c_str();
 }
 
-static const char* get_orig_filenames(const DataEvent* event, const Packet*, const Flow*)
+static const char* get_orig_filenames(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_filename(HttpCommon::SRC_CLIENT).c_str();
 }
 
-static const char* get_resp_filenames(const DataEvent* event, const Packet*, const Flow*)
+static const char* get_resp_filenames(const DataEvent* event, const Flow*)
 {
     return ((const HttpTransactionEndEvent*)event)->get_filename(HttpCommon::SRC_SERVER).c_str();
+}
+
+static const char* get_orig_mime_types(const DataEvent* event, const Flow*)
+{
+    return ((const HttpTransactionEndEvent*)event)->get_content_type(HttpCommon::SRC_CLIENT).c_str();
+}
+
+static const char* get_resp_mime_types(const DataEvent* event, const Flow*)
+{
+    return ((const HttpTransactionEndEvent*)event)->get_content_type(HttpCommon::SRC_SERVER).c_str();
 }
 
 static const map<string, ExtractorEvent::BufGetFn> sub_buf_getters =
@@ -130,7 +140,9 @@ static const map<string, ExtractorEvent::BufGetFn> sub_buf_getters =
     {"version", get_version},
     {"proxied", get_proxied},
     {"orig_filenames", get_orig_filenames},
-    {"resp_filenames", get_resp_filenames}
+    {"resp_filenames", get_resp_filenames},
+    {"orig_mime_types", get_orig_mime_types},
+    {"resp_mime_types", get_resp_mime_types}
 };
 
 static const map<string, ExtractorEvent::NumGetFn> sub_num_getters =
@@ -157,7 +169,7 @@ static const map<string, HttpExtractor::SubGetFn> sub_getters =
 THREAD_LOCAL const snort::Connector::ID* HttpExtractor::log_id = nullptr;
 
 HttpExtractor::HttpExtractor(Extractor& i, uint32_t t, const vector<string>& fields)
-    : ExtractorEvent(i, t)
+    : ExtractorEvent(ServiceType::HTTP, i, t)
 {
     for (const auto& f : fields)
     {
@@ -175,19 +187,20 @@ HttpExtractor::HttpExtractor(Extractor& i, uint32_t t, const vector<string>& fie
             continue;
     }
 
-    DataBus::subscribe(http_pub_key, HttpEventIds::END_OF_TRANSACTION, new Eot(*this, S_NAME));
+    DataBus::subscribe_global(http_pub_key, HttpEventIds::END_OF_TRANSACTION,
+        new Eot(*this, S_NAME), i.get_snort_config());
 }
 
 void HttpExtractor::internal_tinit(const snort::Connector::ID* service_id)
 { log_id = service_id; }
 
 template<>
-void ExtractorEvent::log<vector<HttpExtractor::SubField>, DataEvent*, Packet*, Flow*, bool>(
-    const vector<HttpExtractor::SubField>& fields, DataEvent* event, Packet* pkt, Flow* flow, bool strict)
+void ExtractorEvent::log<vector<HttpExtractor::SubField>, DataEvent*, Flow*, bool>(
+    const vector<HttpExtractor::SubField>& fields, DataEvent* event, Flow* flow, bool strict)
 {
     for (const auto& f : fields)
     {
-        const auto& field = f.get(event, pkt, flow);
+        const auto& field = f.get(event, flow);
         if (field.length() > 0)
             logger->add_field(f.name, (const char*)field.start(), field.length());
         else if (strict)
@@ -200,25 +213,17 @@ void HttpExtractor::handle(DataEvent& event, Flow* flow)
     // cppcheck-suppress unreadVariable
     Profile profile(extractor_perf_stats);
 
-    uint32_t tid = 0;
-
-#ifndef DISABLE_TENANT_ID
-    tid = flow->key->tenant_id;
-#endif
-
-    if (tenant_id != tid)
+    if (!filter(flow))
         return;
 
     extractor_stats.total_event++;
 
-    Packet* packet = DetectionEngine::get_current_packet();
-
     logger->open_record();
-    log(nts_fields, &event, packet, flow);
-    log(sip_fields, &event, packet, flow);
-    log(num_fields, &event, packet, flow);
-    log(buf_fields, &event, packet, flow);
-    log(sub_fields, &event, packet, flow, logger->is_strict());
+    log(nts_fields, &event, flow);
+    log(sip_fields, &event, flow);
+    log(num_fields, &event, flow);
+    log(buf_fields, &event, flow);
+    log(sub_fields, &event, flow, logger->is_strict());
     logger->close_record(*log_id);
 }
 

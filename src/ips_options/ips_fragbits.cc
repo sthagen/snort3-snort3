@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -429,7 +429,7 @@ static const IpsApi fragbits_api =
 
     //IpsApi struct
     OPT_TYPE_DETECTION, //RuleOptType
-    1,                  //max per rule
+    -1,//max per rule
     0,                  //IpsOptFunc protos
     nullptr,            //IpsOptFunc pinit
     nullptr,            //IpsOptFunc pterm

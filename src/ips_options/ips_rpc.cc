@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -336,7 +336,7 @@ static const IpsApi rpc_api =
         mod_dtor
     },
     OPT_TYPE_DETECTION,
-    1, PROTO_BIT__TCP|PROTO_BIT__UDP,
+    -1, PROTO_BIT__TCP|PROTO_BIT__UDP,
     nullptr,
     nullptr,
     nullptr,

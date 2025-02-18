@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -82,7 +82,8 @@ private:
         uint8_t*& partial_detect_buffer, uint32_t& partial_js_detect_length,
         int32_t detect_length);
     void get_file_info( FileDirection dir, const uint8_t*& filename_buffer,
-        uint32_t& filename_length, const uint8_t*& uri_buffer, uint32_t& uri_length);
+        uint32_t& filename_length, const uint8_t*& filetype_buffer, uint32_t& filetype_length,
+        const uint8_t*& uri_buffer, uint32_t& uri_length);
     void get_ole_data();
 
     Field msg_text_new;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2024-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2024-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -53,9 +53,7 @@ void JsonExtractorLogger::add_field(const char* f, const char* v)
 
 void JsonExtractorLogger::add_field(const char* f, const char* v, size_t len)
 {
-    std::string s(v, len);
-
-    js.put(f, s);
+    js.put(f, {v, len});
 }
 
 void JsonExtractorLogger::add_field(const char* f, uint64_t v)

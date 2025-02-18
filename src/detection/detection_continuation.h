@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2022-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2022-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -188,8 +188,9 @@ void Continuation::eval(snort::Packet& p)
         {
             assert(0 < states_cnt);
             assert(st != &states);
+            assert((**st).packet_number != p.context->packet_number);
+
             --states_cnt;
-            st->leave_group();
             delete st;
         }
     }

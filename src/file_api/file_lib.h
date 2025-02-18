@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -95,6 +95,7 @@ public:
     UserFileDataBase* get_file_data() const;
     void copy(const FileInfo& other, bool clear_data = true);
     void reset();
+    void set_capture_file_data(const uint8_t* file_data, uint32_t size);
     // Preserve the file in memory until it is released
     // The file reserved will be returned and it will be detached from file context/session
     FileCaptureState reserve_file(FileCapture*& dest);
@@ -111,9 +112,8 @@ public:
     bool has_to_re_eval();
     void unset_re_eval();
 
-    // Flag which indicates that the file requires re-eval even though it was fully processed before.
-    // If "true" and the policy was checked - has to be set to "false" again.
-    bool re_eval = false;
+    void set_partial_flag(bool partial);
+    bool is_partial_download() const;
 
 protected:
     std::string file_name;
@@ -134,6 +134,12 @@ protected:
     FileState file_state = { FILE_CAPTURE_SUCCESS, FILE_SIG_PROCESSING };
     uint32_t policy_id = 0;
     UserFileDataBase* user_file_data = nullptr;
+
+    // Flag which indicates that the file requires re-eval even though it was fully processed before.
+    // If "true" and the policy was checked - has to be set to "false" again.
+    bool re_eval = false;
+    // Indicates that file transmission goes through 206 HTTP Partial Content
+    bool is_partial = false;
 };
 
 class SO_PUBLIC FileContext : public FileInfo
@@ -176,7 +182,6 @@ public:
     // Configuration functions
     void remove_segments();
     void reset();
-    
 private:
     uint64_t processed_bytes = 0;
     void* file_type_context;

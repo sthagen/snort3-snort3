@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -326,7 +326,7 @@ void FileFlows::remove_processed_file_context(uint64_t file_id)
 bool FileFlows::file_process(Packet* p, uint64_t file_id, const uint8_t* file_data,
     int data_size, uint64_t offset, FileDirection dir, uint64_t multi_file_processing_id,
     FilePosition position, const uint8_t* fname, uint32_t name_size,
-    const uint8_t* url, uint32_t url_size, const std::string& host_name)
+    const uint8_t* url, uint32_t url_size, const std::string& host_name, const bool is_partial)
 {
     int64_t file_depth = FileService::get_max_file_depth();
     bool continue_processing;
@@ -351,9 +351,10 @@ bool FileFlows::file_process(Packet* p, uint64_t file_id, const uint8_t* file_da
         return false;
     }
 
-    if (context->has_to_re_eval() and context->processing_complete)
+    if (context->has_to_re_eval() and context->processing_complete and not is_partial)
         context->reset();
 
+    context->set_partial_flag(is_partial);
     context->set_weak_file_name((const char*)fname, name_size);
     context->set_weak_url((const char*)url, url_size);
     context->set_host(host_name.c_str(), host_name.size());
@@ -378,10 +379,10 @@ bool FileFlows::file_process(Packet* p, uint64_t file_id, const uint8_t* file_da
         context->set_file_id(file_id);
     }
 
-    if (context->is_cacheable() and not is_new_context)
+    if ((context->is_cacheable() and not is_new_context) or context->is_partial_download()) // If partial header was seen - check file_cache
     {
         FileVerdict verdict = FileService::get_file_cache()->cached_verdict_lookup(p, context,
-            file_policy);
+            file_policy, file_data, data_size);
         if (verdict != FILE_VERDICT_UNKNOWN and verdict != FILE_VERDICT_PENDING)
         {
             context->processing_complete = true;

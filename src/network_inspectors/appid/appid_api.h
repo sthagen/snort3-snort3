@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -54,6 +54,7 @@ public:
     bool is_inspection_needed(const Inspector& g) const;
     const char* get_appid_detector_directory() const;
     void reset_appid_cpu_profiler_stats();
+    void update_shadow_traffic_status(bool status);
 
     bool is_service_http_type(AppId service_id) const
     {

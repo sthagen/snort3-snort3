@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2024-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2024-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -30,7 +30,7 @@ public:
         HTTP,
         FTP,
         CONN,
-        UNDEFINED,
+        ANY,
         MAX
     };
 
@@ -51,15 +51,15 @@ public:
             return "ftp";
         case CONN:
             return "conn";
-        case UNDEFINED: // fallthrough
-        case MAX:       // fallthrough
+        case ANY: // fallthrough
+        case MAX: // fallthrough
         default:
             return "(not set)";
         }
     }
 
 private:
-    Value v = UNDEFINED;
+    Value v = ANY;
 };
 
 class FormatType

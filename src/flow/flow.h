@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -27,6 +27,7 @@
 // state.  Inspector state is stored in FlowData, and Flow manages a list
 // of FlowData items.
 
+#include <bitset>
 #include <string>
 #include <sys/time.h>
 
@@ -533,6 +534,8 @@ public:  // FIXIT-M privatize if possible
     FilteringState filtering_state;
 
     DAQ_Verdict last_verdict = MAX_DAQ_VERDICT;
+
+    std::bitset<64> data_log_filtering_state;
 
 private:
     void clean();

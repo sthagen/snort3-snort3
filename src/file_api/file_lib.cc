@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -137,6 +137,7 @@ void FileInfo::copy(const FileInfo& other, bool clear_data)
     host_set = other.host_set;
     verdict = other.verdict;
     file_type_enabled = other.file_type_enabled;
+    is_partial = other.is_partial;
     file_signature_enabled = other.file_signature_enabled;
     file_capture_enabled = other.file_capture_enabled;
     file_state = other.file_state;
@@ -365,6 +366,12 @@ void FileInfo::set_file_data(UserFileDataBase* fd)
     user_file_data = fd;
 }
 
+void FileInfo::set_capture_file_data(const uint8_t* file_data, uint32_t size)
+{
+    if (file_capture)
+        file_capture->set_data(file_data, size);
+}
+
 UserFileDataBase* FileInfo::get_file_data() const
 {
     return user_file_data;
@@ -402,8 +409,8 @@ inline void FileContext::finalize_file_type()
 
 void FileContext::log_file_event(Flow* flow, FilePolicyBase* policy)
 {
-    // wait for file name is set to log file event
-    if ( is_file_name_set() )
+    // log file event either when filename is set or if it is a asymmetric flow  
+    if ( is_file_name_set() or !flow->two_way_traffic() )
     {
         bool log_needed = true;
 
@@ -510,6 +517,16 @@ void FileContext::check_policy(Flow* flow, FileDirection dir, FilePolicyBase* po
     policy->policy_check(flow, this);
 }
 
+void FileInfo::set_partial_flag(bool partial)
+{
+    is_partial = partial;
+}
+
+bool FileInfo::is_partial_download() const
+{
+    return is_partial;
+}
+
 void FileInfo::reset()
 {
     verdict = FILE_VERDICT_UNKNOWN;
@@ -587,7 +604,7 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
         return false;
     }
 
-    if (cacheable and (FileService::get_file_cache()->cached_verdict_lookup(p, this, policy) !=
+    if (cacheable and (FileService::get_file_cache()->cached_verdict_lookup(p, this, policy, file_data, data_size) !=
         FILE_VERDICT_UNKNOWN))
     {
         FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL,
@@ -676,7 +693,9 @@ bool FileContext::process(Packet* p, const uint8_t* file_data, int data_size,
         /*Fails to capture, when out of memory or size limit, need lookup*/
         if (is_file_capture_enabled())
         {
+            user_file_data_mutex.lock();
             process_file_capture(file_data, data_size, position);
+            user_file_data_mutex.unlock();
         }
 
         finish_signature_lookup(p, ( file_state.sig_state != FILE_SIG_FLUSH ), policy);
@@ -1091,6 +1110,16 @@ TEST_CASE ("re_eval", "[file_info]")
     CHECK (true == info.has_to_re_eval());
     info.unset_re_eval();
     CHECK (false == info.has_to_re_eval());
+}
+
+TEST_CASE ("is_partial", "[file_info]")
+{
+    FI_TEST info;
+    CHECK (false == info.is_partial_download());
+    info.set_partial_flag(true);
+    CHECK (true == info.is_partial_download());
+    info.set_partial_flag(false);
+    CHECK (false == info.is_partial_download());
 }
 #endif
 

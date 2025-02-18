@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -43,6 +43,10 @@
 
 #ifdef HAVE_JEMALLOC
 #include <jemalloc/jemalloc.h>
+#endif
+
+#ifdef HAVE_LIBML
+#include <libml.h>
 #endif
 
 #ifdef HAVE_LIBUNWIND
@@ -694,7 +698,7 @@ int DisplayBanner()
 #endif
     LogMessage("   ''''    By Martin Roesch & The Snort Team\n");
     LogMessage("           http://snort.org/contact#team\n");
-    LogMessage("           Copyright (C) 2014-2024 Cisco and/or its affiliates."
+    LogMessage("           Copyright (C) 2014-2025 Cisco and/or its affiliates."
                            " All rights reserved.\n");
     LogMessage("           Copyright (C) 1998-2013 Sourcefire, Inc., et al.\n");
     LogMessage("           Using DAQ version %s\n", daq_version_string());
@@ -706,6 +710,9 @@ int DisplayBanner()
     size_t sz = sizeof(jv);
     mallctl("version", &jv,  &sz, NULL, 0);
     LogMessage("           Using Jemalloc version %s\n", jv);
+#endif
+#ifdef HAVE_LIBML
+    LogMessage("           Using LibML version %s\n", libml::version());
 #endif
     LogMessage("           Using %s\n", pcap_lib_version());
     LogMessage("           Using LuaJIT version %s\n", ljv);
@@ -755,8 +762,7 @@ void CreatePidFile(pid_t pid)
 {
     SnortConfig* sc = SnortConfig::get_main_conf();
 
-    sc->pid_filename = sc->log_dir;
-    sc->pid_filename += "/snort.pid";
+    sc->pid_filename = sc->log_dir + '/' + sc->pid_filename;
 
     std::string pid_lockfilename;
 

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -39,6 +39,7 @@
 #include "utils/bits.h"
 
 #define DEFAULT_LOG_DIR "."
+#define DEFAULT_PID_FILENAME "snort.pid"
 
 enum RunFlag
 {
@@ -330,6 +331,7 @@ public:
     bool stdin_rules = false;
 
     std::string pid_filename;
+    uint8_t max_procs = 1;
     std::string orig_log_dir;      /* set in case of chroot */
 
     int thiszone = 0;
@@ -450,6 +452,8 @@ public:
     void set_alert_mode(const char*);
     void set_chroot_dir(const char*);
     void set_create_pid_file(bool);
+    void set_pid_filename(const char*);
+    void set_max_procs(uint8_t);
     void set_daemon(bool);
     void set_decode_data_link(bool);
     void set_dirty_pig(bool);

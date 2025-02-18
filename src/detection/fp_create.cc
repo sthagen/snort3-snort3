@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -118,19 +118,18 @@ static int finalize_detection_option_tree(SnortConfig* sc, detection_option_tree
 
         if ( void* dup_node = add_detection_option_tree(sc, node) )
         {
-            // FIXIT-L delete dup_node and keep original?
             delete node;
             root->children[i] = (detection_option_tree_node_t*)dup_node;
         }
         else
         {
             fixup_tree(root->children[i], true, 0);
+
+            trace_logf(detection_trace, TRACE_OPTION_TREE, nullptr, "%3d %3d  %p %4s\n",
+                0, root->num_children, (void*)root, "root");
+
+            print_option_tree(root->children[i], 0);
         }
-
-        trace_logf(detection_trace, TRACE_OPTION_TREE, nullptr, "%3d %3d  %p %4s\n",
-            0, root->num_children, (void*)root, "root");
-
-        print_option_tree(root->children[i], 0);
     }
 
     return 0;

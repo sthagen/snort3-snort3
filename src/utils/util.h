@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -65,6 +65,7 @@
 
 unsigned int get_random_seed();
 bool get_file_size(const std::string&, size_t&);
+bool is_directory_path(const std::string&);
 
 namespace
 {

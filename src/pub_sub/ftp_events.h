@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2024-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -46,12 +46,6 @@ public:
 
     const FTP_CLIENT_REQ& get_request() const
     { return session.client.request; }
-
-    uint64_t get_client_port() const
-    { return (uint64_t)session.clientPort; }
-
-    const snort::SfIp& get_client_ip() const
-    { return session.clientIP; }
 
 private:
     const FTP_SESSION& session;

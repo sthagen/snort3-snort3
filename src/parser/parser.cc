@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -332,6 +332,8 @@ SnortConfig* ParseSnortConf(const SnortConfig* cmd_line_conf, const char* fname)
     sc->tweaks = cmd_line_conf->tweaks;
     sc->dump_config_type = cmd_line_conf->dump_config_type;
     sc->dump_config_file = cmd_line_conf->dump_config_file;
+    sc->pid_filename = cmd_line_conf->pid_filename;
+    sc->max_procs = cmd_line_conf->max_procs;
 
     if ( !fname )
         fname = get_snort_conf();

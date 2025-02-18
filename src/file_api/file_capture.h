@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -96,6 +96,7 @@ public:
     int64_t get_max_file_capture_size() { return capture_max_size; }
     int64_t get_file_capture_size() { return capture_size; }
     void get_file_reset() { current_block = head; }
+    void set_data(const uint8_t* file_data, const uint32_t size) {current_data = file_data; current_data_len = size;}
 
 private:
 

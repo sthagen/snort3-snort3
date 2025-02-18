@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -584,6 +584,19 @@ void SnortConfig::set_create_pid_file(bool enabled)
         run_flags |= RUN_FLAG__CREATE_PID_FILE;
     else
         run_flags &= ~RUN_FLAG__CREATE_PID_FILE;
+}
+
+void SnortConfig::set_pid_filename(const char* name)
+{
+    if (name && name[0] != '\0')
+        pid_filename = name;
+    else
+        pid_filename = DEFAULT_PID_FILENAME;
+}
+
+void SnortConfig::set_max_procs(uint8_t n)
+{
+    max_procs = n;
 }
 
 void SnortConfig::set_daemon(bool enabled)

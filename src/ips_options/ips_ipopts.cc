@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -262,7 +262,7 @@ static const IpsApi ipopts_api =
         mod_dtor
     },
     OPT_TYPE_DETECTION,
-    1, 0,
+    -1, 0,
     nullptr,
     nullptr,
     nullptr,

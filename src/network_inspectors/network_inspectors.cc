@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -34,8 +34,8 @@ extern const BaseApi* nin_appid[];
 extern const BaseApi* nin_extractor[];
 
 #if defined(HAVE_LIBML) || defined(USE_LIBML_MOCK)
-extern const BaseApi* nin_kaizen_engine[];
-extern const BaseApi* nin_kaizen[];
+extern const BaseApi* nin_snort_ml_engine[];
+extern const BaseApi* nin_snort_ml[];
 #endif
 
 extern const BaseApi* nin_port_scan[];
@@ -62,8 +62,8 @@ void load_network_inspectors()
     PluginManager::load_plugins(nin_extractor);
 
 #if defined(HAVE_LIBML) || defined(USE_LIBML_MOCK)
-    PluginManager::load_plugins(nin_kaizen_engine);
-    PluginManager::load_plugins(nin_kaizen);
+    PluginManager::load_plugins(nin_snort_ml_engine);
+    PluginManager::load_plugins(nin_snort_ml);
 #endif
 
     PluginManager::load_plugins(nin_port_scan);

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -279,6 +279,16 @@ public:
     {
         return user_data_map;
     }
+
+    void set_appid_shadow_traffic_status(bool status)
+    { 
+        appid_shadow_traffic_status = status; 
+    }
+
+    bool get_appid_shadow_traffic_status() const
+    { 
+        return appid_shadow_traffic_status; 
+    }
  
     unsigned get_pattern_count();
     void add_port_service_id(IpProtocol, uint16_t, AppId);
@@ -315,6 +325,7 @@ private:
 
     uint32_t version;
     static uint32_t next_version;
+    bool appid_shadow_traffic_status = true;
 };
 
 class OdpThreadContext

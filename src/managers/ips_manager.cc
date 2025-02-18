@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -204,11 +204,19 @@ bool IpsManager::option_begin(
         opt->init = true;
     }
 
-    if ( opt->api->max_per_rule && (++opt->count > opt->api->max_per_rule) )
+    unsigned max = std::abs(opt->api->max_per_rule);
+    if ( max && (++opt->count > max) )
     {
-        ParseError("%s allowed only %u time(s) per rule",
-            opt->api->base.name, opt->api->max_per_rule);
-        return false;
+        if ( opt->api->max_per_rule > 0 )
+        {
+            ParseError("%s allowed only %u time(s) per rule", opt->api->base.name, max);
+            return false;
+        }
+
+        bool is_first_excessive_opt = (opt->count - max) == 1;
+        if ( is_first_excessive_opt )
+            ParseWarning(WARN_RULES, "for best performance, all %s options could be consolidated",
+                opt->api->base.name);
     }
 
     // FIXIT-M allow service too

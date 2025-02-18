@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -367,8 +367,11 @@ static const Parameter s_params[] =
       "<file> to create unix socket" },
 #endif
 
-    { "--create-pidfile", Parameter::PT_IMPLIED, nullptr, nullptr,
+    { "--create-pidfile", Parameter::PT_STRING, "(optional)", nullptr,
       "create PID file, even when not in Daemon mode" },
+
+    { "--max-procs", Parameter::PT_INT, "1:", nullptr,
+      "number of simultaneous Snort processes" },
 
     { "--daq", Parameter::PT_STRING, nullptr, nullptr,
       "<type> select packet acquisition module (default is pcap)" },
@@ -899,7 +902,13 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
 #endif
 
     else if ( is(v, "--create-pidfile") )
+    {
         sc->set_create_pid_file(true);
+        sc->set_pid_filename(v.get_string());
+    }
+
+    else if ( is(v, "--max-procs") )
+        sc->set_max_procs(v.get_uint8());
 
     else if ( is(v, "--daq") )
         module_config = sc->daq_config->add_module_config(v.get_string());

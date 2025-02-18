@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -217,6 +217,11 @@ const char* AppInfoManager::get_app_name(int32_t)
     return nullptr;
 }
 
+uint32_t AppInfoManager::getAttributeBits(AppId)
+{
+    return 0;
+} 
+
 // Stubs for AppIdSession
 void AppIdSession::sync_with_snort_protocol_id(AppId, Packet*) {}
 void AppIdSession::check_app_detection_restart(AppidChangeBits&, ThirdPartyAppIdContext*) {}
@@ -227,6 +232,8 @@ void AppIdSession::update_encrypted_app_id(AppId) {}
 bool AppIdSession::is_tp_processing_done() const {return false;}
 AppId AppIdSession::pick_ss_payload_app_id(AppId) const { return get_payload_id(); }
 bool AppIdSession::need_to_delete_tp_conn(ThirdPartyAppIdContext*) const { return true; }
+void AppIdSession::process_shadow_traffic_appids() {}
+
 AppIdSession* AppIdSession::allocate_session(const Packet*, IpProtocol,
     AppidSessionDirection, AppIdInspector&, OdpContext&)
 {

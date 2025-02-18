@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -199,10 +199,11 @@ void HttpMsgBody::analyze()
         {
             // After process_mime_data(), ptr will point to the last byte processed in the current MIME part
             ptr = session_data->mime_state[source_id]->process_mime_data(p, ptr, 
-                (section_end - ptr), true, SNORT_FILE_POSITION_UNKNOWN);
+                (section_end - ptr), true, SNORT_FILE_POSITION_UNKNOWN, &latest_attachment);
             ptr++;
 
-            latest_attachment = session_data->mime_state[source_id]->get_attachment();
+            if (latest_attachment.started)
+                transaction->add_filename(source_id, latest_attachment.filename, latest_attachment.content_type);
 
             if (!latest_attachment.data)
             {
@@ -602,6 +603,7 @@ static FilePosition find_range_file_pos(const std::string& hdr_content, bool fro
     if (errno or end_ptr != hdr_content.c_str() + dash_pos)
         return SNORT_FILE_POSITION_UNKNOWN;
 
+    // return middle no matter what range actually is
     if (range_start != 0)
         return SNORT_FILE_MIDDLE;
 
@@ -651,6 +653,7 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
     const bool front = (body_octets == 0) &&
         (session_data->partial_inspected_octets[source_id] == 0);
     const bool back = (session_data->cutter[source_id] == nullptr) || tcp_close;
+    bool is_partially_downloaded = false;
 
     if (session_data->status_code_num != 206 or source_id != SRC_SERVER)
     {
@@ -679,6 +682,8 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
 
         if (file_position == SNORT_FILE_POSITION_UNKNOWN)
             return;
+
+        is_partially_downloaded = true;
     }
 
     const int32_t fp_length = (file_data.length() <=
@@ -694,13 +699,17 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
     uint64_t file_index = get_header(source_id)->get_file_cache_index();
     // Get host from the header field.
     std::string host = get_header(source_id)->get_host_header_field();
-    
+
     const uint8_t* filename_buffer = nullptr;
     uint32_t filename_length = 0;
+    const uint8_t* filetype_buffer = nullptr;
+    uint32_t filetype_length = 0;
     const uint8_t* uri_buffer = nullptr;
     uint32_t uri_length = 0;
+
     if (request != nullptr)
-        get_file_info(dir, filename_buffer, filename_length, uri_buffer, uri_length);
+        get_file_info(dir, filename_buffer, filename_length, filetype_buffer, filetype_length,
+            uri_buffer, uri_length);
 
     // Get host from the uri.
     if (host.empty() and request != nullptr)
@@ -709,7 +718,7 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
     bool continue_processing_file = file_flows->file_process(p, file_index, file_data.start(),
         fp_length, session_data->file_octets[source_id], dir,
         get_header(source_id)->get_multi_file_processing_id(), file_position,
-        filename_buffer, filename_length, uri_buffer, uri_length, host);
+        filename_buffer, filename_length, uri_buffer, uri_length, host, is_partially_downloaded);
     if (continue_processing_file)
     {
         session_data->file_depth_remaining[source_id] -= fp_length;
@@ -723,7 +732,8 @@ void HttpMsgBody::do_file_processing(const Field& file_data)
                     filename_length, 0,
                     get_header(source_id)->get_multi_file_processing_id(), uri_buffer,
                     uri_length);
-                transaction->set_filename(source_id, (const char*) filename_buffer, filename_length);
+                transaction->add_filename(source_id, (const char*) filename_buffer, filename_length,
+                    (const char*) filetype_buffer, filetype_length);
             }
         }
     }
@@ -808,7 +818,8 @@ void HttpMsgBody::clear()
 // query or fragment. For the uri, use the request raw uri. If there is no URI or nothing in the
 // path after the last slash, the filename and uri buffers may be empty. The normalized URI is used.
 void HttpMsgBody::get_file_info(FileDirection dir, const uint8_t*& filename_buffer,
-    uint32_t& filename_length, const uint8_t*& uri_buffer, uint32_t& uri_length)
+    uint32_t& filename_length, const uint8_t*& filetype_buffer, uint32_t& filetype_length,
+    const uint8_t*& uri_buffer, uint32_t& uri_length)
 {
     filename_buffer = uri_buffer = nullptr;
     filename_length = uri_length = 0;
@@ -823,6 +834,15 @@ void HttpMsgBody::get_file_info(FileDirection dir, const uint8_t*& filename_buff
             filename_buffer = cd_filename.start();
             filename_length = cd_filename.length();
         }
+    }
+
+    const Field& filetype = get_header(source_id)->get_header_value_norm(HEAD_CONTENT_TYPE);
+    if (filetype.length() > 0)
+    {
+        filetype_buffer = filetype.start();
+        filetype_length = filetype.length();
+        if (filetype_buffer[filetype_length - 1] == ';')
+            filetype_length--;
     }
 
     if (http_uri)

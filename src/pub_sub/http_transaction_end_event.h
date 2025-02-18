@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2024-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2024-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -56,6 +56,7 @@ public:
     uint8_t get_info_code() const;
     const Field& get_info_msg() const;
     const std::string& get_filename(HttpCommon::SourceId) const;
+    const std::string& get_content_type(HttpCommon::SourceId) const;
     const std::string& get_proxied() const;
 
 private:

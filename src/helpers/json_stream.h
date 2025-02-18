@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -50,6 +50,9 @@ public:
     void put_false(const char* key);
 
     void put_eol();
+
+protected:
+    void put_escaped(const char* v, size_t len);
 
 private:
     void split();

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -889,6 +889,9 @@ void AppIdDiscovery::do_post_discovery(Packet* p, AppIdSession& asd,
 
     if (PacketTracer::is_daq_activated())
         populate_trace_data(asd);
+
+    if (is_discovery_done and asd.get_shadow_traffic_bits() == 0 )
+        asd.process_shadow_traffic_appids();
 
     asd.publish_appid_event(change_bits, *p);
 }

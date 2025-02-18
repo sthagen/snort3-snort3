@@ -37,17 +37,17 @@
 using namespace snort;
 using namespace std;
 
-static uint64_t get_orig_pkts(const DataEvent*, const Packet*, const Flow* f)
+static uint64_t get_orig_pkts(const DataEvent*, const Flow* f)
 {
     return f->flowstats.client_pkts;
 }
 
-static uint64_t get_resp_pkts(const DataEvent*, const Packet*, const Flow* f)
+static uint64_t get_resp_pkts(const DataEvent*, const Flow* f)
 {
     return f->flowstats.server_pkts;
 }
 
-static uint64_t get_duration(const DataEvent*, const Packet*, const Flow* f)
+static uint64_t get_duration(const DataEvent*, const Flow* f)
 {
     return f->last_data_seen - f->flowstats.start_time.tv_sec;
 }
@@ -59,7 +59,7 @@ static const map<string, ExtractorEvent::NumGetFn> sub_num_getters =
     {"duration", get_duration}
 };
 
-static const char* get_service(const DataEvent*, const Packet*, const Flow* f)
+static const char* get_service(const DataEvent*, const Flow* f)
 {
     SnortConfig* sc = SnortConfig::get_main_conf();
     return sc->proto_ref->get_name(f->ssn_state.snort_protocol_id);
@@ -73,7 +73,7 @@ static const map<PktType, string> pkttype_to_protocol =
     {PktType::ICMP, "ICMP"}
 };
 
-static const char* get_proto(const DataEvent*, const Packet*, const Flow* f)
+static const char* get_proto(const DataEvent*, const Flow* f)
 {
     const auto& iter = pkttype_to_protocol.find(f->pkt_type);
     return (iter != pkttype_to_protocol.end()) ? iter->second.c_str() : "";
@@ -88,7 +88,7 @@ static const map<string, ExtractorEvent::BufGetFn> sub_buf_getters =
 THREAD_LOCAL const snort::Connector::ID* ConnExtractor::log_id = nullptr;
 
 ConnExtractor::ConnExtractor(Extractor& i, uint32_t t, const vector<string>& fields)
-    : ExtractorEvent(i, t)
+    : ExtractorEvent(ServiceType::CONN, i, t)
 {
     for (const auto& f : fields)
     {
@@ -104,7 +104,8 @@ ConnExtractor::ConnExtractor(Extractor& i, uint32_t t, const vector<string>& fie
             continue;
     }
 
-    DataBus::subscribe(intrinsic_pub_key, IntrinsicEventIds::FLOW_END, new Eof(*this, S_NAME));
+    DataBus::subscribe_global(intrinsic_pub_key, IntrinsicEventIds::FLOW_END,
+        new Eof(*this, S_NAME), i.get_snort_config());
 }
 
 void ConnExtractor::internal_tinit(const snort::Connector::ID* service_id)
@@ -115,27 +116,16 @@ void ConnExtractor::handle(DataEvent& event, Flow* flow)
     // cppcheck-suppress unreadVariable
     Profile profile(extractor_perf_stats);
 
-    uint32_t tid = 0;
-
-    if ((flow->pkt_type < PktType::IP) or (flow->pkt_type > PktType::ICMP))
+    if (flow->pkt_type < PktType::IP or flow->pkt_type > PktType::ICMP or !filter(flow))
         return;
-
-#ifndef DISABLE_TENANT_ID
-    tid = flow->key->tenant_id;
-#endif
-
-    if (tenant_id != tid)
-        return;
-
-    Packet* packet = (DetectionEngine::get_context()) ? DetectionEngine::get_current_packet() : nullptr;
 
     extractor_stats.total_event++;
 
     logger->open_record();
-    log(nts_fields, &event, packet, flow);
-    log(sip_fields, &event, packet, flow);
-    log(num_fields, &event, packet, flow);
-    log(buf_fields, &event, packet, flow);
+    log(nts_fields, &event, flow);
+    log(sip_fields, &event, flow);
+    log(num_fields, &event, flow);
+    log(buf_fields, &event, flow);
     logger->close_record(*log_id);
 }
 
@@ -156,11 +146,11 @@ TEST_CASE("Conn Proto", "[extractor]")
     set_inspection_policy(&ins);
     NetworkPolicy net;
     set_network_policy(&net);
-  
+
     SECTION("unknown")
     {
         flow->pkt_type = PktType::NONE;
-        const char* proto = get_proto(nullptr, nullptr, flow);
+        const char* proto = get_proto(nullptr, flow);
         CHECK_FALSE(strcmp("", proto));
     }
 

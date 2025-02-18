@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 1998-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -254,7 +254,7 @@ static const IpsApi base64_decode_api =
         mod_dtor
     },
     OPT_TYPE_DETECTION,
-    1, 0,
+    -1, 0,
     nullptr,
     nullptr,
     nullptr,

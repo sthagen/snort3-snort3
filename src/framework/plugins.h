@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2024-2024 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2024-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -37,7 +37,7 @@
 #include "framework/policy_selector.h"
 #include "framework/so_rule.h"
 
-// forward decls we must explicitly include here to 
+// forward decls we must explicitly include here to
 // generate the complete set of API dependencies:
 
 #include "flow/flow.h"

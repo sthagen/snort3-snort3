@@ -46,6 +46,7 @@
 #include "detector_plugins/detector_dns.h"
 #include "detector_plugins/http_url_patterns.h"
 #include "host_port_app_cache.h"
+#include "pub_sub/domain_fronting.h"
 #include "service_plugins/service_discovery.h"
 #include "tp_lib_handler.h"
 #include "tp_appid_utils.h"
@@ -481,7 +482,7 @@ bool AppIdDiscovery::do_host_port_based_discovery(Packet* p, AppIdSession& asd, 
             port = p->ptrs.sp;
         }
     }
-    HostPortVal* hv = nullptr;
+    const HostPortVal* hv = nullptr;
 
     if (check_static and
         (hv = asd.get_odp_ctxt().host_port_cache_find(ip, port, protocol)))
@@ -573,8 +574,7 @@ bool AppIdDiscovery::detect_on_first_pkt(Packet* p, AppIdSession& asd,
         port = p->ptrs.sp;
     }
 
-    HostAppIdsVal* hv = nullptr;
-    hv = asd.get_odp_ctxt().host_first_pkt_find(ip, port, protocol);
+    const HostAppIdsVal* hv = asd.get_odp_ctxt().host_first_pkt_find(ip, port, protocol);
     if (hv)
     {
         const char *service_app_name = nullptr, *client_app_name = nullptr, *payload_app_name = nullptr;

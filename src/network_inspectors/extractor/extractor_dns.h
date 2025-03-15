@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2025-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,42 +15,26 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
-// appid_ssh_event_handler.h  author Daniel McGarvey <danmcgar@cisco.com>
+// extractor_dns.h author Cisco
 
-#ifndef APPID_SSH_EVENT_HANDLER_H
-#define APPID_SSH_EVENT_HANDLER_H
+#ifndef EXTRACTOR_DNS_H
+#define EXTRACTOR_DNS_H
 
-#include "pub_sub/ssh_events.h"
+#include "extractors.h"
 
-#include "appid_flow_data.h"
-#include "appid_module.h"
-
-class SshEventHandler : public snort::DataHandler
+class DnsResponseExtractor : public ExtractorEvent
 {
 public:
-    SshEventHandler() : snort::DataHandler(MOD_NAME)
-    { id = snort::FlowData::create_flow_data_id(); }
+    DnsResponseExtractor(Extractor&, uint32_t tenant, const std::vector<std::string>& fields);
 
-    void handle(snort::DataEvent &, snort::Flow *) override;
+    void handle(DataEvent&, Flow*);
 
 private:
-    static unsigned int id;
-};
+    using Resp = Handler<DnsResponseExtractor>;
 
-struct SshAppIdInfo
-{
-    std::string vendor;
-    std::string version;
-    bool finished = false;
-};
+    void internal_tinit(const snort::Connector::ID*) override;
 
-class SshEventFlowData : public AppIdFlowData
-{
-public:
-    ~SshEventFlowData() override = default;
-    SshAppIdInfo service_info;
-    SshAppIdInfo client_info;
-    bool failed = false;
+    static THREAD_LOCAL const snort::Connector::ID* log_id;
 };
 
 #endif

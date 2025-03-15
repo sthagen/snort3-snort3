@@ -15,32 +15,39 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+// domain_fronting.h author Bhumika Sachdeva <bsachdev@cisco.com>
 
-// appid_event_ids.h author Russ Combs <rucombs@cisco.com>
-
-#ifndef APPID_EVENT_IDS_H
-#define APPID_EVENT_IDS_H
+#ifndef DOMAIN_FRONTING_H
+#define DOMAIN_FRONTING_H
 
 #include "framework/data_bus.h"
+#include "pub_sub/appid_events.h"
+#include <string>
 
-namespace snort
+enum class DomainFrontingStatus  
 {
+     UNDEFINED,
+     MISMATCH,  
+     MATCHES,  
+     CERT_NOT_IN_CACHE  
+};
 
-struct AppIdEventIds
-{ enum : unsigned {
+class SO_PUBLIC TLSDomainFrontCheckEvent : public snort::DataEvent 
+{
+public: 
+     TLSDomainFrontCheckEvent(const std::string& certificate_id, 
+          const std::string& hostname)
+     : cert_id(certificate_id), hostname(hostname) {}
 
-    ANY_CHANGE,
-    DEBUG_LOG,
-    DHCP_DATA,
-    DHCP_INFO,
-    FP_SMB_DATA,
-    DOMAIN_FRONTING,
+     const std::string& get_cert_id() { return cert_id; }
+     const std::string& get_hostname () { return hostname; }
+     void set_cert_lookup_verdict(DomainFrontingStatus status) { this->df_status = status; }
+     DomainFrontingStatus get_cert_lookup_verdict() const { return df_status; }
 
-    num_ids
-}; };
+private:
+     const std::string &cert_id;
+     const std::string &hostname;
+     DomainFrontingStatus df_status = DomainFrontingStatus::UNDEFINED;
+};
 
-const PubKey appid_pub_key { "appid", AppIdEventIds::num_ids };
-
-}
 #endif
-

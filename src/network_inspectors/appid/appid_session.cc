@@ -158,12 +158,10 @@ AppIdSession::~AppIdSession()
     }
  
     if ((pkt_thread_odp_ctxt->get_version() == api.asd->get_odp_ctxt_version()) and api.asd->get_odp_ctxt().get_appid_shadow_traffic_status())
-    { 
-        if (get_shadow_traffic_publishing_appid() > APP_ID_NONE)
-        {
-            if (api.asd->appid_shadow_traffic_bits != 0)
-                api.asd->publish_shadow_traffic_event(api.asd->appid_shadow_traffic_bits, api.asd->flow);
-        } 
+    {
+        check_domain_fronting_status();
+        if (api.asd->appid_shadow_traffic_bits != 0)
+            api.asd->publish_shadow_traffic_event(api.asd->appid_shadow_traffic_bits, api.asd->flow);
     }
 
     if (!in_expected_cache)
@@ -723,41 +721,44 @@ void AppIdSession::delete_session_data()
     delete tsession;
 }
 
-int AppIdSession::add_flow_data(void* data, unsigned id, AppIdFreeFCN fcn)
+int AppIdSession::add_flow_data(AppIdFlowData* data, unsigned id)
 {
-    AppIdFlowDataIter it = flow_data.find(id);
+    auto it = flow_data.find(id);
     if (it != flow_data.end())
         return -1;
 
-    AppIdFlowData* fd = new AppIdFlowData(data, id, fcn);
-    flow_data[id] = fd;
+    flow_data[id] = data;
     return 0;
 }
 
-void* AppIdSession::get_flow_data(unsigned id) const
+AppIdFlowData* AppIdSession::get_flow_data(unsigned id) const
 {
-    AppIdFlowDataIter it = flow_data.find(id);
+    auto it = flow_data.find(id);
     if (it != flow_data.end())
-        return it->second->fd_data;
+    {
+        assert(id == it->first);
+        return it->second;
+    }
     else
         return nullptr;
 }
 
 void AppIdSession::free_flow_data()
 {
-    for (AppIdFlowDataIter it = flow_data.cbegin();
-         it != flow_data.cend();
-         ++it)
-        delete it->second;
-
+    std::for_each(std::cbegin(flow_data), std::cend(flow_data),
+        [](const std::pair<unsigned, AppIdFlowData*>& p)
+        {
+            delete p.second;
+        });
     flow_data.clear();
 }
 
 void AppIdSession::free_flow_data_by_id(unsigned id)
 {
-    AppIdFlowDataIter it = flow_data.find(id);
+    auto it = flow_data.find(id);
     if (it != flow_data.end())
     {
+        assert(id == it->first);
         delete it->second;
         flow_data.erase(it);
     }
@@ -765,14 +766,16 @@ void AppIdSession::free_flow_data_by_id(unsigned id)
 
 void AppIdSession::free_flow_data_by_mask(unsigned mask)
 {
-    for (AppIdFlowDataIter it = flow_data.cbegin(); it != flow_data.cend();)
-        if (!mask or (it->second->fd_id & mask))
+    for (auto it = flow_data.cbegin(); it != flow_data.cend();)
+    {
+        if (!mask or (it->first & mask))
         {
             delete it->second;
             it = flow_data.erase(it);
         }
         else
             ++it;
+    }
 }
 
 int AppIdSession::add_flow_data_id(uint16_t port, ServiceDetector* service)
@@ -1220,7 +1223,7 @@ void AppIdSession::publish_shadow_traffic_event(const uint32_t &shadow_traffic_b
     app_name = api.asd->get_odp_ctxt().get_app_info_mgr().get_app_name(publishing_appid);
     if (app_name == nullptr)
     {
-        APPID_LOG(nullptr, TRACE_ERROR_LEVEL, "Appname is invalid, not publishing shadow traffic event without appname\n");
+        APPID_LOG(CURRENT_PACKET, TRACE_DEBUG_LEVEL,"Appname is invalid, not publishing shadow traffic event without appname\n");
         return;
     }
 
@@ -1353,3 +1356,28 @@ void AppIdSession::process_shadow_traffic_appids()
         set_shadow_traffic_publishing_appid(publishing_appid);
     } 
 }
+
+void AppIdSession::check_domain_fronting_status()  
+{
+    if (api.asd->get_session_flags(APPID_SESSION_DECRYPTED) or api.asd->get_session_flags(APPID_SESSION_APP_REINSPECT)) 
+    { 
+        AppIdHttpSession* hsession = api.asd->get_http_session();
+        if (hsession) 
+        {
+            const std::string* host = hsession->get_field(REQ_HOST_FID); 
+            if (host)
+            {
+                TLSDomainFrontCheckEvent domain_front_event(api.asd->get_cert_key(), *host);
+                DataBus::publish(AppIdInspector::get_pub_id(), AppIdEventIds::DOMAIN_FRONTING, domain_front_event);
+                if (DomainFrontingStatus::MISMATCH == domain_front_event.get_cert_lookup_verdict())
+                {
+                    uint32_t shadow_bits = get_shadow_traffic_bits();
+                    shadow_bits |= ShadowTraffic_Type_Domain_Fronting;
+                    set_shadow_traffic_bits(shadow_bits);
+                    AppId payload_id = api.asd->get_api().get_payload_app_id();
+                    set_shadow_traffic_publishing_appid(payload_id);
+                }
+            }
+        } 
+    } 
+} 

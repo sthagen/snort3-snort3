@@ -35,6 +35,7 @@
 #include "appid_api.h"
 #include "appid_app_descriptor.h"
 #include "appid_config.h"
+#include "appid_flow_data.h"
 #include "appid_http_session.h"
 #include "appid_types.h"
 #include "application_ids.h"
@@ -54,8 +55,6 @@ class AppIdDnsSession;
 class AppIdHttpSession;
 class ThirdPartyAppIdSession;
 
-using AppIdFreeFCN = void (*)(void*);
-
 const uint8_t* service_strstr(const uint8_t* haystack, unsigned haystack_len,
     const uint8_t* needle, unsigned needle_len);
 
@@ -74,25 +73,6 @@ enum APPID_DISCOVERY_STATE
     APPID_DISCO_STATE_STATEFUL,
     APPID_DISCO_STATE_FINISHED
 };
-
-class AppIdFlowData
-{
-public:
-    AppIdFlowData(void* data, unsigned id, AppIdFreeFCN fcn) :
-        fd_data(data), fd_id(id), fd_free(fcn)
-    { }
-
-    ~AppIdFlowData()
-    {
-        if (fd_data && fd_free)
-            fd_free(fd_data);
-    }
-
-    void* fd_data;
-    unsigned fd_id;
-    AppIdFreeFCN fd_free;
-};
-typedef std::unordered_map<unsigned, AppIdFlowData*>::const_iterator AppIdFlowDataIter;
 
 enum MatchedTlsType
 {
@@ -374,8 +354,8 @@ public:
     bool is_decrypted() const { return ((flags & APPID_SESSION_DECRYPTED) == 0) ? false : true; }
     bool is_svc_taking_too_much_time() const;
 
-    void* get_flow_data(unsigned id) const;
-    int add_flow_data(void* data, unsigned id, AppIdFreeFCN);
+    AppIdFlowData* get_flow_data(unsigned id) const;
+    int add_flow_data(AppIdFlowData* data, unsigned id);
     int add_flow_data_id(uint16_t port, ServiceDetector*);
     void free_flow_data_by_id(unsigned id);
     void free_flow_data_by_mask(unsigned mask);
@@ -438,6 +418,7 @@ public:
     void publish_shadow_traffic_event(const uint32_t& shadow_traffic_bits,snort::Flow*)const;
     void process_shadow_traffic_appids();
     void check_shadow_traffic_bits(AppId id, uint32_t& shadow_bits, AppId &publishing_appid, bool& is_publishing_set);
+    void check_domain_fronting_status();
 
     bool need_to_delete_tp_conn(ThirdPartyAppIdContext*) const;
 
@@ -805,6 +786,16 @@ public:
         
         str.append(tempStr);     
     } 
+    
+    void set_cert_key (const std::string& key)
+    {
+        ssl_cert_key = key;
+    }
+
+    const std::string& get_cert_key() const
+    {
+        return ssl_cert_key;
+    }
 
 private:
     uint16_t prev_httpx_raw_packet = 0;
@@ -829,6 +820,7 @@ private:
     bool no_service_candidate = false;
     bool no_service_inspector = false;
     bool client_info_unpublished = false;
+    string ssl_cert_key;
     uint32_t appid_shadow_traffic_bits = 0;
     AppId shadow_traffic_appid = APP_ID_NONE;
 };

@@ -28,6 +28,8 @@
 #include <mutex>
 #include <pwd.h>
 #include <syslog.h>
+#include <sys/types.h>
+#include <unistd.h>
 #include <unordered_map>
 
 #include "actions/ips_actions.h"
@@ -197,6 +199,8 @@ void SnortConfig::init(const SnortConfig* const other_conf, ProtocolReference* p
         policy_map = new PolicyMap;
         thread_config = new ThreadConfig();
         global_dbus = new DataBus();
+        if (max_procs > 1)
+            mp_dbus = new MPDataBus();
 
         proto_ref = new ProtocolReference(protocol_reference);
         so_rules = new SoRules;
@@ -217,6 +221,8 @@ static void generate_config_dump(std::list<ConfigData*> *config_data, time_t tim
 {
     ++threads_cnt;
 
+    file_name += "_";
+    file_name += std::to_string(getpid());
     file_name += "_";
     file_name += std::to_string(timestamp);
     file_name += "_";
@@ -258,6 +264,8 @@ SnortConfig::~SnortConfig()
     if ( cloned )
     {
         delete global_dbus;
+        if (max_procs > 1)
+            delete mp_dbus;
         policy_map->set_cloned(true);
         delete policy_map;
         return;
@@ -317,6 +325,8 @@ SnortConfig::~SnortConfig()
     delete overlay_trace_config;
     delete ha_config;
     delete global_dbus;
+    if (max_procs > 1)
+        delete mp_dbus;
 
     delete profiler;
     delete latency;
@@ -386,6 +396,9 @@ void SnortConfig::clone(const SnortConfig* const conf)
 {
     *this = *conf;
     global_dbus = new DataBus();
+    if (max_procs > 1)
+        mp_dbus = new MPDataBus();
+    
     if (conf->homenet.get_family() != 0)
         memcpy(&homenet, &conf->homenet, sizeof(homenet));
 

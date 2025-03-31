@@ -25,6 +25,7 @@
 
 #include <cmath>
 #include <daq.h>
+#include <openssl/crypto.h>
 #include <sys/stat.h>
 #include <syslog.h>
 
@@ -118,6 +119,8 @@ void Snort::init(int argc, char** argv)
     DataBus::init();
 
     DetectionEngine::init();
+
+    OPENSSL_init_crypto(OPENSSL_INIT_LOAD_CONFIG, nullptr);
 
     load_actions();
     load_codecs();
@@ -568,6 +571,8 @@ SnortConfig* Snort::get_updated_policy(
 
     SnortConfig* sc = new SnortConfig(other_conf, iname);
     sc->global_dbus->clone(*other_conf->global_dbus, iname);
+    if (sc->max_procs > 1)
+        sc->mp_dbus->clone(*other_conf->mp_dbus, iname);
 
     if ( fname )
     {

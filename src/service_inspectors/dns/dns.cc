@@ -40,7 +40,6 @@
 using namespace snort;
 
 #define MAX_UDP_PAYLOAD 0x1FFF
-#define DNS_RR_PTR 0xC0
 
 THREAD_LOCAL ProfileStats dnsPerfStats;
 THREAD_LOCAL DnsStats dnsstats;
@@ -76,6 +75,10 @@ DnsFlowData::~DnsFlowData()
     assert(dnsstats.concurrent_sessions > 0);
     dnsstats.concurrent_sessions--;
 }
+
+unsigned DnsUdpFlowData::inspector_id = 0;
+
+DnsUdpFlowData::DnsUdpFlowData() : FlowData(inspector_id) {}
 
 bool DNSData::publish_response() const
 {
@@ -121,13 +124,6 @@ bool DNSData::valid_dns(const DNSHdr& dns_header) const
         return false;
 
     return true;
-}
-
-void DNSData::add_answer(const char* answer)
-{
-    if (!answers.empty())
-        answers.append(" ");
-    answers.append(answer);
 }
 
 DNSData* get_dns_session_data(Packet* p, bool from_server, DNSData& udpSessionData)
@@ -508,7 +504,8 @@ static uint16_t ParseDNSQuestion(
 }
 
 static uint16_t ParseDNSAnswer(
-    const unsigned char* data, uint16_t bytes_unused, DNSData* dnsSessionData)
+    const unsigned char* data, uint16_t bytes_unused, DNSData* dnsSessionData,
+    const Packet* p, std::vector<uint16_t>& tabs)
 {
     if ( !bytes_unused )
         return 0;
@@ -536,6 +533,7 @@ static uint16_t ParseDNSAnswer(
     switch (dnsSessionData->curr_rec_state)
     {
     case DNS_RESP_STATE_RR_TYPE:
+        tabs.emplace_back(data - p->data);
         dnsSessionData->curr_rr.type = (uint8_t)*data << 8;
         data++;
 
@@ -752,8 +750,7 @@ static uint16_t SkipDNSRData(
 static uint16_t ParseDNSRData(
     const unsigned char* data,
     uint16_t bytes_unused,
-    DNSData* dnsSessionData,
-    void (DNSData::*save_rdata)(const char*) = nullptr)
+    DNSData* dnsSessionData)
 {
     if (bytes_unused == 0)
     {
@@ -785,23 +782,13 @@ static uint16_t ParseDNSRData(
         break;
     case DNS_RR_TYPE_A:
     case DNS_RR_TYPE_AAAA:
+        if (dnsSessionData->publish_response())
         {
-            auto resp_ip = DnsResponseIp(data, dnsSessionData->curr_rr.type);
-            if (dnsSessionData->publish_response())
-            {
-                dnsSessionData->dns_events.add_fqdn(dnsSessionData->cur_fqdn_event, dnsSessionData->curr_rr.ttl);
-                dnsSessionData->dns_events.add_ip(resp_ip);
-            }
-
-            if (save_rdata)
-            {
-                SfIpString ipbuf;
-                resp_ip.get_ip().ntop(ipbuf);
-                (dnsSessionData->*save_rdata)(ipbuf);
-            }
+            dnsSessionData->dns_events.add_fqdn(dnsSessionData->cur_fqdn_event, dnsSessionData->curr_rr.ttl);
+            dnsSessionData->dns_events.add_ip(DnsResponseIp(data, dnsSessionData->curr_rr.type));
         }
-        bytes_unused = SkipDNSRData(data, bytes_unused, dnsSessionData);
 
+        bytes_unused = SkipDNSRData(data, bytes_unused, dnsSessionData);
         break;
     case DNS_RR_TYPE_CNAME:
         if (dnsSessionData->publish_response())
@@ -815,6 +802,9 @@ static uint16_t ParseDNSRData(
     case DNS_RR_TYPE_PTR:
     case DNS_RR_TYPE_HINFO:
     case DNS_RR_TYPE_MX:
+    case DNS_RR_TYPE_RRSIG:
+    case DNS_RR_TYPE_NSEC:
+    case DNS_RR_TYPE_DS:
         bytes_unused = SkipDNSRData(data, bytes_unused, dnsSessionData);
         break;
     default:
@@ -912,7 +902,7 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData, bool& ne
         case DNS_RESP_STATE_ANS_RR: /* ANSWERS section */
             for (i=dnsSessionData->curr_rec; i<dnsSessionData->hdr.answers; i++)
             {
-                bytes_unused = ParseDNSAnswer(data, bytes_unused, dnsSessionData);
+                bytes_unused = ParseDNSAnswer(data, bytes_unused, dnsSessionData, p, dnsSessionData->answer_tabs);
 
                 if (bytes_unused == 0)
                 {
@@ -929,7 +919,7 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData, bool& ne
                 case DNS_RESP_STATE_RR_RDATA_MID:
                     /* Data now points to the beginning of the RDATA */
                     data = p->data + (p->dsize - bytes_unused);
-                    bytes_unused = ParseDNSRData(data, bytes_unused, dnsSessionData, &DNSData::add_answer);
+                    bytes_unused = ParseDNSRData(data, bytes_unused, dnsSessionData);
                     if (dnsSessionData->curr_rec_state != DNS_RESP_STATE_RR_COMPLETE)
                     {
                         needNextPacket = true;
@@ -957,7 +947,7 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData, bool& ne
         case DNS_RESP_STATE_AUTH_RR: /* AUTHORITIES section */
             for (i=dnsSessionData->curr_rec; i<dnsSessionData->hdr.authorities; i++)
             {
-                bytes_unused = ParseDNSAnswer(data, bytes_unused, dnsSessionData);
+                bytes_unused = ParseDNSAnswer(data, bytes_unused, dnsSessionData, p, dnsSessionData->auth_tabs);
 
                 if (bytes_unused == 0)
                 {
@@ -1002,7 +992,7 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData, bool& ne
         case DNS_RESP_STATE_ADD_RR: /* ADDITIONALS section */
             for (i=dnsSessionData->curr_rec; i<dnsSessionData->hdr.additionals; i++)
             {
-                bytes_unused = ParseDNSAnswer(data, bytes_unused, dnsSessionData);
+                bytes_unused = ParseDNSAnswer(data, bytes_unused, dnsSessionData, p, dnsSessionData->addl_tabs);
 
                 if (bytes_unused == 0)
                 {
@@ -1149,6 +1139,53 @@ StreamSplitter* Dns::get_splitter(bool c2s)
     return new DnsSplitter(c2s);
 }
 
+// Get the DNS transaction ID from a UDP packet's data field
+static inline uint16_t get_udp_trans_id(Packet* p)
+{
+    // The length of packet's data field should have already been validated
+    return (static_cast<uint16_t>(p->data[0]) << 8) | static_cast<uint16_t>(p->data[1]);
+}
+
+// Add DNS transaction ID to the UDP packet's flow data object
+static void add_to_udp_flow(Packet* p, uint16_t trans_id)
+{
+    DnsUdpFlowData* udp_flow_data = (DnsUdpFlowData*)((p->flow)->get_flow_data(DnsUdpFlowData::inspector_id));
+    if (!udp_flow_data)
+    {
+        udp_flow_data = new DnsUdpFlowData();
+        p->flow->set_flow_data(udp_flow_data);
+    }
+    udp_flow_data->trans_ids.emplace(trans_id);
+}
+
+// Check if the DNS transaction ID is found in the UDP packet's flow data object
+static bool is_in_udp_flow(Packet* p, uint16_t trans_id)
+{
+    bool found = false;
+    DnsUdpFlowData* udp_flow_data = (DnsUdpFlowData*)((p->flow)->get_flow_data(DnsUdpFlowData::inspector_id));
+    if (udp_flow_data)
+        found = udp_flow_data->trans_ids.find(trans_id) != udp_flow_data->trans_ids.end();
+    return found;
+}
+
+// Remove DNS transaction ID from the UDP packet's flow data object
+static void rm_from_udp_flow(Packet* p, uint16_t trans_id)
+{
+    DnsUdpFlowData* udp_flow_data = (DnsUdpFlowData*)((p->flow)->get_flow_data(DnsUdpFlowData::inspector_id));
+    bool should_close = true;
+    if (udp_flow_data)
+    {
+        udp_flow_data->trans_ids.erase(trans_id);
+        should_close = udp_flow_data->trans_ids.empty();
+    }
+    if (should_close)
+    {
+        // Mark the UDP flow as "closed" only when all trans_ids are matched
+        // and removed by DNS-reply packets, or if the flow data object is not found
+        p->flow->session_state |= STREAM_STATE_CLOSED;
+    }
+}
+
 static void snort_dns(Packet* p, const DnsConfig* dns_config)
 {
     // cppcheck-suppress unreadVariable
@@ -1191,27 +1228,44 @@ static void snort_dns(Packet* p, const DnsConfig* dns_config)
     dnsSessionData->dns_config = dns_config;
     if ( from_server )
     {
-        bool needNextPacket = false;
-        ParseDNSResponseMessage(p, dnsSessionData, needNextPacket);
-
-        if (!dnsSessionData->valid_dns(dnsSessionData->hdr))
+        uint16_t trans_id = 0;
+        // Always parse the response packet for TCP flows
+        bool should_parse_response = true;
+        if (p->is_udp())
         {
-            dnsSessionData->flags |= DNS_FLAG_NOT_DNS;
-            return;
+            // If this is a DNS-over-UDP flow then parse the response packet and publish events
+            // only when the response packet's DNS transaction-ID is found in the flow data object
+            trans_id = get_udp_trans_id(p);
+            should_parse_response = is_in_udp_flow(p, trans_id);
         }
 
-        if (!needNextPacket and dnsSessionData->has_events())
-            DataBus::publish(Dns::get_pub_id(), DnsEventIds::DNS_RESPONSE_DATA, dnsSessionData->dns_events);
+        if (should_parse_response)
+        {
+            bool needNextPacket = false;
+            ParseDNSResponseMessage(p, dnsSessionData, needNextPacket);
+            trans_id = dnsSessionData->hdr.id;
 
-        DnsResponseEvent dns_response_event(*dnsSessionData);
-        DataBus::publish(Dns::get_pub_id(), DnsEventIds::DNS_RESPONSE, dns_response_event, p->flow);
+            if (!dnsSessionData->valid_dns(dnsSessionData->hdr))
+            {
+                dnsSessionData->flags |= DNS_FLAG_NOT_DNS;
+                return;
+            }
 
-        if (p->type() == PktType::UDP)
-            p->flow->session_state |= STREAM_STATE_CLOSED;
+            if (!needNextPacket and dnsSessionData->has_events())
+                DataBus::publish(Dns::get_pub_id(), DnsEventIds::DNS_RESPONSE_DATA, dnsSessionData->dns_events);
+
+            DnsResponseEvent dns_response_event(*dnsSessionData, p);
+            DataBus::publish(Dns::get_pub_id(), DnsEventIds::DNS_RESPONSE, dns_response_event, p->flow);
+        }
+
+        if (p->is_udp())
+            rm_from_udp_flow(p, trans_id);
     }
     else
     {
         dnsstats.requests++;
+        if (p->is_udp())
+            add_to_udp_flow(p, get_udp_trans_id(p));
     }
 }
 
@@ -1228,6 +1282,7 @@ static void mod_dtor(Module* m)
 static void dns_init()
 {
     DnsFlowData::init();
+    DnsUdpFlowData::init();
 }
 
 static Inspector* dns_ctor(Module* m)

@@ -22,6 +22,8 @@
 #ifndef DNS_H
 #define DNS_H
 
+#include <set>
+
 #include "flow/flow.h"
 
 #include "protocols/packet.h"
@@ -110,6 +112,11 @@ struct DNSNameState
 #define DNS_RR_TYPE_MX                      0x000f
 #define DNS_RR_TYPE_TXT                     0x0010
 #define DNS_RR_TYPE_AAAA                    0x001c
+#define DNS_RR_TYPE_RRSIG                   0x002e
+#define DNS_RR_TYPE_NSEC                    0x002f
+#define DNS_RR_TYPE_DS                      0x002b
+
+#define DNS_RR_PTR 0xC0
 
 #define DNS_FLAG_NOT_DNS                0x01
 
@@ -206,12 +213,22 @@ struct DNSData
     snort::DnsResponseDataEvents dns_events;
     DnsResponseFqdn cur_fqdn_event;
     std::string resp_query;
-    std::string answers;
+    std::vector<uint16_t> answer_tabs;
+    std::vector<uint16_t> auth_tabs;
+    std::vector<uint16_t> addl_tabs;
 
     bool publish_response() const;
     bool has_events() const;
     bool valid_dns(const DNSHdr&) const;
-    void add_answer(const char* answer);
+
+    void decode_rdata(const snort::Packet* p, const uint8_t* rdata, uint16_t rdlength,
+        uint16_t type, std::string& rdata_str) const;
+    void get_rr_data(const snort::Packet *p, const std::vector<uint16_t>& tabs,
+        std::string& rrs, std::string* ttls = nullptr) const;
+    void get_answers(const snort::Packet *p, std::string& answers, std::string& ttls) const
+    { get_rr_data(p, answer_tabs, answers, &ttls); }
+    void get_auth(const snort::Packet *p, std::string& auth) const { get_rr_data(p, auth_tabs, auth); }
+    void get_addl(const snort::Packet *p, std::string& addl) const { get_rr_data(p, addl_tabs, addl); }
 };
 
 DNSData* get_dns_session_data(snort::Packet* p, bool from_server, DNSData& udpSessionData);
@@ -233,6 +250,7 @@ private:
     uint16_t type = 0;
 };
 
+// Flow data class for DNS over TCP
 class DnsFlowData : public snort::FlowData
 {
 public:
@@ -245,6 +263,20 @@ public:
 public:
     static unsigned inspector_id;
     DNSData session;
+};
+
+// Flow data class for DNS over UDP
+class DnsUdpFlowData : public snort::FlowData
+{
+public:
+    DnsUdpFlowData();
+
+    static void init()
+    { inspector_id = snort::FlowData::create_flow_data_id(); }
+
+public:
+    static unsigned inspector_id;
+    std::set<uint16_t> trans_ids;
 };
 
 #endif

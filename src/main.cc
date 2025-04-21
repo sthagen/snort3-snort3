@@ -871,6 +871,13 @@ int show_snort_cpu(lua_State* L)
     return 0;
 }
 
+int show_snort_packet_latency(lua_State* L)
+{
+    ControlConn* ctrlconn = ControlConn::query_from_lua(L);
+    send_response(ctrlconn, "Snort Packet latency data\n\n");
+    main_broadcast_command(new ACShowSnortPacketLatencyData(ctrlconn), ctrlconn);
+    return 0;
+}
 //-------------------------------------------------------------------------
 // housekeeping foo
 //-------------------------------------------------------------------------
@@ -879,10 +886,8 @@ static int signal_check()
 {
     PigSignal s = get_pending_signal();
 
-    if ( s == PIG_SIG_NONE or s >= PIG_SIG_MAX )
-        return 0;
-
-    LogMessage("** caught %s signal\n", get_signal_name(s));
+    if ( s > PIG_SIG_NONE and s < PIG_SIG_MAX )
+        LogMessage("** caught %s signal\n", get_signal_name(s));
 
     switch ( s )
     {
@@ -913,8 +918,12 @@ static int signal_check()
     case PIG_SIG_ROTATE_STATS:
         main_rotate_stats();
         break;
+
     default:
-        break;
+        // if signal is not handled, return 0
+        if ( s >= PIG_SIG_MAX )
+            LogMessage("** caught unknown signal - %u\n", s);
+        return 0;
     }
     proc_stats.signals++;
     return 1;

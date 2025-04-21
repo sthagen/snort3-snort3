@@ -67,7 +67,7 @@ static const Parameter extractor_proto_params[] =
 
 static const Parameter s_params[] =
 {
-    { "formatting", Parameter::PT_ENUM, "csv | json", "csv",
+    { "formatting", Parameter::PT_ENUM, "csv | tsv | json", "csv",
       "output format for extractor" },
 
     { "connector", Parameter::PT_STRING, nullptr, nullptr,
@@ -100,7 +100,7 @@ void ExtractorModule::commit_config()
     for (const auto& p : extractor_config.protocols)
     {
         if (p.tenant_id == service_config.tenant_id and p.service == service_config.service)
-            ParseWarning(WARN_CONF_STRICT, "%s service got multiple configurations", service_config.service.c_str());
+            ParseWarning(WARN_CONF, "%s service got multiple configurations", service_config.service.c_str());
     }
 
     extractor_config.protocols.push_back(service_config);

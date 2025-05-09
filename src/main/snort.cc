@@ -60,6 +60,7 @@
 #include "managers/plugin_manager.h"
 #include "managers/policy_selector_manager.h"
 #include "managers/script_manager.h"
+#include "managers/mp_transport_manager.h"
 #include "memory/memory_cap.h"
 #include "network_inspectors/network_inspectors.h"
 #include "packet_io/active.h"
@@ -79,6 +80,7 @@
 #include "trace/trace_api.h"
 #include "trace/trace_config.h"
 #include "trace/trace_logger.h"
+#include "mp_transport/mp_transports.h"
 #include "utils/stats.h"
 #include "utils/util.h"
 
@@ -132,6 +134,7 @@ void Snort::init(int argc, char** argv)
     load_stream_inspectors();
     load_network_inspectors();
     load_service_inspectors();
+    load_mp_transports();
 
     snort_cmd_line_conf = parse_cmd_line(argc, argv);
     SnortConfig::set_conf(snort_cmd_line_conf);
@@ -168,6 +171,10 @@ void Snort::init(int argc, char** argv)
     // This call must be immediately after "SnortConfig::set_conf(sc)"
     // since the first trace call may happen somewhere after this point
     TraceApi::thread_init(sc->trace_config);
+    if (sc->max_procs > 1)
+    {
+        sc->mp_dbus = new MPDataBus();
+    }
 
     PluginManager::load_so_plugins(sc);
 
@@ -186,6 +193,11 @@ void Snort::init(int argc, char** argv)
 
     ModuleManager::init_stats();
     ModuleManager::reset_stats(sc);
+
+    if (sc->mp_dbus)
+    {
+        sc->mp_dbus->init(sc->max_procs);
+    }
 
     if (sc->alert_before_pass())
         sc->rule_order = IpsAction::get_default_priorities(true);
@@ -327,6 +339,7 @@ void Snort::term()
 
     const SnortConfig* sc = SnortConfig::get_conf();
 
+    MPTransportManager::term();
     IpsManager::global_term(sc);
     HostAttributesManager::term();
 
@@ -571,7 +584,8 @@ SnortConfig* Snort::get_updated_policy(
 
     SnortConfig* sc = new SnortConfig(other_conf, iname);
     sc->global_dbus->clone(*other_conf->global_dbus, iname);
-    if (sc->max_procs > 1)
+
+    if (other_conf->mp_dbus != nullptr)
         sc->mp_dbus->clone(*other_conf->mp_dbus, iname);
 
     if ( fname )

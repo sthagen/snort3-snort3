@@ -35,11 +35,25 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
 #include <queue>
+#include <atomic>
+#include <thread>
+#include <bitset>
 
+#include "control/control.h"
+#include "framework/mp_transport.h"
+#include "framework/counts.h"
 #include "main/snort_types.h"
 #include "data_bus.h"
-#include <bitset>
+
+#define DEFAULT_TRANSPORT "unix_transport"
+#define DEFAULT_MAX_EVENTQ_SIZE 1000
+#define WORKER_THREAD_SLEEP 100
+
+template <typename T>
+class Ring;
 
 namespace snort
 {
@@ -47,8 +61,35 @@ class Flow;
 struct Packet;
 struct SnortConfig;
 
-typedef bool (*MPSerializeFunc)(const DataEvent& event, char** buffer, size_t* length);
-typedef bool (*MPDeserializeFunc)(const char* buffer, size_t length, DataEvent* event);
+struct MPDataBusStats
+{
+    MPDataBusStats() :
+        total_messages_sent(0),
+        total_messages_received(0),
+        total_messages_dropped(0),
+        total_messages_published(0),
+        total_messages_delivered(0)
+    { }
+
+    PegCount total_messages_sent;
+    PegCount total_messages_received;
+    PegCount total_messages_dropped;
+    PegCount total_messages_published;
+    PegCount total_messages_delivered;
+};
+
+static const PegInfo mp_databus_pegs[] =
+{
+    { CountType::SUM, "total_messages_sent", "total messages sent" },
+    { CountType::SUM, "total_messages_received", "total messages received" },
+    { CountType::SUM, "total_messages_dropped", "total messages dropped" },
+    { CountType::SUM, "total_messages_published", "total messages published" },
+    { CountType::SUM, "total_messages_delivered", "total messages delivered" },
+    { CountType::END, nullptr, nullptr },
+};
+
+typedef bool (*MPSerializeFunc)(DataEvent* event, char*& buffer, uint16_t* length);
+typedef bool (*MPDeserializeFunc)(const char* buffer, uint16_t length, DataEvent*& event);
 
 // Similar to the DataBus class, the MPDataBus class uses uses a combination of PubKey and event ID
 // for event subscriptions and publishing. New MP-specific event type enums should be added to the
@@ -58,56 +99,113 @@ typedef bool (*MPDeserializeFunc)(const char* buffer, size_t length, DataEvent* 
 // manner analogous to the approach used for intra-snort pub_sub.
 typedef unsigned MPEventType;
 
-struct MPEventInfo 
+struct MPEventInfo
 {
-    MPEventType type;
     unsigned pub_id;
-    DataEvent event;
-    MPEventInfo(const DataEvent& e, MPEventType t, unsigned id = 0)
-        : type(t), pub_id(id), event(e) {}
+    MPEventType type;
+    std::shared_ptr<DataEvent> event;
+    MPEventInfo(std::shared_ptr<DataEvent> e, MPEventType t, unsigned id = 0)
+        : pub_id(id), type(t), event(std::move(e)) {}
 };
 
 struct MPHelperFunctions {
-    MPSerializeFunc* serializer;
-    MPDeserializeFunc* deserializer;
+    MPSerializeFunc serializer;
+    MPDeserializeFunc deserializer;
     
-    MPHelperFunctions(MPSerializeFunc* s, MPDeserializeFunc* d) 
+    MPHelperFunctions(MPSerializeFunc s, MPDeserializeFunc d) 
         : serializer(s), deserializer(d) {}
+};
+
+struct pair_hash
+{
+    template <class T1, class T2>
+    std::size_t operator()(const std::pair<T1, T2>& pair) const
+    {
+        std::hash<T1> hash1;
+        std::hash<T2> hash2;
+        return hash1(pair.first) ^ (hash2(pair.second) << 1);
+    }
 };
 
 class SO_PUBLIC MPDataBus
 { 
 public: 
-    MPDataBus(); 
+    MPDataBus();
     ~MPDataBus();
+    
+    static uint32_t mp_max_eventq_size;
+    static std::string transport;
+    static bool enable_debug;
+#ifdef REG_TEST
+    static bool hold_events;
+#endif
 
-    static unsigned init(int);
+    static MPTransport * transport_layer;
+    static MPDataBusStats mp_global_stats;
+    unsigned init(int);
     void clone(MPDataBus& from, const char* exclude_name = nullptr);
 
-    unsigned get_id(const PubKey& key) 
-    { return DataBus::get_id(key); }
+    static unsigned get_id(const PubKey& key);
+    static const char* get_name_from_id(unsigned id);
 
-    bool valid(unsigned pub_id)
+    static bool valid(unsigned pub_id)
     { return pub_id != 0; }
 
-    void subscribe(const PubKey& key, unsigned id, DataHandler* handler); 
+    static void subscribe(const PubKey& key, unsigned id, DataHandler* handler); 
 
-    bool publish(unsigned pub_id, unsigned evt_id, DataEvent& e, Flow* f = nullptr); 
+    // API for publishing the DataEvent to the peer Snort processes
+    // The user needs to pass a shared_ptr to the DataEvent object as the third argument
+    // This is to ensure that the DataEvent object is not deleted before it is published
+    // or consumed by the worker thread
+    // and the shared_ptr will handle the memory management by reference counting
+    static bool publish(unsigned pub_id, unsigned evt_id, std::shared_ptr<DataEvent> e, Flow* f = nullptr);
 
-    void register_event_helpers(const PubKey& key, unsigned evt_id, MPSerializeFunc* mp_serializer_helper, MPDeserializeFunc* mp_deserializer_helper);
-
+    // The user needs to pass the MPSerializeFunc and MPDeserializeFunc function pointers
+    // to the register_event_helpers function, which will be used to serialize and deserialize
+    // before publishing any events to the MPDataBus
+    static void register_event_helpers(const PubKey& key, unsigned evt_id, MPSerializeFunc& mp_serializer_helper, MPDeserializeFunc& mp_deserializer_helper);
     // API for receiving the DataEvent and Event type from transport layer using EventInfo
     void receive_message(const MPEventInfo& event_info);
 
+    Ring<std::shared_ptr<MPEventInfo>>* get_event_queue()
+    { return mp_event_queue; }
+
+    void set_debug_enabled(bool flag);
+
+    void sum_stats();
+
+    void dump_stats(ControlConn* ctrlconn, const char* module_name);
+    void dump_events(ControlConn* ctrlconn, const char* module_name);
+    void show_channel_status(ControlConn* ctrlconn);
+
 private: 
     void _subscribe(unsigned pid, unsigned eid, DataHandler* h);
-    void _publish(unsigned pid, unsigned eid, DataEvent& e, Flow* f);
+    void _subscribe(const PubKey& key, unsigned eid, DataHandler* h);
+
+    bool _publish(unsigned pid, unsigned eid, DataEvent& e, Flow* f);
+    bool _enqueue_event(std::shared_ptr<MPEventInfo> ev_info);
 
 private:
     typedef std::vector<DataHandler*> SubList;
-    std::vector<SubList> mp_pub_sub;
+
+    std::unordered_map<std::pair<unsigned, unsigned>, SubList, pair_hash> mp_pub_sub;
+
+    std::atomic<bool> run_thread;
+    std::unique_ptr<std::thread> worker_thread;
+
+    Ring<std::shared_ptr<MPEventInfo>>* mp_event_queue;
+
+    std::condition_variable queue_cv;
+    std::mutex queue_mutex;
+
+    std::unordered_map<unsigned, MPDataBusStats> mp_pub_stats;
+
+    void start_worker_thread();
+    void stop_worker_thread();
+    void worker_thread_func();
+    void process_event_queue();
 };
-}
+};
 
 #endif
 

@@ -35,7 +35,9 @@ struct HttpEventIds
     REQUEST_HEADER,
     RESPONSE_HEADER,
     REQUEST_BODY,
-    END_OF_TRANSACTION,  
+    BODY,
+    END_OF_TRANSACTION,
+    HTTP_PUBLISH_LENGTH,
 
     num_ids
 }; };

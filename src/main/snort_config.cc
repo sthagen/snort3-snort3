@@ -63,6 +63,7 @@
 #include "managers/mpse_manager.h"
 #include "managers/plugin_manager.h"
 #include "managers/so_manager.h"
+#include "managers/mp_transport_manager.h"
 #include "memory/memory_config.h"
 #include "packet_io/sfdaq.h"
 #include "packet_io/sfdaq_config.h"
@@ -199,8 +200,6 @@ void SnortConfig::init(const SnortConfig* const other_conf, ProtocolReference* p
         policy_map = new PolicyMap;
         thread_config = new ThreadConfig();
         global_dbus = new DataBus();
-        if (max_procs > 1)
-            mp_dbus = new MPDataBus();
 
         proto_ref = new ProtocolReference(protocol_reference);
         so_rules = new SoRules;
@@ -264,7 +263,7 @@ SnortConfig::~SnortConfig()
     if ( cloned )
     {
         delete global_dbus;
-        if (max_procs > 1)
+        if (mp_dbus)
             delete mp_dbus;
         policy_map->set_cloned(true);
         delete policy_map;
@@ -325,7 +324,7 @@ SnortConfig::~SnortConfig()
     delete overlay_trace_config;
     delete ha_config;
     delete global_dbus;
-    if (max_procs > 1)
+    if (mp_dbus)
         delete mp_dbus;
 
     delete profiler;
@@ -1135,6 +1134,7 @@ void SnortConfig::cleanup_fatal_error()
     const SnortConfig* sc = SnortConfig::get_conf();
     if ( sc && !sc->dirty_pig )
     {
+        MPTransportManager::term();
         ModuleManager::term();
         EventManager::release_plugins();
         IpsManager::release_plugins();

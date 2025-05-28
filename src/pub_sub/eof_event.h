@@ -1,6 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
-// Copyright (C) 2005-2013 Sourcefire, Inc.
+// Copyright (C) 2025-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -17,34 +16,27 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-#ifndef UDP_SESSION_H
-#define UDP_SESSION_H
+// eof_event.h author Maya Dagon <mdagon@cisco.com>
 
-#include <sys/time.h>
+#ifndef EOF_EVENT_H
+#define EOF_EVENT_H
 
-#include "flow/session.h"
+#include "framework/data_bus.h"
 
-class SO_PUBLIC UdpSession : public Session
-
+namespace snort
+{
+class SO_PUBLIC EofEvent : public snort::DataEvent
 {
 public:
-    UdpSession(snort::Flow*);
-    ~UdpSession() override;
-
-    bool setup(snort::Packet*) override;
-    void update_direction(char dir, const snort::SfIp*, uint16_t port) override;
-    int process(snort::Packet*) override;
-    void clear() override;
-    void count_stale_packet() override;
-
-    public:
-    struct timeval ssn_time = {};
-    uint64_t payload_bytes_seen_client = 0;
-    uint64_t payload_bytes_seen_server = 0;
+    EofEvent(const Flow* const flow) : f(flow) { }
+    const std::string& get_history() const;
+    const std::string& get_state() const;
 
 private:
-    int process_udp(snort::Flow*, snort::Packet*);
+    const Flow* const f;
+    mutable std::string history;
+    mutable std::string state;
 };
+}
 
 #endif
-

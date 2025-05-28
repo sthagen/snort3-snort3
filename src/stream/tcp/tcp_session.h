@@ -119,6 +119,9 @@ public:
     void handle_data_segment(TcpSegmentDescriptor&, bool flush = true);
     bool validate_packet_established_session(TcpSegmentDescriptor&);
 
+    void count_stale_packet() override
+    { tcpStats.stale_packets++; }
+
     TcpStreamTracker client;
     TcpStreamTracker server;
     TcpStreamConfig* tcp_config = nullptr;
@@ -135,6 +138,14 @@ public:
     bool cleaning = false;
     uint8_t held_packet_dir = SSN_DIR_NONE;
     uint8_t ecn = 0;
+
+    struct TcpSessionStats
+    {
+         using TcpEvents = std::bitset<TcpStreamTracker::TcpEvent::TCP_MAX_TALKER_EVENT + 1>;
+         TcpEvents client_events;
+         TcpEvents server_events;
+    };
+    TcpSessionStats tcp_ssn_stats;
 
 private:
     int process_tcp_packet(TcpSegmentDescriptor&, const snort::Packet*);
@@ -156,6 +167,7 @@ private:
     void set_packet_header_foo(const TcpSegmentDescriptor&);
     void update_session_on_server_packet(TcpSegmentDescriptor&);
     void update_session_on_client_packet(TcpSegmentDescriptor&);
+    bool is_hole_present(TcpStreamTracker*, snort::Packet*);
 
     TcpStateMachine* tsm;
     bool splitter_init = false;

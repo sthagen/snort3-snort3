@@ -600,7 +600,7 @@ void TcpSession::mark_packet_for_drop(TcpSegmentDescriptor& tsd)
 bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, TcpStreamTracker* listener)
 {
     // if this packet fits within the current queue limit window then it's good
-    if( listener->seglist.segment_within_seglist_window(tsd) )
+    if ( listener->seglist.segment_within_seglist_window(tsd) )
         return false;
 
     bool inline_mode = tsd.is_nap_policy_inline();
@@ -613,6 +613,10 @@ bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, Tc
         if ( space_left < (int32_t)tsd.get_len() )
         {
             tcpStats.exceeded_max_bytes++;
+
+            if ( is_hole_present(listener, tsd.get_pkt()) )
+                tcpStats.max_bytes_exceeded_hole++;
+
             bool ret_val = true;
 
             // if this is an asymmetric flow then skip over any seglist holes
@@ -633,6 +637,7 @@ bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, Tc
             {
                 // FIXIT-M - only alert once per threshold exceeded event
                 tel.set_tcp_event(EVENT_MAX_QUEUED_BYTES_EXCEEDED);
+                listener->seglist.print_stream_state(tsd.get_talker());
                 listener->normalizer.log_drop_reason(tsd, inline_mode, "stream",
                     "stream_tcp: Flow exceeded the configured max byte threshold (" + std::to_string(tcp_config->max_queued_bytes) +
                     "). You may want to adjust the 'max_bytes' parameter in the NAP policy"
@@ -650,6 +655,9 @@ bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, Tc
         {
             tcpStats.exceeded_max_segs++;
 
+            if ( is_hole_present(listener, tsd.get_pkt()) )
+                tcpStats.max_segs_exceeded_hole++;
+
             // if this is an asymmetric flow then skip over any seglist holes
             // and flush to free up seglist space
             if ( !tsd.get_pkt()->flow->two_way_traffic() )
@@ -663,6 +671,7 @@ bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, Tc
             {
                 // FIXIT-M - only alert once per threshold exceeded event
                 tel.set_tcp_event(EVENT_MAX_QUEUED_SEGS_EXCEEDED);
+                listener->seglist.print_stream_state(tsd.get_talker());
                 listener->normalizer.log_drop_reason(tsd, inline_mode, "stream",
                     "stream_tcp: Flow exceeded the configured max segment threshold (" + std::to_string(tcp_config->max_queued_segs) +
                     "). You may want to adjust the 'max_segments' parameter in the NAP policy"
@@ -679,9 +688,7 @@ bool TcpSession::check_reassembly_queue_thresholds(TcpSegmentDescriptor& tsd, Tc
 
 bool TcpSession::filter_packet_for_reassembly(TcpSegmentDescriptor& tsd, TcpStreamTracker* listener)
 {
-    if ( tsd.are_packet_flags_set(PKT_IGNORE)
-        or listener->get_flush_policy() == STREAM_FLPOLICY_IGNORE
-        or ( ( tcp_config->flags & STREAM_CONFIG_NO_ASYNC_REASSEMBLY ) && !flow->two_way_traffic() ) )
+    if ( tsd.are_packet_flags_set(PKT_IGNORE) or listener->get_flush_policy() == STREAM_FLPOLICY_IGNORE )
         return false;
 
     return !check_reassembly_queue_thresholds(tsd, listener);
@@ -942,6 +949,9 @@ bool TcpSession::cleanup_session_if_expired(Packet* p)
     // the packet...Insert a packet, or handle state change SYN, FIN, RST, etc.
     if ( Stream::expired_flow(flow, p) )
     {
+        if ( PacketTracer::is_active() and p and p->ptrs.tcph )
+            PacketTracer::log("Stream TCP session expired with session flags 0x%x, flow state %hhu, and seq %u\n",
+                flow->get_session_flags(), static_cast<uint8_t>(flow->flow_state), p->ptrs.tcph->seq());
         /* Session is timed out, if also reset then restart, otherwise clear */
         if ( flow->get_session_flags() & SSNFLAG_RESET )
             clear_session(true, true, true, p);
@@ -1424,4 +1434,41 @@ void TcpSession::check_for_pseudo_established(Packet* p)
     }
 }
 
+bool TcpSession::is_hole_present(TcpStreamTracker* listener, snort::Packet* pkt)
+{
+    // This function logs detection of hole in IPS mode
+    if ( listener->get_flush_policy() != STREAM_FLPOLICY_ON_DATA )
+        return false;
 
+    auto log_hole_detection = [pkt](const uint32_t leftmost_hole, const uint32_t hole_size)
+    {
+        if ( hole_size )
+        {
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("stream_tcp: Hole detected at seq %u of size %u bytes\n", \
+                                  leftmost_hole, hole_size);
+
+            if ( stream_tcp_trace_enabled && pkt )
+                trace_logf(TRACE_WARNING_LEVEL, stream_tcp_trace, DEFAULT_TRACE_OPTION_ID, pkt, \
+                          "stream_tcp: Hole detected at seq %u of size %u bytes\n", leftmost_hole, hole_size);
+            return true;
+        }
+        return false;
+    };
+
+    // Check for hole at the beginning of seglist
+    if ( SEQ_LT(listener->rcv_nxt, listener->seglist.head->start_seq()) )
+    {
+        auto hole_size = listener->seglist.head->start_seq() - listener->rcv_nxt;
+        return log_hole_detection(listener->rcv_nxt, hole_size);
+    }
+
+    if ( listener->seglist.cur_sseg && listener->seglist.cur_sseg->next )
+    {
+        auto leftmost_hole = listener->seglist.cur_sseg->next_seq();
+        auto hole_size = listener->seglist.cur_sseg->next->start_seq() - \
+                         listener->seglist.cur_sseg->next_seq();
+        return log_hole_detection(leftmost_hole, hole_size);
+    }
+    return false;
+}

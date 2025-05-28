@@ -1,9 +1,9 @@
-cmake_minimum_required (VERSION 3.4.3)
+cmake_minimum_required (VERSION 3.5)
 project (snort CXX C)
 
 set (VERSION_MAJOR 3)
-set (VERSION_MINOR 7)
-set (VERSION_PATCH 4)
+set (VERSION_MINOR 8)
+set (VERSION_PATCH 1)
 set (VERSION_SUBLEVEL 0)
 set (VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_SUBLEVEL}")
 

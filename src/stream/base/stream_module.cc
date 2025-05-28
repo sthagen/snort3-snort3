@@ -72,6 +72,9 @@ static const Parameter allowlist_cache_params[] =
     { "enable", Parameter::PT_BOOL, nullptr, "false",
       "enable allowlist cache" },
 
+    { "move_on_excess", Parameter::PT_BOOL, nullptr, "false",
+      "move flows to allowlist instead of removing when max flows limit reached" },
+
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
@@ -112,6 +115,9 @@ static const Parameter s_params[] =
       "don't track midstream TCP sessions after given seconds from start up; -1 tracks all" },
 
     { "allowlist_cache", Parameter::PT_TABLE, allowlist_cache_params, nullptr, "configure allowlist cache" },
+
+    { "drop_stale_packets", Parameter::PT_BOOL, nullptr, "false",
+      "enable dropping of packets with stale timestamp" },
 
     FLOW_TYPE_TABLE("ip_cache",   "ip",   ip_params),
     FLOW_TYPE_TABLE("icmp_cache", "icmp", icmp_params),
@@ -418,6 +424,9 @@ bool StreamModule::set(const char* fqn, Value& v, SnortConfig* c)
     else if ( !strcmp(fqn, "stream.allowlist_cache.enable") )
         config.flow_cache_cfg.allowlist_cache = v.get_bool();
 
+    else if ( !strcmp(fqn, "stream.allowlist_cache.move_on_excess") )
+        config.flow_cache_cfg.move_to_allowlist_on_excess = v.get_bool();
+
     else if ( !strcmp(fqn, "stream.file_cache.idle_timeout") )
         config.flow_cache_cfg.proto[to_utype(PktType::FILE)].nominal_timeout = v.get_uint32();
 
@@ -433,6 +442,15 @@ bool StreamModule::set(const char* fqn, Value& v, SnortConfig* c)
     else if ( !strcmp(fqn, "stream.udp_cache.idle_timeout") )
         config.flow_cache_cfg.proto[to_utype(PktType::UDP)].nominal_timeout = v.get_uint32();
 
+    else if ( v.is("drop_stale_packets") )
+    {
+        config.drop_stale_packets = v.get_bool();
+        if (config.drop_stale_packets)
+            c->set_run_flags(RUN_FLAG__DROP_STALE_PACKETS);
+        else
+            c->clear_run_flags(RUN_FLAG__DROP_STALE_PACKETS);
+        return true;
+    }
     else
     {
         assert(!strcmp(fqn, "stream.user_cache.idle_timeout"));
@@ -601,7 +619,8 @@ void StreamModuleConfig::show() const
     ConfigLogger::log_value("pruning_timeout", flow_cache_cfg.pruning_timeout);
     ConfigLogger::log_value("prune_flows", flow_cache_cfg.prune_flows);
     ConfigLogger::log_limit("require_3whs", hs_timeout, -1, hs_timeout < 0 ? hs_timeout : -1);
-
+    ConfigLogger::log_value("drop_stale_packets", drop_stale_packets ? "enabled" : "disabled");
+    
     for (int i = to_utype(PktType::IP); i < to_utype(PktType::PDU); ++i)
     {
         std::string tmp;
@@ -613,6 +632,7 @@ void StreamModuleConfig::show() const
     {
         std::string tmp;
         tmp += "{ enable = " + (flow_cache_cfg.allowlist_cache ? std::string("true") : std::string("false"));
+        tmp += ", move_on_excess = " + (flow_cache_cfg.move_to_allowlist_on_excess ? std::string("true") : std::string("false"));
         tmp += " }";
         ConfigLogger::log_value("allowlist_cache", tmp.c_str());
     }

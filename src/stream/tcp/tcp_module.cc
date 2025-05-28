@@ -121,6 +121,8 @@ const PegInfo tcp_pegs[] =
     { CountType::SUM, "full_retransmits", "number of fully retransmitted segments" },
     { CountType::SUM, "flush_on_asymmetric_flow", "number of flushes on asymmetric flows" },
     { CountType::SUM, "asymmetric_flows", "number of completed flows having one-way traffic only" },
+    { CountType::SUM, "max_bytes_exceeded_hole", "number of times max bytes were exceeded due to a hole" },
+    { CountType::SUM, "max_segs_exceeded_hole", "number of times max segs were exceeded due to a hole" },
     { CountType::END, nullptr, nullptr }
 };
 
@@ -363,10 +365,8 @@ bool StreamTcpModule::set(const char*, Value& v, SnortConfig*)
 
     else if ( v.is("reassemble_async") )
     {
-        if ( v.get_bool() )
-            config->flags &= ~STREAM_CONFIG_NO_ASYNC_REASSEMBLY;
-        else
-            config->flags |= STREAM_CONFIG_NO_ASYNC_REASSEMBLY;
+        // this option is deprecated, reassembly on asymmetric connections 
+        // is always enabled
     }
 
     else if ( v.is("require_3whs") )

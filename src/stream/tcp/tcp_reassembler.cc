@@ -594,11 +594,6 @@ uint32_t TcpReassemblerBase::perform_partial_flush(Packet* p)
         paf.paf_jump(flushed);
         tcpStats.partial_flushes++;
         tcpStats.partial_flush_bytes += flushed;
-        if ( seglist.seg_count )
-        {
-            purge_to_seq(seglist.head->start_seq() + flushed);
-            tracker.r_win_base = seglist.seglist_base_seq;
-        }
     }
 
     return flushed;

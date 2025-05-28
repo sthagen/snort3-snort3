@@ -479,6 +479,8 @@ public:  // FIXIT-M privatize if possible
     uint64_t expire_time = 0;
 
     unsigned network_policy_id = 0;
+    struct timeval prev_packet_time = {0, 0};
+    
     unsigned inspection_policy_id = 0;
     unsigned ips_policy_id = 0;
     unsigned reload_id = 0;
@@ -527,6 +529,7 @@ public:  // FIXIT-M privatize if possible
         bool binder_action_allow : 1;
         bool binder_action_block : 1;
         bool in_allowlist : 1; // Set if the flow is in the allowlist
+        bool allowed_on_excess : 1; // Set if the flow is allowed on excess
     } flags = {};
 
     FlowState flow_state = FlowState::SETUP;

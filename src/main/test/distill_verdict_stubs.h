@@ -148,6 +148,7 @@ Packet::Packet(bool)
     packet_flags = PKT_FROM_CLIENT;
 }
 Packet::~Packet()  = default;
+int Packet::inject() { return 0; }
 IpsPolicy* get_ips_policy() { return nullptr; }
 void DataBus::publish(unsigned, unsigned, Packet*, Flow*) { }
 void DataBus::publish(unsigned, unsigned, DataEvent&, Flow*) { }
@@ -236,6 +237,7 @@ NetworkPolicy* get_network_policy() { return nullptr; }
 InspectionPolicy* get_inspection_policy() { return nullptr; }
 Flow::~Flow() = default;
 bool Flow::handle_allowlist() { return true; }
+FlowDataStore::~FlowDataStore() = default;
 void ThreadConfig::implement_thread_affinity(SThreadType, unsigned) { }
 void ThreadConfig::apply_thread_policy(SThreadType , unsigned ) { }
 void ThreadConfig::set_instance_tid(int) { }

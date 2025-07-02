@@ -44,6 +44,31 @@ struct MPUnixTransportStats
         closed_connections(0),
         connection_retries(0)
     { }
+
+    MPUnixTransportStats(const MPUnixTransportStats& other) :
+        sent_events(other.sent_events),
+        sent_bytes(other.sent_bytes),
+        received_events(other.received_events),
+        received_bytes(other.received_bytes),
+        send_errors(other.send_errors),
+        successful_connections(other.successful_connections),
+        closed_connections(other.closed_connections),
+        connection_retries(other.connection_retries)
+    { }
+
+    MPUnixTransportStats& operator=(const MPUnixTransportStats& other)
+    {
+        sent_events = other.sent_events;
+        sent_bytes = other.sent_bytes;
+        received_events = other.received_events;
+        received_bytes = other.received_bytes;
+        send_errors = other.send_errors;
+        successful_connections = other.successful_connections;
+        closed_connections = other.closed_connections;
+        connection_retries = other.connection_retries;
+
+        return *this;
+    }
     
     PegCount sent_events;
     PegCount sent_bytes;
@@ -83,8 +108,9 @@ struct SerializeFunctionHandle
 
 struct SideChannelHandle
 {
-    SideChannelHandle(SideChannel* sc, UnixDomainConnectorConfig* cc, const unsigned short& channel_id) :
-        side_channel(sc), connector_config(cc), channel_id(channel_id)
+    SideChannelHandle(SideChannel* sc, UnixDomainConnectorConfig* cc, const unsigned short& channel_id, 
+                      UnixDomainConnectorReconnectHelper* reconnect_helper = nullptr) :
+        side_channel(sc), connector_config(cc), channel_id(channel_id), reconnect_helper(reconnect_helper)
     { }
 
     ~SideChannelHandle();
@@ -92,6 +118,7 @@ struct SideChannelHandle
     SideChannel* side_channel;
     UnixDomainConnectorConfig* connector_config;
     unsigned short channel_id;
+    UnixDomainConnectorReconnectHelper* reconnect_helper;
 };
 
 struct UnixAcceptorHandle
@@ -125,6 +152,9 @@ class MPUnixDomainTransport : public MPTransport
     { return config; }
 
 
+    void sum_stats();
+    void reset_stats();
+
     private:
 
     void init_side_channels();
@@ -133,13 +163,13 @@ class MPUnixDomainTransport : public MPTransport
     void handle_new_connection(UnixDomainConnector* connector, UnixDomainConnectorConfig* cfg, const unsigned short& channel_id);
     void process_messages_from_side_channels();
     void notify_process_thread();
-    void connector_update_handler(UnixDomainConnector* connector, bool is_recconecting, SideChannel* side_channel);
+    void connector_update_handler(UnixDomainConnector* connector, bool is_reconecting, SideChannel* side_channel);
     void MPTransportLog(const char* msg, ...);
 
     MPSerializeFunc get_event_serialization_function(unsigned pub_id, unsigned event_id);
     MPDeserializeFunc get_event_deserialization_function(unsigned pub_id, unsigned event_id);
 
-    uint32_t mp_current_process_id = 0;
+    uint16_t mp_current_process_id = 0;
 
     TransportReceiveEventHandler transport_receive_handler = nullptr;
     MPUnixDomainTransportConfig* config = nullptr;
@@ -155,6 +185,7 @@ class MPUnixDomainTransport : public MPTransport
     std::thread* consume_thread = nullptr;
     std::condition_variable consume_thread_cv;
 
+    MPUnixTransportStats dynamic_transport_stats;
     MPUnixTransportStats& transport_stats;
 };
 

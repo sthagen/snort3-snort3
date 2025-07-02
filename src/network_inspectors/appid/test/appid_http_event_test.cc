@@ -62,8 +62,8 @@ Packet* DetectionEngine::get_current_packet()
     return &p;
 }
 
-AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&) :
-    StashGenericObject(STASH_GENERIC_OBJECT_APPID) {}
+AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&)
+{ }
 }
 
 void appid_log(const snort::Packet*, unsigned char, char const*, ...) { }
@@ -87,6 +87,7 @@ FakeHttpMsgHeader* fake_msg_header = nullptr;
 
 bool OdpContext::is_appid_cpu_profiler_enabled() { return false; }
 bool OdpContext::is_appid_cpu_profiler_running() { return false; }
+void AppIdSession::check_domain_fronting_status(const std::string&) {}
 
 AppIdSession* AppIdSession::allocate_session(const Packet*, IpProtocol, AppidSessionDirection,
     AppIdInspector&, OdpContext&)

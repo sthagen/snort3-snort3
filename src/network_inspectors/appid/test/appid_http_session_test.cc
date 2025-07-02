@@ -54,8 +54,8 @@ namespace snort
 Packet::Packet(bool) {}
 Packet::~Packet() = default;
 Packet* DetectionEngine::get_current_packet() { return nullptr; }
-AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&) :
-    StashGenericObject(STASH_GENERIC_OBJECT_APPID) {}
+AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&)
+{ }
 }
 
 void FlowHAState::add(uint8_t) { }
@@ -158,6 +158,8 @@ bool AppIdSession::is_tp_appid_available() const
 void AppIdSession::update_encrypted_app_id(AppId)
 {
 }
+
+void AppIdSession::check_domain_fronting_status(const std::string&) {}
 
 void AppIdModule::reset_stats() {}
 

@@ -54,7 +54,8 @@ enum AppidChangeBit
     APPID_REFERER_BIT,
 
     // dns
-    APPID_DNS_HOST_BIT,
+    APPID_DNS_REQUEST_HOST_BIT,
+    APPID_DNS_RESPONSE_HOST_BIT,
 
     // other
     APPID_SERVICE_INFO_BIT,
@@ -64,6 +65,7 @@ enum AppidChangeBit
     APPID_NETBIOS_DOMAIN_BIT,
     APPID_DISCOVERY_FINISHED_BIT,
     APPID_TLS_VERSION_BIT,
+    APPID_PROTOCOL_ID_BIT,
 
     APPID_MAX_BIT
 };
@@ -100,8 +102,10 @@ inline void change_bits_to_string(const AppidChangeBits& change_bits, std::strin
         --n? str.append("response, ") : str.append("response");
     if (change_bits.test(APPID_REFERER_BIT))
         --n? str.append("referrer, ") : str.append("referrer");
-    if (change_bits.test(APPID_DNS_HOST_BIT))
+    if (change_bits.test(APPID_DNS_REQUEST_HOST_BIT))
         --n? str.append("dns-host, ") : str.append("dns-host");
+    if (change_bits.test(APPID_DNS_RESPONSE_HOST_BIT))
+        --n? str.append("dns-response-host, ") : str.append("dns-response-host");
     if (change_bits.test(APPID_SERVICE_INFO_BIT))
         --n? str.append("service-info, ") : str.append("service-info");
     if (change_bits.test(APPID_CLIENT_INFO_BIT))
@@ -116,6 +120,8 @@ inline void change_bits_to_string(const AppidChangeBits& change_bits, std::strin
         --n? str.append("finished, ") : str.append("finished");
     if (change_bits.test(APPID_TLS_VERSION_BIT))
         --n? str.append("tls-version, ") : str.append("tls-version");
+    if (change_bits.test(APPID_PROTOCOL_ID_BIT))
+        --n? str.append("protocol-id, ") : str.append("protocol-id");
     if (n != 0) // make sure all bits from AppidChangeBit enum get translated
         str.append("change_bits_to_string error!");
 }

@@ -156,13 +156,6 @@ AppIdSession::~AppIdSession()
     {
         api.asd->get_odp_ctxt().get_appid_cpu_profiler_mgr().check_appid_cpu_profiler_table_entry(api.asd, api.get_service_app_id(), api.get_client_app_id(), api.get_payload_app_id(), api.get_misc_app_id());
     }
- 
-    if ((pkt_thread_odp_ctxt->get_version() == api.asd->get_odp_ctxt_version()) and api.asd->get_odp_ctxt().get_appid_shadow_traffic_status())
-    {
-        check_domain_fronting_status();
-        if (api.asd->appid_shadow_traffic_bits != 0)
-            api.asd->publish_shadow_traffic_event(api.asd->appid_shadow_traffic_bits, api.asd->flow);
-    }
 
     if (!in_expected_cache)
     {
@@ -248,9 +241,10 @@ AppIdSession* AppIdSession::create_future_session(const Packet* ctrlPkt, const S
     char src_ip[INET6_ADDRSTRLEN];
     char dst_ip[INET6_ADDRSTRLEN];
 
-    AppIdInspector* inspector = (AppIdInspector*)ctrlPkt->flow->current_flow_data->get_handler();
-    if ((inspector == nullptr) or strcmp(inspector->get_name(), MOD_NAME))
-        inspector = (AppIdInspector*)InspectorManager::get_inspector(MOD_NAME, true);
+    AppIdInspector* inspector =
+        static_cast<AppIdInspector*>(
+            InspectorManager::get_inspector(MOD_NAME, MOD_USAGE, appid_inspector_api.type));
+    assert(inspector);
 
     // FIXIT-RC - port parameter passed in as 0 since we may not know client port, verify
 
@@ -345,7 +339,7 @@ void AppIdSession::reinit_session_data(AppidChangeBits& change_bits,
         APPID_SESSION_HTTP_SESSION | APPID_SESSION_APP_REINSPECT);
 }
 
-void AppIdSession::sync_with_snort_protocol_id(AppId newAppId, Packet* p)
+void AppIdSession::sync_with_snort_protocol_id(AppId newAppId, Packet* p, AppidChangeBits& change_bits)
 {
     if (newAppId  <= APP_ID_NONE or newAppId >= SF_APPID_MAX)
         return;
@@ -385,10 +379,15 @@ void AppIdSession::sync_with_snort_protocol_id(AppId newAppId, Packet* p)
     // A particular APP_ID_xxx may not be assigned a service_snort_key value
     // in the appMapping.data file entry; so ignore the snort_protocol_id ==
     // UNKNOWN_PROTOCOL_ID case.
-    if (tmp_snort_protocol_id != snort_protocol_id)
+    if (tmp_snort_protocol_id)
     {
-        snort_protocol_id = tmp_snort_protocol_id;
-        Stream::set_snort_protocol_id(p->flow, tmp_snort_protocol_id, true);
+        if (tmp_snort_protocol_id != snort_protocol_id)
+        {
+            if (tmp_snort_protocol_id != p->flow->ssn_state.snort_protocol_id)
+                change_bits.set(APPID_PROTOCOL_ID_BIT);
+            snort_protocol_id = tmp_snort_protocol_id;
+            Stream::set_snort_protocol_id(p->flow, tmp_snort_protocol_id, true);
+        }
     }
 }
 
@@ -1132,7 +1131,7 @@ AppIdDnsSession* AppIdSession::get_dns_session() const
 
 bool AppIdSession::is_tp_appid_done() const
 {
-    if (get_session_flags(APPID_SESSION_FUTURE_FLOW) or !tp_appid_ctxt)
+    if (get_session_flags(APPID_SESSION_FUTURE_FLOW | APPID_SESSION_NO_TPI) or !tp_appid_ctxt)
         return true;
 
     if (!tpsession)
@@ -1210,15 +1209,21 @@ void AppIdSession::set_tp_payload_app_id(const Packet& p, AppidSessionDirection 
     }
 }
 
-void AppIdSession::publish_shadow_traffic_event(const uint32_t &shadow_traffic_bits, snort::Flow *) const
+void AppIdSession::publish_shadow_traffic_event(const uint32_t& shadow_traffic_bits, snort::Flow* flow)
 {
-    if (shadow_traffic_bits == 0) 
+    if (shadow_traffic_bits == appid_previous_shadow_traffic_bits)
         return;
-     
+
     const char* app_name;
     unsigned shadow_traffic_pub_id = 0;
     std::string str_print;
     Packet* curr_packet = nullptr;
+
+    if (shadow_traffic_bits & ShadowTraffic_Type_Domain_Fronting)
+    {
+        AppId payload_id = api.asd->get_api().get_payload_app_id();
+        set_shadow_traffic_publishing_appid(payload_id);
+    }
 
     AppId publishing_appid = get_shadow_traffic_publishing_appid();
     app_name = api.asd->get_odp_ctxt().get_app_info_mgr().get_app_name(publishing_appid);
@@ -1237,7 +1242,7 @@ void AppIdSession::publish_shadow_traffic_event(const uint32_t &shadow_traffic_b
         }
         else 
         {
-            APPID_LOG(curr_packet, TRACE_DEBUG_LEVEL,"Appname is invalid, not publishing shadow traffic event without appname\n");
+            APPID_LOG(curr_packet, TRACE_DEBUG_LEVEL, "Appname is invalid, not publishing shadow traffic event without appname\n");
             return; 
         }
     }
@@ -1253,15 +1258,18 @@ void AppIdSession::publish_shadow_traffic_event(const uint32_t &shadow_traffic_b
     APPID_LOG(curr_packet, TRACE_DEBUG_LEVEL, 
         "AppID: ShadowTraffic Published event for: %s, application_name: %s(%d)\n", 
         str_print.c_str(), app_name, publishing_appid);
-} 
+
+    set_previous_shadow_traffic_bits(shadow_traffic_bits);
+    reset_shadow_traffic_bits();
+}
 
 void AppIdSession::publish_appid_event(AppidChangeBits& change_bits, const Packet& p,
     bool is_httpx, uint32_t httpx_stream_index)
 {
     if (!api.flags.stored_in_stash)
     {
-        assert(p.flow and p.flow->stash);
-        p.flow->stash->store(STASH_APPID_DATA, &api, false);
+        assert(p.flow);
+        p.flow->set_attr(STASH_APPID_DATA, &api);
         api.flags.stored_in_stash = true;
     }
 
@@ -1372,27 +1380,14 @@ void AppIdSession::process_shadow_traffic_appids()
     } 
 }
 
-void AppIdSession::check_domain_fronting_status()  
+void AppIdSession::check_domain_fronting_status(const std::string& host)  
 {
-    if (api.asd->get_session_flags(APPID_SESSION_DECRYPTED) or api.asd->get_session_flags(APPID_SESSION_APP_REINSPECT)) 
-    { 
-        AppIdHttpSession* hsession = api.asd->get_http_session();
-        if (hsession) 
-        {
-            const std::string* host = hsession->get_field(REQ_HOST_FID); 
-            if (host)
-            {
-                TLSDomainFrontCheckEvent domain_front_event(api.asd->get_cert_key(), *host);
-                DataBus::publish(AppIdInspector::get_pub_id(), AppIdEventIds::DOMAIN_FRONTING, domain_front_event);
-                if (DomainFrontingStatus::MISMATCH == domain_front_event.get_cert_lookup_verdict())
-                {
-                    uint32_t shadow_bits = get_shadow_traffic_bits();
-                    shadow_bits |= ShadowTraffic_Type_Domain_Fronting;
-                    set_shadow_traffic_bits(shadow_bits);
-                    AppId payload_id = api.asd->get_api().get_payload_app_id();
-                    set_shadow_traffic_publishing_appid(payload_id);
-                }
-            }
-        } 
-    } 
-} 
+    TLSDomainFrontCheckEvent domain_front_event(api.asd->get_cert_key(), host);
+    DataBus::publish(AppIdInspector::get_pub_id(), AppIdEventIds::DOMAIN_FRONTING, domain_front_event);
+    if (DomainFrontingStatus::MISMATCH == domain_front_event.get_cert_lookup_verdict())
+    {
+        uint32_t shadow_bits = get_shadow_traffic_bits();
+        shadow_bits |= ShadowTraffic_Type_Domain_Fronting;
+        set_shadow_traffic_bits(shadow_bits);
+    }
+}

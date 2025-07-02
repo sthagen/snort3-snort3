@@ -96,6 +96,7 @@ static const std::map<std::string, clear_counter_type_t> counter_name_to_id =
 	{"file_id", clear_counter_type_t::TYPE_FILE_ID},
 	{"snort", clear_counter_type_t::TYPE_SNORT},
 	{"ha", clear_counter_type_t::TYPE_HA},
+    {"messaging", clear_counter_type_t::TYPE_MESSAGING},
 	{"all", clear_counter_type_t::TYPE_ALL}
 };
 
@@ -559,6 +560,19 @@ int main_reload_config(lua_State* L)
     SnortConfig::set_conf(sc);
     TraceApi::thread_reinit(sc->trace_config);
     proc_stats.conf_reloads++;
+
+    if(sc->max_procs > 1)
+    {
+        if (old and old->mp_dbus != nullptr)
+        {
+            sc->mp_dbus = old->mp_dbus;
+        }
+        else
+        {
+            sc->mp_dbus = new MPDataBus();
+            sc->mp_dbus->init(sc->max_procs);
+        }
+    }
 
     ReloadTracker::update(ctrlcon, "start swapping configuration ...");
     send_response(ctrlcon, ".. swapping configuration\n");

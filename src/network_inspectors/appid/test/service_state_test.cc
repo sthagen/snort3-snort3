@@ -29,6 +29,7 @@
 #include <vector>
 
 THREAD_LOCAL bool TimeProfilerStats::enabled = false;
+THREAD_LOCAL bool appid_trace_enabled = false;
 
 namespace snort
 {
@@ -74,8 +75,8 @@ char* snort_strdup(const char* str)
 }
 time_t packet_time() { return std::time(nullptr); }
 
-AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&) :
-    StashGenericObject(STASH_GENERIC_OBJECT_APPID) {}
+AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&)
+{ }
 }
 
 DiscoveryFilter::~DiscoveryFilter(){}
@@ -87,7 +88,7 @@ AppInfoTableEntry* AppInfoManager::get_app_info_entry(AppId)
 
 // Stubs for appid classes
 class AppIdInspector{};
-FlowData::FlowData(unsigned, Inspector*) : next(nullptr), prev(nullptr), handler(nullptr), id(0)
+FlowData::FlowData(unsigned, Inspector*) : handler(nullptr), id(0)
 { }
 FlowData::~FlowData() = default;
 

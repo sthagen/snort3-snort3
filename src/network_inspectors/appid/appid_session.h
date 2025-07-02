@@ -29,6 +29,7 @@
 #include <unordered_map>
 
 #include <daq_common.h>
+#include "flow/flow_data.h"
 #include "pub_sub/appid_events.h"
 
 #include "app_info_table.h"
@@ -43,6 +44,8 @@
 #include "length_app_cache.h"
 #include "pub_sub/shadowtraffic_aggregator.h"
 #include "service_state.h"
+
+#define STASH_APPID_DATA "appid_data"
 
 namespace snort
 {
@@ -340,7 +343,7 @@ public:
     static unsigned inspector_id;
     static std::mutex inferred_svcs_lock;
 
-    static void init() { inspector_id = FlowData::create_flow_data_id(); }
+    static void init() { inspector_id = snort::FlowData::create_flow_data_id(); }
 
     void set_session_flags(uint64_t set_flags) { flags |= set_flags; }
     void clear_session_flags(uint64_t clear_flags) { flags &= ~clear_flags; }
@@ -390,7 +393,7 @@ public:
     void check_tunnel_detection_restart();
     void update_encrypted_app_id(AppId);
     void examine_rtmp_metadata(AppidChangeBits& change_bits);
-    void sync_with_snort_protocol_id(AppId, snort::Packet*);
+    void sync_with_snort_protocol_id(AppId, snort::Packet*, AppidChangeBits&);
     void stop_service_inspection(snort::Packet*,  AppidSessionDirection);
 
     void clear_http_flags();
@@ -415,10 +418,11 @@ public:
         AppidChangeBits& change_bits);
     void publish_appid_event(AppidChangeBits&, const snort::Packet&, bool is_httpx = false,
         uint32_t httpx_stream_index = 0);
-    void publish_shadow_traffic_event(const uint32_t& shadow_traffic_bits,snort::Flow*)const;
+    void publish_shadow_traffic_event(const uint32_t& shadow_traffic_bits,snort::Flow*);
     void process_shadow_traffic_appids();
     void check_shadow_traffic_bits(AppId id, uint32_t& shadow_bits, AppId &publishing_appid, bool& is_publishing_set);
-    void check_domain_fronting_status();
+    void check_domain_fronting_status(const std::string& host);
+
 
     bool need_to_delete_tp_conn(ThirdPartyAppIdContext*) const;
 
@@ -746,7 +750,12 @@ public:
 
     void set_shadow_traffic_bits(uint32_t lv_bits)
     {
-       appid_shadow_traffic_bits = lv_bits;
+        appid_shadow_traffic_bits = lv_bits;
+    }
+
+    void reset_shadow_traffic_bits()
+    {
+        appid_shadow_traffic_bits = 0;
     }
 
     uint32_t get_shadow_traffic_bits()
@@ -756,16 +765,16 @@ public:
 
     void set_shadow_traffic_publishing_appid(AppId id)
     {
-       shadow_traffic_appid = id; 
+       shadow_traffic_appid = id;
     }
 
     AppId get_shadow_traffic_publishing_appid() const
     {
         return shadow_traffic_appid;
     }
-    
-    inline void change_shadow_traffic_bits_to_string (const uint32_t& st_bits,std::string& str) const 
-    {  
+
+    inline void change_shadow_traffic_bits_to_string (const uint32_t& st_bits,std::string& str) const
+    {
         std::string tempStr;
 
         if (st_bits & ShadowTraffic_Type_Encrypted_DNS) {
@@ -783,10 +792,10 @@ public:
         if (!tempStr.empty()) {
             tempStr.pop_back();
         }
-        
-        str.append(tempStr);     
-    } 
-    
+
+        str.append(tempStr);
+    }
+
     void set_cert_key (const std::string& key)
     {
         ssl_cert_key = key;
@@ -795,6 +804,16 @@ public:
     const std::string& get_cert_key() const
     {
         return ssl_cert_key;
+    }
+
+    void set_previous_shadow_traffic_bits(uint32_t lv_bits)
+    {
+       appid_previous_shadow_traffic_bits = lv_bits;
+    }
+
+    uint32_t get_previous_shadow_traffic_bits()
+    {
+        return appid_previous_shadow_traffic_bits;
     }
 
 private:
@@ -822,6 +841,7 @@ private:
     bool client_info_unpublished = false;
     string ssl_cert_key;
     uint32_t appid_shadow_traffic_bits = 0;
+    uint32_t appid_previous_shadow_traffic_bits = 0;
     AppId shadow_traffic_appid = APP_ID_NONE;
 };
 

@@ -70,8 +70,8 @@ Packet* DetectionEngine::get_current_packet()
     return &p;
 }
 
-AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&) :
-    StashGenericObject(STASH_GENERIC_OBJECT_APPID) {}
+AppIdSessionApi::AppIdSessionApi(const AppIdSession*, const SfIp&)
+{ }
 }
 
 void appid_log(const snort::Packet*, unsigned char, char const*, ...) { }
@@ -274,7 +274,7 @@ TEST(appid_api, set_ssl_certificate_key)
     appid_api.set_ssl_certificate_key(*flow, cert_key);
     asd.set_cert_key(cert_key);
     CHECK_EQUAL(asd.get_cert_key(), cert_key);
-    delete &asd.get_api(); 
+    delete &asd.get_api();
 }
 
 TEST(appid_api, ssl_app_group_id_lookup)
@@ -292,7 +292,7 @@ TEST(appid_api, ssl_app_group_id_lookup)
     CHECK_EQUAL(service, APPID_UT_ID);
     CHECK_EQUAL(client, APPID_UT_ID);
     CHECK_EQUAL(payload, APPID_UT_ID);
-    STRCMP_EQUAL("Published change_bits == 000000000000000000000", test_log);
+    STRCMP_EQUAL("Published change_bits == 00000000000000000000000", test_log);
 
     // Server name based detection
     service = APP_ID_NONE;
@@ -307,7 +307,7 @@ TEST(appid_api, ssl_app_group_id_lookup)
     STRCMP_EQUAL(mock_session->tsession->get_tls_first_alt_name(), APPID_UT_TLS_HOST);
     STRCMP_EQUAL(mock_session->tsession->get_tls_cname(), APPID_UT_TLS_HOST);
     STRCMP_EQUAL(mock_session->tsession->get_tls_sni(),  APPID_UT_TLS_HOST);
-    STRCMP_EQUAL("Published change_bits == 000000000000100011000", test_log);
+    STRCMP_EQUAL("Published change_bits == 00000000000000100011000", test_log);
 
     // Common name based detection
     mock_session->tsession->set_tls_host("www.cisco.com", 13, change_bits);
@@ -324,7 +324,7 @@ TEST(appid_api, ssl_app_group_id_lookup)
     STRCMP_EQUAL(mock_session->tsession->get_tls_host(), APPID_UT_TLS_HOST);
     STRCMP_EQUAL(mock_session->tsession->get_tls_cname(), APPID_UT_TLS_HOST);
     STRCMP_EQUAL(mock_session->tsession->get_tls_org_unit(), "Cisco");
-    STRCMP_EQUAL("Published change_bits == 000000000000100011000", test_log);
+    STRCMP_EQUAL("Published change_bits == 00000000000000100011000", test_log);
 
     // First alt name based detection
     change_bits.reset();
@@ -336,7 +336,7 @@ TEST(appid_api, ssl_app_group_id_lookup)
     CHECK_EQUAL(payload, APPID_UT_ID + 1);
     STRCMP_EQUAL(mock_session->tsession->get_tls_host(), APPID_UT_TLS_HOST);
     STRCMP_EQUAL(mock_session->tsession->get_tls_first_alt_name(), APPID_UT_TLS_HOST);
-    STRCMP_EQUAL("Published change_bits == 000000000000100011000", test_log);
+    STRCMP_EQUAL("Published change_bits == 00000000000000100011000", test_log);
 
     // Org unit based detection
     string host = "";
@@ -348,7 +348,7 @@ TEST(appid_api, ssl_app_group_id_lookup)
     CHECK_EQUAL(client, APPID_UT_ID + 3);
     CHECK_EQUAL(payload, APPID_UT_ID + 3);
     STRCMP_EQUAL(mock_session->tsession->get_tls_org_unit(), APPID_UT_ORG_UNIT);
-    STRCMP_EQUAL("Published change_bits == 000000000000000011000", test_log);
+    STRCMP_EQUAL("Published change_bits == 00000000000000000011000", test_log);
 
     // Override client id found by SSL pattern matcher with the client id provided by
     // Encrypted Visibility Engine if available
@@ -367,7 +367,7 @@ TEST(appid_api, ssl_app_group_id_lookup)
     STRCMP_EQUAL(mock_session->tsession->get_tls_host(), APPID_UT_TLS_HOST);
     STRCMP_EQUAL(mock_session->tsession->get_tls_first_alt_name(), APPID_UT_TLS_HOST);
     STRCMP_EQUAL(mock_session->tsession->get_tls_cname(), APPID_UT_TLS_HOST);
-    STRCMP_EQUAL("Published change_bits == 000000000000100011000", test_log);
+    STRCMP_EQUAL("Published change_bits == 00000000000000100011000", test_log);
 
     //check for sni mismatch being stored in sni field
     change_bits.reset();
@@ -386,7 +386,8 @@ TEST(appid_api, ssl_app_group_id_lookup)
     // When appid session is not existing
     // 1. Match based on server name
     Flow* f = new Flow;
-    flow->set_flow_data(nullptr);
+    // This call just sets mock_flow_data pointer to nullptr, so mocks work correctly for the test.
+    flow->free_flow_data(1);
     service = APP_ID_NONE;
     client = APP_ID_NONE;
     payload = APP_ID_NONE;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2025-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,22 +15,43 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
-// stash_events.h author Silviu Minut <sminut@cisco.com>
 
-#ifndef STASH_EVENTS_H
-#define STASH_EVENTS_H
+// std_connector_buffer.h author Cisco
 
-#include "framework/data_bus.h"
+#ifndef STD_CONNECTOR_BUFFER_H
+#define STD_CONNECTOR_BUFFER_H
 
-using snort::StashItem;
+#include <atomic>
+#include <list>
+#include <mutex>
+#include <string>
+#include <thread>
 
-class StashEvent : public snort::DataEvent
+#include "helpers/ring2.h"
+
+struct TextLog;
+
+class StdConnectorBuffer
 {
 public:
-    StashEvent(const StashItem* it = nullptr) : item(it) {}
-    const StashItem* get_item() const { return item; }
+    StdConnectorBuffer(const char* output);
+    ~StdConnectorBuffer();
+
+    void start();
+
+    Ring2::Writer acquire(size_t buffer_size);
+    bool release(const Ring2::Writer&);
+
 private:
-    const StashItem* item;
+    std::string destination;
+    std::mutex start_mutex;
+
+    std::mutex rings_mutex;
+    std::list<Ring2> rings;
+    std::list<std::list<Ring2>::iterator> rings_removed;
+    std::thread* sink{nullptr};
+    std::atomic_flag sink_latest{false};
+    std::atomic_flag sink_run{false};
 };
 
 #endif

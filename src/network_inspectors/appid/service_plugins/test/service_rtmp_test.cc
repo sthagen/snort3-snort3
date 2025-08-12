@@ -15,30 +15,48 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+//
+// service_rtmp_test.cc author Oleksandr Stepanov <ostepano@cisco.com>
 
-// http_event_ids.h author Shilpa Nagpal <shinagpa@cisco.com>
-
-// File events published by File Service for MP snort support.
-
-#ifndef FILE_MP_EVENTS_IDS_H
-#define FILE_MP_EVENTS_IDS_H
-
-#include "framework/mp_data_bus.h"
-
-namespace snort
-{
-
-struct FileMPEvents
-{
-    enum : unsigned {
-        FILE_SHARE = 0,
-        FILE_SHARE_SYNC,
-        num_ids
-    };
-};
-
-const PubKey file_pub_key { "file_mp_events", FileMPEvents::num_ids };
-
-}
+#ifdef HAVE_CONFIG_H
+#include "config.h"
 #endif
 
+#include "../service_rtmp.h"
+#include "../service_rtmp.cc"
+#include "service_plugin_mock.h"
+
+#include <CppUTest/CommandLineTestRunner.h>
+#include <CppUTest/TestHarness.h>
+#include <CppUTestExt/MockSupport.h>
+
+TEST_GROUP(rtmp_parsing_tests)
+{
+    void setup() override
+    {
+        
+    }
+    void teardown() override
+    {
+        
+    }
+};
+
+TEST(rtmp_parsing_tests, rtmp_parse_invalid_len)
+{
+    const uint8_t* data = (const uint8_t*)"\x41\x00";
+    uint16_t size = 2;
+    uint8_t format = 0;
+    uint32_t chunk_stream_id = 0;
+
+    int ret = parse_rtmp_chunk_basic_header(&data, &size, &format, &chunk_stream_id);
+    CHECK_EQUAL(0, ret);
+    CHECK_EQUAL(2, size);
+    CHECK_EQUAL(1, chunk_stream_id);
+}
+
+int main(int argc, char** argv)
+{
+    int return_value = CommandLineTestRunner::RunAllTests(argc, argv);
+    return return_value;
+}

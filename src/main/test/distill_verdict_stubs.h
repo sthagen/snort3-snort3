@@ -130,7 +130,6 @@ eth_t* eth_open(const char*) { return nullptr; }
 eth_t* eth_close(eth_t*) { return nullptr; }
 ssize_t eth_send(eth_t*, const void*, size_t) { return -1; }
 void HostAttributesManager::initialize() { }
-
 void select_default_policy(const _daq_pkt_hdr&, const snort::SnortConfig*) { }
 void select_default_policy(const _daq_flow_stats&, const snort::SnortConfig*) { }
 
@@ -165,6 +164,7 @@ bool SFDAQInstance::interrupt() { return false; }
 int SFDAQInstance::inject(DAQ_Msg_h, int, const uint8_t*, uint32_t) { return -1; }
 DAQ_RecvStatus SFDAQInstance::receive_messages(unsigned) { return DAQ_RSTAT_ERROR; }
 int SFDAQInstance::ioctl(DAQ_IoctlCmd, void*, size_t) { return -4; }
+bool SFDAQInstance::can_invoke_inject_drop() const { return false; }
 void SFDAQ::set_local_instance(SFDAQInstance*) { }
 const char* SFDAQ::verdict_to_string(DAQ_Verdict) { return nullptr; }
 bool SFDAQ::forwarding_packet(const DAQ_PktHdr_t*) { return false; }

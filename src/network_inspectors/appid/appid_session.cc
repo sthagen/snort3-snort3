@@ -126,7 +126,11 @@ AppIdSession* AppIdSession::allocate_session(const Packet* p, IpProtocol proto,
     asd->flow = p->flow;
     asd->stats.first_packet_second = p->pkth->ts.tv_sec;
     asd->snort_protocol_id = asd->config.snort_proto_ids[PROTO_INDEX_UNSYNCHRONIZED];
-    p->flow->set_flow_data(asd);
+
+    if (!p->flow)
+        APPID_LOG(CURRENT_PACKET, TRACE_ERROR_LEVEL,"flow is null, allocated appid session:%p\n", asd);
+    else
+        p->flow->set_flow_data(asd);
     return asd;
 }
 
@@ -547,7 +551,7 @@ void AppIdSession::examine_ssl_metadata(AppidChangeBits& change_bits)
     if (tls_str)
     {
         size_t size = strlen(tls_str);
-        if (odp_ctxt.get_ssl_matchers().scan_cname((const uint8_t*)tls_str, size,
+        if (odp_ctxt.get_host_matchers().scan_cname((const uint8_t*)tls_str, size,
             client_id, payload_id))
         {
             set_client_appid_data(client_id, change_bits);
@@ -558,7 +562,7 @@ void AppIdSession::examine_ssl_metadata(AppidChangeBits& change_bits)
     if ((scan_flags & SCAN_SSL_HOST_FLAG) and (tls_str = tsession->get_tls_host()))
     {
         size_t size = strlen(tls_str);
-        if (odp_ctxt.get_ssl_matchers().scan_hostname((const uint8_t*)tls_str, size,
+        if (odp_ctxt.get_host_matchers().scan_hostname((const uint8_t*)tls_str, size,
             client_id, payload_id))
         {
             if (api.client.get_id() == APP_ID_NONE or api.client.get_id() == APP_ID_SSL_CLIENT)
@@ -570,7 +574,7 @@ void AppIdSession::examine_ssl_metadata(AppidChangeBits& change_bits)
     if ((scan_flags & SCAN_SSL_CERTIFICATE_FLAG) and (tls_str = tsession->get_tls_cname()))
     {
         size_t size = strlen(tls_str);
-        if (odp_ctxt.get_ssl_matchers().scan_cname((const uint8_t*)tls_str, size,
+        if (odp_ctxt.get_host_matchers().scan_cname((const uint8_t*)tls_str, size,
             client_id, payload_id))
         {
             if (api.client.get_id() == APP_ID_NONE or api.client.get_id() == APP_ID_SSL_CLIENT)

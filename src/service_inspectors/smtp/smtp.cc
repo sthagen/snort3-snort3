@@ -22,6 +22,7 @@
 
 #include "smtp.h"
 
+#include <random>
 #include <string>
 
 #include "detection/detection_engine.h"
@@ -110,6 +111,7 @@ const SMTPToken smtp_known_cmds[] =
     { "XSTA",          4, CMD_XSTA, SMTP_CMD_TYPE_NORMAL },
     { "XTRN",          4, CMD_XTRN, SMTP_CMD_TYPE_NORMAL },
     { "XUSR",          4, CMD_XUSR, SMTP_CMD_TYPE_NORMAL },
+    { "X-ANONYMOUSTLS", 14, CMD_X_ANONYMOUSTLS, SMTP_CMD_TYPE_NORMAL },
     { "*",             1, CMD_ABORT, SMTP_CMD_TYPE_NORMAL },
     { nullptr,            0, 0, SMTP_CMD_TYPE_NORMAL }
 };
@@ -253,16 +255,26 @@ static inline PDFJSNorm* acquire_js_ctx(SMTPData& smtp_ssn, const void* data, si
     return smtp_ssn.jsn;
 }
 
+static uint64_t get_smtp_base_file_id()
+{
+    std::random_device rd;
+    std::mt19937 gen(rd());
+    std::uniform_int_distribution<> distrib(SMTP_MIN_BASE_FILE_ID, SMTP_MAX_BASE_FILE_ID);
+    uint64_t randomId = distrib(gen);
+    return randomId;
+}
+
 static SMTPData* SetNewSMTPData(SmtpProtoConf* config, Packet* p)
 {
     SMTPData* smtp_ssn;
     SmtpFlowData* fd = new SmtpFlowData;
+    uint64_t base_file_id = get_smtp_base_file_id();
 
     p->flow->set_flow_data(fd);
     smtp_ssn = &fd->session;
 
     smtpstats.sessions++;
-    smtp_ssn->mime_ssn = new SmtpMime(p, &(config->decode_conf), &(config->log_config));
+    smtp_ssn->mime_ssn = new SmtpMime(p, &(config->decode_conf), &(config->log_config), base_file_id);
     smtp_ssn->mime_ssn->config = config;
     smtp_ssn->mime_ssn->set_mime_stats(&(smtpstats.mime_stats));
 
@@ -885,6 +897,11 @@ static const uint8_t* SMTP_HandleCommand(SmtpProtoConf* config, Packet* p, SMTPD
             smtp_ssn->client_requested_starttls = true;
         }
 
+        break;
+
+    case CMD_X_ANONYMOUSTLS:
+        if (eol == end)
+            smtp_ssn->state = STATE_TLS_CLIENT_PEND;
         break;
 
     case CMD_X_LINK2STATE:

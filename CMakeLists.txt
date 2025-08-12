@@ -3,7 +3,7 @@ project (snort CXX C)
 
 set (VERSION_MAJOR 3)
 set (VERSION_MINOR 9)
-set (VERSION_PATCH 2)
+set (VERSION_PATCH 3)
 set (VERSION_SUBLEVEL 0)
 set (VERSION "${VERSION_MAJOR}.${VERSION_MINOR}.${VERSION_PATCH}.${VERSION_SUBLEVEL}")
 
@@ -18,6 +18,9 @@ set (CMAKE_CXX_EXTENSIONS OFF)
 set (CMAKE_C_STANDARD 99)
 set (CMAKE_C_STANDARD_REQUIRED ON)
 set (CMAKE_C_EXTENSIONS ON)
+
+# dump compile_commands.json to make it easier to use clangd with IDEs
+set (CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 set (CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake")
 # Pull in definitions of various install directories

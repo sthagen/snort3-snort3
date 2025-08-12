@@ -68,12 +68,20 @@ void OleFile :: walk_directory_list()
 
     dir_list = new DirectoryList();
 
+    std::unordered_set<int32_t> visited_dir_sectors;
     while (current_sector > INVALID_SECTOR)
     {
+        if (visited_dir_sectors.count(current_sector)) {
+            VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+                "Potential loop in Directory FAT sector chain at sector %d. Aborting walk_directory_list.\n", current_sector);
+            return;
+        }
+        visited_dir_sectors.insert(current_sector);
         const uint8_t* buf = file_buf;
         uint32_t start_offset = get_fat_offset(current_sector);
 
-        if ((start_offset + sector_size) > buf_len)
+        // Integer overflow check
+        if (start_offset + sector_size < start_offset || (start_offset + sector_size) > buf_len)
             return;
 
         buf += start_offset;
@@ -223,6 +231,9 @@ int32_t OleFile :: get_mini_fat_offset(int32_t sec_id)
     int32_t sec_position, mini_sec_position, count, current_sector;
     int32_t byte_offset, mini_fat_persector;
 
+    if (header->get_mini_sector_size() == 0)
+        return -1;
+    
     mini_fat_persector = header->get_sector_size() / header->get_mini_sector_size();
 
     if (sec_id >=  mini_fat_persector)
@@ -299,8 +310,15 @@ void OleFile :: get_file_data(FileProperty* node, uint8_t*& file_data, uint32_t&
         {
             int32_t current_sector = starting_sector;
             uint16_t sector_size = header->get_sector_size();
+            std::unordered_set<int32_t> visited_sectors;
             while (current_sector > INVALID_SECTOR)
             {
+                if (visited_sectors.count(current_sector)) {
+                    VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+                        "Potential loop in FAT sector chain at sector %d. Aborting get_file_data.\n", current_sector);
+                    return;
+                }
+                visited_sectors.insert(current_sector);
                 byte_offset = get_fat_offset(current_sector);
                 if (byte_offset > buf_len)
                     return;
@@ -320,11 +338,21 @@ void OleFile :: get_file_data(FileProperty* node, uint8_t*& file_data, uint32_t&
         {
             int32_t mini_sector = node->get_starting_sector();
             uint16_t mini_sector_size = header->get_mini_sector_size();
+            std::unordered_set<int32_t> visited_mini_sectors;
             while (mini_sector > INVALID_SECTOR)
             {
-                byte_offset = get_mini_fat_offset(mini_sector);
-                if (byte_offset > buf_len)
+                if (visited_mini_sectors.count(mini_sector)) {
+                    VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+                        "Potential loop in Mini-FAT sector chain at sector %d. Aborting get_file_data.\n", mini_sector);
                     return;
+                }
+                visited_mini_sectors.insert(mini_sector);
+                int32_t check_offset = get_mini_fat_offset(mini_sector);
+                if (check_offset < 0 || static_cast<uint32_t>(check_offset) > buf_len)
+                    return;
+
+                byte_offset = static_cast<uint32_t>(check_offset);
+
 
                 bytes_to_copy = find_bytes_to_copy(byte_offset, data_len,
                                     stream_size, mini_sector_size);
@@ -367,16 +395,20 @@ void OleFile :: populate_fat_list()
     current_sector = fat_sector;
     while (current_sector > INVALID_SECTOR)
     {
-        uint32_t byte_offset = OLE_HEADER_LEN + (current_sector * header->get_sector_size());
+        uint32_t sector_size = header->get_sector_size();
+        uint32_t byte_offset = OLE_HEADER_LEN + (current_sector * sector_size);
+
+        // Integer overflow check
+        if (byte_offset + sector_size < byte_offset || (byte_offset + sector_size) > buf_len)
+            return;
 
         const uint8_t* buf = file_buf;
-
         buf += byte_offset;
 
         if ((byte_offset + header->get_sector_size()) > buf_len)
             return;
 
-        while ((count - (fat_sector_curr_cnt * max_secchain_cnt)) < (max_secchain_cnt))
+        while ((count - (fat_sector_curr_cnt * max_secchain_cnt)) < (max_secchain_cnt) and count < fat_list_len)
         {
             if (!header->get_byte_order())
                 fat_list[count] = LETOHL_UNALIGNED(buf);
@@ -384,6 +416,9 @@ void OleFile :: populate_fat_list()
                 fat_list[count] = BETOHL_UNALIGNED(buf);
             count++;
             buf += 4;
+        }
+        if (count >= fat_list_len) {
+            break;
         }
         fat_sector_curr_cnt++;
         if (fat_sector_curr_cnt < MAX_DIFAT_SECTORS)
@@ -422,18 +457,26 @@ void OleFile :: populate_mini_fat_list()
 
     current_sector = minifat_sector;
     int32_t minfat_curr_cnt = 0;
+    std::unordered_set<int32_t> visited_mini_fat_sectors;
     while (current_sector > INVALID_SECTOR)
     {
-        uint32_t byte_offset = OLE_HEADER_LEN + (current_sector * header->get_sector_size());
+        uint32_t sector_size = header->get_sector_size();
+        if (visited_mini_fat_sectors.count(current_sector)) {
+            VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+                "Potential loop in Mini-FAT FAT sector chain at sector %d. Aborting populate_mini_fat_list.\n", current_sector);
+            return;
+        }
+        visited_mini_fat_sectors.insert(current_sector);
+        uint32_t byte_offset = OLE_HEADER_LEN + (current_sector * sector_size);
 
-        if ((byte_offset + header->get_sector_size()) > buf_len)
+        // Integer overflow check
+        if (byte_offset + sector_size < byte_offset || (byte_offset + sector_size) > buf_len)
             return;
 
         const uint8_t* buf = file_buf;
-
         buf += byte_offset;
 
-        while ((count - (minfat_curr_cnt * max_secchain_cnt)) < max_secchain_cnt)
+        while ((count - (minfat_curr_cnt * max_secchain_cnt)) < max_secchain_cnt and count < mini_fat_list_len)
         {
             if (!header->get_byte_order())
                 mini_fat_list[count] = LETOHL_UNALIGNED(buf);
@@ -441,6 +484,9 @@ void OleFile :: populate_mini_fat_list()
                 mini_fat_list[count] = BETOHL_UNALIGNED(buf);
             count++;
             buf += 4;
+        }
+        if (count >= mini_fat_list_len) {
+            break;
         }
         minfat_curr_cnt++;
         int32_t next_sector = get_next_fat_sector(current_sector);

@@ -22,6 +22,7 @@
 #ifndef APP_ID_CONFIG_H
 #define APP_ID_CONFIG_H
 
+#include <atomic>
 #include <array>
 #include <memory>
 #include <string>
@@ -36,7 +37,7 @@
 #include "detector_plugins/dns_patterns.h"
 #include "detector_plugins/http_url_patterns.h"
 #include "detector_plugins/sip_patterns.h"
-#include "detector_plugins/ssl_patterns.h"
+#include "detector_plugins/host_patterns.h"
 #include "host_port_app_cache.h"
 #include "length_app_cache.h"
 #include "lua_detector_flow_api.h"
@@ -247,9 +248,9 @@ public:
         return sip_matchers;
     }
 
-    SslPatternMatchers& get_ssl_matchers()
+    HostPatternMatchers& get_host_matchers()
     {
-        return ssl_matchers;
+        return host_matchers;
     }
 
     SshPatternMatchers& get_ssh_matchers()
@@ -284,12 +285,12 @@ public:
 
     void set_appid_shadow_traffic_status(bool status)
     { 
-        appid_shadow_traffic_status = status; 
+        appid_shadow_traffic_status.store(status, std::memory_order_relaxed); 
     }
 
     bool get_appid_shadow_traffic_status() const
     { 
-        return appid_shadow_traffic_status; 
+        return appid_shadow_traffic_status.load(std::memory_order_relaxed); 
     }
  
     unsigned get_pattern_count();
@@ -314,7 +315,7 @@ private:
     EveCaPatternMatchers eve_ca_matchers;
     ServiceDiscovery service_disco_mgr;
     SipPatternMatchers sip_matchers;
-    SslPatternMatchers ssl_matchers;
+    HostPatternMatchers host_matchers;
     SshPatternMatchers ssh_matchers;
     PatternClientDetector* client_pattern_detector;
     PatternServiceDetector* service_pattern_detector;
@@ -327,7 +328,7 @@ private:
 
     uint32_t version;
     static uint32_t next_version;
-    bool appid_shadow_traffic_status = false;
+    std::atomic<bool> appid_shadow_traffic_status = false;
 };
 
 class OdpThreadContext

@@ -29,6 +29,7 @@
 #include "file_api/file_flows.h"
 #include "file_api/file_service.h"
 #include "hash/hash_key_operations.h"
+#include "pub_sub/opportunistic_tls_event.h"
 #include "pub_sub/http_events.h"
 #include "pub_sub/http_event_ids.h"
 #include "pub_sub/http_request_body_event.h"
@@ -60,6 +61,9 @@ HttpMsgHeader::HttpMsgHeader(const uint8_t* buffer, const uint16_t buf_size,
 
 void HttpMsgHeader::publish(unsigned pub_id)
 {
+    if (session_data->partial_flush[source_id])
+        return;
+
     const int64_t stream_id = session_data->get_hx_stream_id();
 
     HttpEvent http_header_event(this, session_data->for_httpx, stream_id);
@@ -298,7 +302,9 @@ void HttpMsgHeader::update_flow()
                     "cutover to wizard\n");
             }
 #endif
-
+            Packet* p = DetectionEngine::get_current_packet();
+            OpportunisticTlsEvent event(p, nullptr);
+            DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::OPPORTUNISTIC_TLS, event, p->flow);
             return;
         }
         if ((status_code_num >= 100) && (status_code_num < 200))

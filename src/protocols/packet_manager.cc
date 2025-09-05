@@ -173,7 +173,10 @@ void PacketManager::handle_decode_failure(Packet* p, RawData& raw, const CodecDa
     // if the codec exists, it failed
     if (CodecManager::s_proto_map[to_utype(prev_prot_id)])
     {
-        PacketTracer::log_msg_only("Packet %" PRIu64": decoding error\n", p->context->packet_number);
+        PacketTracer::log_msg_only("Packet %" PRIu64": unable to decode as %s%s\n",
+            p->context->packet_number,
+            get_proto_name(prev_prot_id),
+            (prev_prot_id == ProtocolId::GTP) ? "-u" : "");
         s_stats[discards]++;
     }
     else

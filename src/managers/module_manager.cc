@@ -822,17 +822,14 @@ SO_PUBLIC bool open_table(const char* s, int idx)
         }
     }
 
-    string unique_key = key;
-    if ( !s_aliased_name.empty() )
-        unique_key = s_aliased_name;
-
+    string unique_key = s_aliased_name.empty() ? key : s_aliased_name;
     if ( s_current != unique_key )
     {
         if ( fqn != orig )
             LogMessage("\t%s (%s)\n", key.c_str(), orig);
         else
             LogMessage("\t%s\n", key.c_str());
-        s_current = unique_key;
+        s_current = std::move(unique_key);
     }
 
     if ( s_config->dump_config_mode() or s_config->gen_dump_config() )
@@ -863,6 +860,7 @@ SO_PUBLIC void close_table(const char* s, int idx)
     set_type(fqn);
     s = fqn.c_str();
 
+    // coverity[COPY_INSTEAD_OF_MOVE]
     string key = fqn;
     set_top(key);
 

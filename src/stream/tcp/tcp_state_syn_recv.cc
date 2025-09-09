@@ -177,8 +177,6 @@ bool TcpStateSynRecv::rst_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
     {
         Flow* flow = tsd.get_flow();
         flow->set_session_flags(SSNFLAG_RESET);
-        if ( !((SSNFLAG_TCP_PSEUDO_EST | SSNFLAG_ESTABLISHED) & flow->get_session_flags()) )
-            trk.session->set_pseudo_established(tsd.get_pkt());
     }
     else
     {

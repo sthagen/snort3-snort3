@@ -26,7 +26,7 @@
 
 #include "stream/stream_splitter.h"
 
-enum s7commplus_paf_state_t
+enum s7commplus_paf_state_t : uint8_t
 {
     S7COMMPLUS_PAF_STATE__TPKT_VER = 0,
     S7COMMPLUS_PAF_STATE__TPKT_RESERVED,
@@ -34,8 +34,28 @@ enum s7commplus_paf_state_t
     S7COMMPLUS_PAF_STATE__TPKT_LEN_2,
     S7COMMPLUS_PAF_STATE__COTP_LEN,
     S7COMMPLUS_PAF_STATE__COTP_PDU_TYPE,
-    S7COMMPLUS_PAF_STATE__SET_FLUSH
+    S7COMMPLUS_PAF_STATE__COTP_CR_DST_REF_1,
+    S7COMMPLUS_PAF_STATE__COTP_CR_DST_REF_2,
+    S7COMMPLUS_PAF_STATE__COTP_CR_SRC_REF_1,
+    S7COMMPLUS_PAF_STATE__COTP_CR_SRC_REF_2,
+    S7COMMPLUS_PAF_STATE__COTP_CR_CLASS_OPTIONS,
+    S7COMMPLUS_PAF_STATE__COTP_DT_TPDU_NUM_EOT,
+    S7COMMPLUS_PAF_STATE__S7_PROTOCOL_ID,
+    S7COMMPLUS_PAF_STATE__MAX
 };
+
+inline s7commplus_paf_state_t& operator++(s7commplus_paf_state_t& state)
+{
+    if(state >= S7COMMPLUS_PAF_STATE__MAX)
+    {
+        state = S7COMMPLUS_PAF_STATE__MAX;
+    }
+    else
+    {
+        state = static_cast<s7commplus_paf_state_t>(static_cast<uint8_t>(state) + 1);
+    }
+    return state;
+}
 
 class S7commplusSplitter : public snort::StreamSplitter
 {
@@ -48,6 +68,9 @@ public:
     bool is_paf() override { return true; }
 
 private:
+
+    void reset_state();
+
     s7commplus_paf_state_t state;
     uint16_t tpkt_length;
 };

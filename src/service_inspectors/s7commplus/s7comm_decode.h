@@ -29,26 +29,30 @@ struct Packet;
 
 class S7commplusFlowData;
 
+/* TPKT defines */
+#define TPKT_SUPPORTED_VERSION 0x03
+#define TPKT_MIN_PACKET_LEN 7
+
+/* COTP defines */
+#define COTP_MIN_PACKET_LEN 2
+#define COTP_CONNECTION_REQUEST_TPDU 0x0E
+#define COTP_DATA_TRANSFER_TPDU 0x0F
+
 /* S7comm defines */
 #define S7COMMPLUS_PDUTYPE_CONNECT                 0x01
 #define S7COMMPLUS_PDUTYPE_DATA                    0x02
 #define S7COMMPLUS_PDUTYPE_DATAFW1_5               0x03
 #define S7COMMPLUS_PDUTYPE_KEEPALIVE               0xFF
 
-#define COTP_HDR_LEN_FOR_S7COMMPLUS 2
-#define COTP_HDR_PDU_TYPE_DATA  0xF0
-
 #define S7COMM_PROTOCOL_ID      0x32
-#define S7COMMPLUS_PROTOCOL_ID 0x72
+#define S7COMMPLUS_PROTOCOL_ID  0x72
 
-#define TPKT_MIN_HDR_LEN 7     /* length field in TPKT header for S7comm */
-#define TPKT_MAX_HDR_LEN       /* Undecided */
 #define S7COMMPLUS_MIN_HDR_LEN 4
 #define HDR_VERSION_TWO 0x02
 #define INTEGRITY_PART_LEN 33 /* length of Integrity part in V3 Header packets */
 
 /* Need 8 bytes for MBAP Header + Function Code */
-#define S7COMMPLUS_MIN_LEN 8       this value needs to be decided
+#define S7COMMPLUS_MIN_LEN 8       // this value needs to be decided
 
 /* GIDs, SIDs, and Strings */
 #define GENERATOR_SPP_S7COMMPLUS 149   /* matches generators.h */

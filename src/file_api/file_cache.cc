@@ -27,6 +27,7 @@
 #include "hash/hash_defs.h"
 #include "hash/xhash.h"
 #include "log/messages.h"
+#include "managers/inspector_manager.h"
 #include "main/snort_config.h"
 #include "main/thread_config.h"
 #include "packet_io/active.h"
@@ -35,6 +36,7 @@
 #include "time/packet_time.h"
 
 #include "file_flows.h"
+#include "file_inspect.h"
 #include "file_module.h"
 #include "file_service.h"
 #include "file_stats.h"
@@ -276,10 +278,15 @@ FileContext* FileCache::get_file(Flow* flow, uint64_t file_id, bool to_create,
     if (to_create and !file)
         file = add(hashKey, timeout, cache_full, cache_expire);
 
-    if (file and !file->get_config())
+    if (file and !file->get_config() and !file->get_inspector())
     {
-        FileConfig *fc = get_file_config(SnortConfig::get_conf());  
-        file->set_config(fc);
+        FileInspect *inspector = (FileInspect*)InspectorManager::acquire_file_inspector();
+        if (inspector)
+        {
+            FileConfig *fc = inspector->config;
+            file->set_config(fc);
+            file->set_inspector(inspector);
+        }
     }
     return file;
 }

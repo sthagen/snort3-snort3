@@ -480,7 +480,7 @@ static inline void check_terminate_tp_module(AppIdSession& asd, uint16_t tpPktCo
     if ((tpPktCount >= asd.get_odp_ctxt().max_tp_flow_depth) ||
         (asd.get_session_flags(APPID_SESSION_HTTP_SESSION | APPID_SESSION_APP_REINSPECT) ==
         (APPID_SESSION_HTTP_SESSION | APPID_SESSION_APP_REINSPECT) && hsession &&
-        hsession->get_field(REQ_URI_FID) &&
+        hsession->get_field(REQ_URI_FID) && asd.is_tp_appid_done() &&
         (!hsession->get_chp_candidate() || hsession->is_chp_finished())))
     {
         if (asd.get_tp_app_id() == APP_ID_NONE)

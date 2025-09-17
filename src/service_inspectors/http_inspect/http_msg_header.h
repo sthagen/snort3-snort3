@@ -51,6 +51,8 @@ public:
     bool has_mime_boundary() const
     { return mime_boundary_found; }
 
+    bool has_supported_encoding() const;
+
     // The multi_file_processing_id is unique for each file transferred within a single connection
     // and is used by file processing to store partially processed file contexts in the flow data.
     void set_multi_file_processing_id(const uint64_t transaction_id, const uint32_t stream_id);
@@ -70,6 +72,7 @@ private:
     snort::MailLogConfig mime_conf;
 
     bool mime_boundary_found = false;
+    bool encoding_supported = true;
 
     Field host_name;
     Field true_ip;

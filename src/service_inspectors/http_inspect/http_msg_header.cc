@@ -74,6 +74,11 @@ void HttpMsgHeader::publish(unsigned pub_id)
     DataBus::publish(pub_id, evid, http_header_event, flow);
 }
 
+bool HttpMsgHeader::has_supported_encoding() const
+{
+    return encoding_supported;
+}
+
 const Field& HttpMsgHeader::get_true_ip()
 {
     if (true_ip.length() != STAT_NOT_COMPUTE)
@@ -173,13 +178,13 @@ int32_t HttpMsgHeader::get_num_cookies()
     return num_cookies;
 }
 
- std::string HttpMsgHeader::get_host_header_field() const
- {
+std::string HttpMsgHeader::get_host_header_field() const
+{
     if (host_name.length() > STAT_EMPTY_STRING)
         return std::string((const char*)host_name.start(), host_name.length());
 
     return "";
- }
+}
 
 void HttpMsgHeader::gen_events()
 {
@@ -655,6 +660,7 @@ void HttpMsgHeader::setup_encoding_decompression()
             add_infraction(INF_STACKED_ENCODINGS);
             create_event(EVENT_STACKED_ENCODINGS);
             compression = CMP_NONE;
+            encoding_supported = false;
         }
         switch (content_code)
         {
@@ -671,18 +677,21 @@ void HttpMsgHeader::setup_encoding_decompression()
         case CONTENTCODE_CHUNKED:
             add_infraction(INF_CONTENT_ENCODING_CHUNKED);
             create_event(EVENT_CONTENT_ENCODING_CHUNKED);
+            encoding_supported = false;
             break;
         case CONTENTCODE__OTHER:
             // The ones we never heard of
             HttpModule::increment_peg_counts(PEG_COMPRESSED_UNKNOWN);
             add_infraction(INF_UNKNOWN_ENCODING);
             create_event(EVENT_UNKNOWN_ENCODING);
+            encoding_supported = false;
             break;
         default:
             // The ones we know by name but don't support
             HttpModule::increment_peg_counts(PEG_COMPRESSED_NOT_SUPPORTED);
             add_infraction(INF_UNSUPPORTED_ENCODING);
             create_event(EVENT_UNSUPPORTED_ENCODING);
+            encoding_supported = false;
             break;
         }
     }

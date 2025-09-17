@@ -55,6 +55,7 @@
 #define DIR_STARTING_SEC_OFFSET    116
 #define DIR_STREAM_SIZE_OFFSET     120
 #define DIR_NEXT_ENTR_OFFSET       128
+#define MAX_STREAM_SIZE            838860
 
 #define CURRENT_PACKET snort::DetectionEngine::get_current_packet()
 

@@ -38,7 +38,7 @@ using namespace snort;
 
 static std::string get_ntuple(bool ntuple, const Packet* p)
 {
-    if ( !ntuple or !p or !p->has_ip() )
+    if ( !ntuple or !p or !p->ptrs.ip_api.is_valid() )
         return "";
 
     SfIpString src_addr;

@@ -227,6 +227,7 @@ LuaDetectorManager::~LuaDetectorManager()
 
 void LuaDetectorManager::initialize(const SnortConfig* sc)
 {
+    ctxt.get_odp_ctxt().get_user_data_map().set_configuration_completed(false);
     activate_lua_detectors(sc);
     
     if (SnortConfig::log_verbose())
@@ -515,6 +516,7 @@ void LuaDetectorManager::activate_lua_detectors(const SnortConfig* sc)
         lua_settop(L, 0);
         ++lo;
     }
+    ctxt.get_odp_ctxt().get_user_data_map().set_configuration_completed(true);
 }
 void ControlLuaDetectorManager::process_detector_file(char* detector_file_path, bool is_custom)
 {

@@ -25,6 +25,7 @@
 #include <cstdio>
 #include <ctime>
 #include <map>
+#include <mutex>
 
 #include "utils/sflsq.h"
 #include "utils/util.h"
@@ -68,6 +69,8 @@ public:
     static void cleanup();
     void update(const AppIdSession&);
     void flush();
+
+    static std::mutex stats_manager_lock;
 
 private:
     AppIdStatistics(const AppIdConfig&);

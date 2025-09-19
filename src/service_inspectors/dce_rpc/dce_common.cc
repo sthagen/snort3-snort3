@@ -275,6 +275,14 @@ static void dce2_fill_rpkt_info(Packet* rpkt, Packet* p)
     rpkt->ptrs = p->ptrs;
     rpkt->flow = p->flow;
     rpkt->proto_bits = p->proto_bits;
+
+    if (p->proto_bits & PROTO_BIT__VLAN)
+    {
+        memcpy(rpkt->layers, p->layers, p->num_layers * sizeof(Layer));
+        rpkt->num_layers = p->num_layers;
+        rpkt->vlan_idx = p->vlan_idx;
+    }
+
     rpkt->packet_flags = p->packet_flags;
     rpkt->packet_flags |= PKT_PSEUDO;
     rpkt->user_inspection_policy_id = p->user_inspection_policy_id;

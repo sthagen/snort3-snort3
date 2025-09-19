@@ -51,6 +51,8 @@ public:
     bool is_aggregator() const override
     { return true; }
 
+    void reset_stats() override;
+
 private:
     static std::map<std::string, std::vector<PegInfo>> module_peg_info_map;
     static std::array<PegInfo, ACTIONS_ARRAY_SIZE> peg_info_array;

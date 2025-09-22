@@ -30,6 +30,7 @@ public:
 
     const PegInfo* get_pegs() const override;
     PegCount* get_counts() const override;
+    void sum_stats(bool dump_stats) override;
 
     bool set(const char*, snort::Value&, snort::SnortConfig*) override;
     bool end(const char*, int, snort::SnortConfig*) override;

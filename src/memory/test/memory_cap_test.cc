@@ -24,9 +24,11 @@
 
 #include "memory/memory_cap.h"
 
+#include <vector>
+
 #include "log/messages.h"
 #include "main/thread.h"
-#include "managers/module_manager.h"
+#include "main/thread_config.h"
 #include "profiler/profiler.h"
 #include "time/periodic.h"
 #include "trace/trace_api.h"
@@ -41,6 +43,7 @@ using namespace snort;
 #include <CppUTestExt/MockSupport.h>
 
 using namespace memory;
+using IndexVec = std::vector<unsigned>;
 
 //--------------------------------------------------------------------------
 // stubs
@@ -60,15 +63,20 @@ uint8_t snort::TraceApi::get_constraints_generation() { return 0; }
 
 unsigned get_instance_id()
 { return 0; }
+
+unsigned ThreadConfig::get_instance_max()
+{ return 0; }
+
 }
+
+void show_stats(PegCount*, const PegInfo*, unsigned, const char*) { }
+void show_stats(PegCount*, const PegInfo*, const IndexVec&, const char*, FILE*) { }
 
 THREAD_LOCAL const Trace* memory_trace = nullptr;
 
 #ifndef REG_TEST
 void Periodic::register_handler(PeriodicHook, void*, uint16_t, uint32_t) { }
 #endif
-
-void ModuleManager::accumulate_module(const char*) { }
 
 //--------------------------------------------------------------------------
 // mocks
@@ -83,8 +91,14 @@ public:
     void thread_init() override
     { thread_init_calls++; }
 
-    void get_process_total(uint64_t& e, uint64_t& t) override
-    { e = ++epoch; t = total; }
+    void get_process_total(uint64_t& e, uint64_t& t, bool bump_epoch) override
+    {
+        t = total;
+        if ( bump_epoch )
+            e = ++epoch;
+        else
+            e = epoch;
+    }
 
     void get_thread_allocs(uint64_t& a, uint64_t& d) override
     { a = alloc; d = dealloc; }
@@ -125,27 +139,11 @@ SThreadType get_thread_type()
 
 }
 
-void set_thread_type(SThreadType)
-{ pkt_thread = false; }
-
 static void free_space()
 {
     pkt_thread = true;
     MemoryCap::free_space();
     pkt_thread = false;
-}
-
-static MemoryCounts& get_main_stats()
-{
-    return MemoryCap::get_mem_stats();
-}
-
-static MemoryCounts& get_pkt_stats()
-{
-    pkt_thread = true;
-    MemoryCounts& res = MemoryCap::get_mem_stats();
-    pkt_thread = false;
-    return res;
 }
 
 //--------------------------------------------------------------------------
@@ -261,8 +259,8 @@ TEST(memory, prune1)
     MemoryCap::start(config, pruner);
     MemoryCap::thread_init();
 
-    const MemoryCounts& mc = get_main_stats();
-    const MemoryCounts& pc = get_pkt_stats();
+    const MemoryCounts& mc = MemoryCap::get_mem_stats();
+    MemoryCap::update_global_stats();
     CHECK(mc.start_up_use == start);
 
     fd.flows = 3;
@@ -279,11 +277,11 @@ TEST(memory, prune1)
 
     free_space(); // finish pruning
     UNSIGNED_LONGS_EQUAL(1, fd.flows);
-    UNSIGNED_LONGS_EQUAL(2, pc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(2, mc.reap_decrease);
 
     free_space();
     UNSIGNED_LONGS_EQUAL(1, fd.flows);
-    UNSIGNED_LONGS_EQUAL(2, pc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(2, mc.reap_decrease);
 
     periodic_check(); // still over the limit
     CHECK(heap->epoch == 3);
@@ -297,7 +295,7 @@ TEST(memory, prune1)
 
     free_space(); // abort
     UNSIGNED_LONGS_EQUAL(0, fd.flows);
-    UNSIGNED_LONGS_EQUAL(3, pc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(3, mc.reap_decrease);
 
     heap->total = cap + 1; // over the limit
     periodic_check();
@@ -315,8 +313,8 @@ TEST(memory, prune1)
 
     free_space(); // abort, reap_increase update
     UNSIGNED_LONGS_EQUAL(0, fd.flows);
-    UNSIGNED_LONGS_EQUAL(3, pc.reap_decrease);
-    UNSIGNED_LONGS_EQUAL(4, pc.reap_increase);
+    UNSIGNED_LONGS_EQUAL(3, mc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(4, mc.reap_increase);
 
     heap->total = cap + 1; // over the limit
     periodic_check();
@@ -333,25 +331,27 @@ TEST(memory, prune1)
     heap->alloc += 3;
 
     free_space(); // abort, reap_increase update
+    memory::MemoryCap::update_global_stats();
     UNSIGNED_LONGS_EQUAL(0, fd.flows);
-    UNSIGNED_LONGS_EQUAL(3, pc.reap_decrease);
-    UNSIGNED_LONGS_EQUAL(6, pc.reap_increase);
+    UNSIGNED_LONGS_EQUAL(3, mc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(6, mc.reap_increase);
 
     UNSIGNED_LONGS_EQUAL(start, mc.start_up_use);
     UNSIGNED_LONGS_EQUAL(cap + 1, mc.max_in_use);
     UNSIGNED_LONGS_EQUAL(cap, mc.cur_in_use);
 
     UNSIGNED_LONGS_EQUAL(heap->epoch, mc.epochs);
-    UNSIGNED_LONGS_EQUAL(heap->alloc, pc.allocated);
-    UNSIGNED_LONGS_EQUAL(heap->dealloc, pc.deallocated);
+    UNSIGNED_LONGS_EQUAL(heap->alloc, mc.allocated);
+    UNSIGNED_LONGS_EQUAL(heap->dealloc, mc.deallocated);
 
-    UNSIGNED_LONGS_EQUAL(4, pc.reap_cycles);
-    UNSIGNED_LONGS_EQUAL(5, pc.reap_attempts);
-    UNSIGNED_LONGS_EQUAL(0, pc.reap_failures);
-    UNSIGNED_LONGS_EQUAL(3, pc.reap_aborts);
+    UNSIGNED_LONGS_EQUAL(4, mc.reap_cycles);
+    UNSIGNED_LONGS_EQUAL(5, mc.reap_attempts);
+    UNSIGNED_LONGS_EQUAL(0, mc.reap_failures);
+    UNSIGNED_LONGS_EQUAL(3, mc.reap_aborts);
 
     heap->total = start;
     MemoryCap::stop();
+    memory::MemoryCap::update_global_stats();
     CHECK(mc.epochs == heap->epoch);
     CHECK(mc.cur_in_use == start);
 }
@@ -388,12 +388,12 @@ TEST(memory, prune3)
     free_space();
     CHECK(fd.flows == 0);
 
-    const MemoryCounts& pc = get_pkt_stats();
-    UNSIGNED_LONGS_EQUAL(1, pc.reap_cycles);
-    UNSIGNED_LONGS_EQUAL(3, pc.reap_attempts);
-    UNSIGNED_LONGS_EQUAL(0, pc.reap_failures);
-    UNSIGNED_LONGS_EQUAL(1, pc.reap_decrease);
-    UNSIGNED_LONGS_EQUAL(0, pc.reap_increase);
+    const MemoryCounts& mc = MemoryCap::get_mem_stats();
+    UNSIGNED_LONGS_EQUAL(1, mc.reap_cycles);
+    UNSIGNED_LONGS_EQUAL(3, mc.reap_attempts);
+    UNSIGNED_LONGS_EQUAL(0, mc.reap_failures);
+    UNSIGNED_LONGS_EQUAL(1, mc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(0, mc.reap_increase);
 
     MemoryCap::stop();
 }
@@ -430,12 +430,12 @@ TEST(memory, two_cycles)
     free_space();
     CHECK(fd.flows == 1);
 
-    const MemoryCounts& pc = get_pkt_stats();
-    UNSIGNED_LONGS_EQUAL(2, pc.reap_cycles);
-    UNSIGNED_LONGS_EQUAL(2, pc.reap_attempts);
-    UNSIGNED_LONGS_EQUAL(0, pc.reap_failures);
-    UNSIGNED_LONGS_EQUAL(11, pc.reap_decrease);
-    UNSIGNED_LONGS_EQUAL(0, pc.reap_increase);
+    const MemoryCounts& mc = MemoryCap::get_mem_stats();
+    UNSIGNED_LONGS_EQUAL(2, mc.reap_cycles);
+    UNSIGNED_LONGS_EQUAL(2, mc.reap_attempts);
+    UNSIGNED_LONGS_EQUAL(0, mc.reap_failures);
+    UNSIGNED_LONGS_EQUAL(11, mc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(0, mc.reap_increase);
 
     MemoryCap::stop();
 }
@@ -450,7 +450,7 @@ TEST(memory, reap_failure)
     MemoryCap::start(config, pruner);
     MemoryCap::thread_init();
 
-    const MemoryCounts& pc = get_pkt_stats();
+    const MemoryCounts& mc = MemoryCap::get_mem_stats();
 
     fd.flows = 1;
     heap->total = cap + 1;
@@ -461,7 +461,7 @@ TEST(memory, reap_failure)
 
     free_space(); // reap failure
     CHECK(fd.flows == -1);
-    UNSIGNED_LONGS_EQUAL(1, pc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(1, mc.reap_decrease);
 
     fd.flows = 1;
     heap->total = cap + 1;
@@ -474,8 +474,8 @@ TEST(memory, reap_failure)
 
     free_space(); // reap failure, reap_increase update
     CHECK(fd.flows == -1);
-    UNSIGNED_LONGS_EQUAL(1, pc.reap_decrease);
-    UNSIGNED_LONGS_EQUAL(2, pc.reap_increase);
+    UNSIGNED_LONGS_EQUAL(1, mc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(2, mc.reap_increase);
 
     fd.flows = 1;
     heap->total = cap + 1;
@@ -488,12 +488,12 @@ TEST(memory, reap_failure)
 
     free_space(); // reap failure, reap_increase update
     CHECK(fd.flows == -1);
-    UNSIGNED_LONGS_EQUAL(1, pc.reap_decrease);
-    UNSIGNED_LONGS_EQUAL(3, pc.reap_increase);
+    UNSIGNED_LONGS_EQUAL(1, mc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(3, mc.reap_increase);
 
-    UNSIGNED_LONGS_EQUAL(3, pc.reap_cycles);
-    UNSIGNED_LONGS_EQUAL(6, pc.reap_attempts);
-    UNSIGNED_LONGS_EQUAL(3, pc.reap_failures);
+    UNSIGNED_LONGS_EQUAL(3, mc.reap_cycles);
+    UNSIGNED_LONGS_EQUAL(6, mc.reap_attempts);
+    UNSIGNED_LONGS_EQUAL(3, mc.reap_failures);
 
     MemoryCap::stop();
 }
@@ -527,12 +527,12 @@ TEST(memory, reap_freed_outside_of_pruning)
     free_space();
     UNSIGNED_LONGS_EQUAL(0, fd.flows);
 
-    const MemoryCounts& pc = get_pkt_stats();
-    UNSIGNED_LONGS_EQUAL(1, pc.reap_cycles);
-    UNSIGNED_LONGS_EQUAL(2, pc.reap_attempts);
-    UNSIGNED_LONGS_EQUAL(0, pc.reap_failures);
-    UNSIGNED_LONGS_EQUAL(2, pc.reap_decrease);
-    UNSIGNED_LONGS_EQUAL(0, pc.reap_increase);
+    const MemoryCounts& mc = MemoryCap::get_mem_stats();
+    UNSIGNED_LONGS_EQUAL(1, mc.reap_cycles);
+    UNSIGNED_LONGS_EQUAL(2, mc.reap_attempts);
+    UNSIGNED_LONGS_EQUAL(0, mc.reap_failures);
+    UNSIGNED_LONGS_EQUAL(2, mc.reap_decrease);
+    UNSIGNED_LONGS_EQUAL(0, mc.reap_increase);
 
     MemoryCap::stop();
 }

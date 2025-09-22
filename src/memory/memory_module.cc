@@ -118,6 +118,12 @@ const PegInfo* MemoryModule::get_pegs() const
 PegCount* MemoryModule::get_counts() const
 { return (PegCount*)&memory::MemoryCap::get_mem_stats(); }
 
+void MemoryModule::sum_stats(bool dump_stats)
+{
+    memory::MemoryCap::update_global_stats();
+    Module::sum_stats(dump_stats);
+}
+
 void MemoryModule::set_trace(const Trace* trace) const
 { memory_trace = trace; }
 

@@ -35,7 +35,7 @@ public:
     virtual void main_init() = 0;
     virtual void thread_init() = 0;
 
-    virtual void get_process_total(uint64_t& epoch, uint64_t& total) = 0;
+    virtual void get_process_total(uint64_t& epoch, uint64_t& total, bool bump_epoch = true) = 0;
     virtual void get_thread_allocs(uint64_t& alloc, uint64_t& dealloc) = 0;
 
     virtual void print_stats(ControlConn*) { }

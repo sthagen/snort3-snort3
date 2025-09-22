@@ -109,7 +109,6 @@ public:
     explicit ACResetStats(clear_counter_type_t requested_type);
     bool execute(Analyzer&, void**) override;
     const char* stringify() override { return "RESET_STATS"; }
-    ~ACResetStats() override;
 private:
     clear_counter_type_t requested_type;
 };

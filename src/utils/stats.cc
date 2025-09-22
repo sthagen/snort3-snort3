@@ -205,8 +205,8 @@ void DropStats(ControlConn* ctrlcon)
 
 void PrintStatistics()
 {
-    if ( ModuleManager::get_stats("memory") )
-        memory::MemoryCap::update_pegs();
+    if ( PegCount* pc = ModuleManager::get_stats("memory") )
+        memory::MemoryCap::update_pegs(pc);
 
     DropStats();
     timing_stats();

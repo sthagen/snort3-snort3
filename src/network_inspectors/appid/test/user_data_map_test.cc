@@ -29,7 +29,7 @@
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
 
-static uint appid_log_call_count = 0;
+static unsigned int appid_log_call_count = 0;
 void appid_log(const snort::Packet*, unsigned char, char const*, ...) { appid_log_call_count++; }
 
 SThreadType test_thread_type = SThreadType::STHREAD_TYPE_MAIN;

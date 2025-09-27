@@ -166,7 +166,20 @@ static int enable(lua_State* L)
         constraints.set_bits |= PacketConstraints::SetBits::DST_PORT;
 
     std::string filter_str = regexstr ? regexstr : "";
-    if (!filter_str.empty()) filter_str = (stop_after_match ? "Y" : "N") + filter_str;
+    if (!filter_str.empty()) 
+    {
+        if (!snort::SnortConfig::get_conf()->use_log_buffered())
+        {
+            LogMessage("WARNING: Regex filtering requires log_buffered to be enabled.\n");
+            LogMessage("         Continuing with packet tracer but ignoring regex filter.\n");
+            LogMessage("         To enable regex filtering, add 'log_buffered = true' to output configuration.\n");
+            
+            filter_str.clear();
+        }
+        else
+            filter_str = (stop_after_match ? "Y" : "N") + filter_str;
+    }
+
     BatchedLogger::BatchedLogManager::set_filter(filter_str);
     main_broadcast_command(new PacketTracerDebug(&constraints), ControlConn::query_from_lua(L));
     return 0;

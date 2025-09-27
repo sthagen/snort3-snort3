@@ -93,7 +93,6 @@
 #include "catch/snort_catch.h"
 #endif
 
-#include "log/batched_logger.h"
 #include "snort_config.h"
 #include "thread_config.h"
 
@@ -435,7 +434,6 @@ void Snort::setup(int argc, char* argv[])
 
     init(argc, argv);
     const SnortConfig* sc = SnortConfig::get_conf();
-    BatchedLogger::BatchedLogManager::init();
 
     if ( sc->daemon_mode() )
         daemonize();

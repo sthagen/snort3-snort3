@@ -29,11 +29,16 @@
 #include <pthread.h>
 #include <sched.h>
 
+#include "control/control.h"
 #include "control/control_mgmt.h"
+#include "main/analyzer_command.h"
 #include "main/snort_config.h"
 #include "main/thread_config.h"
+#include "time/periodic.h"
 #include "utils/snort_pcre.h"
 #include "utils/util.h"
+
+#define LOG_BYTE_LIMIT 4096
 
 namespace BatchedLogger
 {
@@ -43,6 +48,21 @@ BatchQueue BatchedLogManager::queue;
 std::thread BatchedLogManager::writer_thread;
 std::atomic<bool> BatchedLogManager::running(false);
 std::atomic<uint64_t> BatchQueue::overwrite_count(0);
+
+class BatchedLoggerPeriodicFlush : public snort::AnalyzerCommand
+{
+public:
+    BatchedLoggerPeriodicFlush(ControlConn* ctrl = nullptr)
+        : AnalyzerCommand(ctrl) {}
+
+    bool execute(Analyzer&, void**) override
+    {
+        BatchedLogManager::flush_thread_buffers();
+        return true;
+    }
+
+    const char* stringify() override { return "BATCHED_LOGGER_PERIODIC_FLUSH"; }
+};
 
 void LogBuffer::append(FILE* fh, bool use_syslog, const char* msg, size_t len)
 {
@@ -193,7 +213,10 @@ void BatchedLogManager::shutdown()
 {
     if (!running)
         return;
+
+    stop_periodic_flush();
     flush_thread_buffers();
+
     running = false;
     queue.push({});
 
@@ -210,6 +233,8 @@ void BatchedLogManager::shutdown()
 
 void BatchedLogManager::log(FILE* fh, bool use_syslog, const char* msg, size_t len)
 {
+    assert(snort::SnortConfig::get_conf()->use_log_buffered());
+
     buffer.append(fh, use_syslog, msg, len);
     auto now = std::chrono::steady_clock::now();
     auto elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(now - buffer.last_flush_time);
@@ -221,11 +246,15 @@ void BatchedLogManager::log(FILE* fh, bool use_syslog, const char* msg, size_t l
 #endif
 }
 
-#if 0
 void BatchedLogManager::log(FILE* fh, bool use_syslog, const char* format, va_list& ap)
 {
-    static char temp[1024];
+    assert(snort::SnortConfig::get_conf()->use_log_buffered());
+
+    thread_local char temp[LOG_BYTE_LIMIT];
     int len = vsnprintf(temp, sizeof(temp), format, ap);
+
+    assert(len <= LOG_BYTE_LIMIT);
+    len = std::min(len, LOG_BYTE_LIMIT);
 
     buffer.append(fh, use_syslog, temp, len);
     auto now = std::chrono::steady_clock::now();
@@ -239,7 +268,23 @@ void BatchedLogManager::log(FILE* fh, bool use_syslog, const char* format, va_li
 #endif
 
 }
-#endif
+
+static void s_batched_logger_flush_handler(void*)
+{
+    BatchedLogManager::flush_thread_buffers();
+    main_broadcast_command(new BatchedLoggerPeriodicFlush());
+}
+
+void BatchedLogManager::start_periodic_flush()
+{
+    Periodic::register_handler(s_batched_logger_flush_handler, nullptr, 0, 250);
+}
+
+void BatchedLogManager::stop_periodic_flush()
+{
+    Periodic::unregister_handler(s_batched_logger_flush_handler);
+}
+
 void BatchedLogManager::flush_thread_buffers()
 {
     buffer.flush();
@@ -248,6 +293,11 @@ void BatchedLogManager::flush_thread_buffers()
 void BatchedLogManager::push_batch(LogBatch&& batch)
 {
     queue.push(std::move(batch));
+}
+
+static bool is_packet_tracer_message(const char* data, size_t size)
+{
+        return memmem(data, size, "PktTracerDbg", 12) != nullptr;
 }
 
 void BatchedLogManager::print_batch(const LogBatch& batch)
@@ -263,8 +313,9 @@ void BatchedLogManager::print_batch(const LogBatch& batch)
     }
     if (stop_trace)
         return;
-
-    if (!s_filter.filter.empty())
+    
+    // Only apply filters to PacketTracer content
+    if (!s_filter.filter.empty() && is_packet_tracer_message(batch.data.data(), batch.size))
     {
         int rc = pcre2_match(
             s_filter.re, reinterpret_cast<PCRE2_SPTR>(batch.data.data()),
@@ -307,7 +358,7 @@ void BatchedLogManager::print_batch(const LogBatch& batch)
         }
     }
 #ifdef SHELL
-    if (stop_trace)
+    if (stop_trace && is_packet_tracer_message(batch.data.data(), batch.size))
         if (!ControlMgmt::send_command_to_socket("packet_tracer.disable()\n"))
             fprintf(stderr, "Batched_logger: Failed to send command to control socket\n");
 #endif
@@ -333,6 +384,9 @@ void BatchedLogManager::writer_thread_func()
 
 void BatchedLogManager::init()
 {
+    if (running)
+        return;
+
     running = true;
 
     snort::ThreadConfig* thread_config = snort::SnortConfig::get_conf()->thread_config;
@@ -346,6 +400,8 @@ void BatchedLogManager::init()
     sched_param sch_params;
     sch_params.sched_priority = 1;
     pthread_setschedparam(writer_thread.native_handle(), SCHED_OTHER, &sch_params);
+
+    start_periodic_flush();
 }
 
 } // namespace BatchedLogger

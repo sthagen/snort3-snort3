@@ -100,6 +100,7 @@ enum OutputFlag
     OUTPUT_FLAG__WIDE_HEX          = 0x00000800,
 
     OUTPUT_FLAG__ALERT_REFS        = 0x00001000,
+    OUTPUT_FLAG__LOG_BUFFERED      = 0x00002000,
 };
 
 enum LoggingFlag
@@ -574,6 +575,9 @@ public:
 
     bool obfuscate() const
     { return output_flags & OUTPUT_FLAG__OBFUSCATE; }
+
+    bool use_log_buffered() const
+    { return output_flags & OUTPUT_FLAG__LOG_BUFFERED; }
 
     bool output_app_data() const
     { return output_flags & OUTPUT_FLAG__APP_DATA; }

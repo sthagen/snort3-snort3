@@ -46,6 +46,7 @@
 #include "host_tracker/host_cache_module.h"
 #include "js_norm/js_norm_module.h"
 #include "latency/latency_module.h"
+#include "log/batched_logger.h"
 #include "log/messages.h"
 #include "lua/lua.h"
 #include "managers/module_manager.h"
@@ -766,6 +767,9 @@ static const Parameter output_params[] =
     { "obfuscate", Parameter::PT_BOOL, nullptr, "false",
       "obfuscate the logged IP addresses (same as -O)" },
 
+    { "log_buffered", Parameter::PT_BOOL, nullptr, "false",
+      "enable buffered logging for all output" },
+
 #ifdef REG_TEST
     { "wide_hex_dump", Parameter::PT_BOOL, nullptr, "true",
 #else
@@ -840,6 +844,16 @@ bool OutputModule::set(const char*, Value& v, SnortConfig* sc)
 
     else if ( v.is("obfuscate") )
         v.update_mask(sc->output_flags, OUTPUT_FLAG__OBFUSCATE);
+    
+    else if ( v.is("log_buffered") )
+    {
+        if ( v.get_bool() )
+            BatchedLogger::BatchedLogManager::init();
+        else
+            BatchedLogger::BatchedLogManager::shutdown();
+
+        v.update_mask(sc->output_flags, OUTPUT_FLAG__LOG_BUFFERED);
+    }
 
     return true;
 }

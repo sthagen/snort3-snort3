@@ -66,6 +66,13 @@ void Periodic::check()
     }
 }
 
+void Periodic::unregister_handler(PeriodicHook hook)
+{
+    s_periodic_handlers.remove_if([hook](const PeriodicHookNode& node) {
+        return node.hook == hook;
+    });
+}
+
 void Periodic::unregister_all()
 { s_periodic_handlers.clear(); }
 

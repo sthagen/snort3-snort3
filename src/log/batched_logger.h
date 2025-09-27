@@ -88,10 +88,12 @@ public:
     static void init();
     static void shutdown();
     static void log(FILE* fh, bool use_syslog, const char* msg, size_t len);
-    //static void log(FILE* fh, bool use_syslog, const char* format, va_list& ap);
+    static void log(FILE* fh, bool use_syslog, const char* format, va_list& ap);
     static void flush_thread_buffers();
     static void push_batch(LogBatch&& batch);
     static void set_filter(const std::string& filter);
+    static void start_periodic_flush();
+    static void stop_periodic_flush();
 
 private:
     static thread_local LogBuffer buffer;

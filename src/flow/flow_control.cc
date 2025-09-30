@@ -571,13 +571,7 @@ unsigned FlowControl::process(Flow* flow, Packet* p, bool new_ha_flow)
         }
         p->filtering_state = flow->filtering_state;
         update_stats(flow, p);
-        if ( p->is_retry() )
-        {
-            RetryPacketEvent retry_event(p);
-            DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::RETRY_PACKET, retry_event);
-            flow->flags.retry_queued = false;
-        }
-        else if ( flow->flags.retry_queued and ( !p->is_cooked() or p->is_defrag() ) )
+        if ( p->is_retry() or (flow->flags.retry_queued and ( !p->is_cooked() or p->is_defrag())) )
         {
             RetryPacketEvent retry_event(p);
             DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::RETRY_PACKET, retry_event);

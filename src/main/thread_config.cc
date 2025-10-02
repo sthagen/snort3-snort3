@@ -112,6 +112,14 @@ CpuSet* ThreadConfig::validate_cpuset_string(const char* cpuset_str)
     if (hwloc_bitmap_list_sscanf(cpuset, cpuset_str) ||
             !hwloc_bitmap_isincluded(cpuset, process_cpuset))
     {
+        char* allowed_s = nullptr;
+        hwloc_bitmap_list_asprintf(&allowed_s, process_cpuset);
+        ParseError("Invalid CPU set '%s'. Allowed process CPU set: %s\n",
+            cpuset_str ? cpuset_str : "(null)", allowed_s ? allowed_s : "(null)");
+
+        if (allowed_s)
+            free(allowed_s);
+
         hwloc_bitmap_free(cpuset);
         return nullptr;
     }

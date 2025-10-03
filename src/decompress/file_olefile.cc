@@ -238,6 +238,8 @@ int32_t OleFile :: get_mini_fat_offset(int32_t sec_id)
 
     if (sec_id >=  mini_fat_persector)
     {
+        if (mini_fat_persector == 0)
+            return -1;
         sec_position = sec_id/mini_fat_persector;
         mini_sec_position = sec_id % mini_fat_persector;
     }

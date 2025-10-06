@@ -1,3 +1,36 @@
+2025-10-06: 3.9.6.0
+
+* actions: fix integer underflow in ips_actions pegcount aggregation
+* appid: add setUserDetectorDataItem lua detector API
+* appid: fixed crash in stats manager
+* appid: fix http content processing
+* appid: fixing loop inside nntp validate data
+* appid: retain the shadow traffic status after detector reload
+* appid: standardize variable types in user data map unit test
+* codecs: fix encode for pppoe and ppp
+* control: fix potential buffer overrun by properly checking return of vsnprintf.
+* dce_rpc: clear rule options before freeing the buffer
+* dce-rpc: proper proto-bits not set in DCE2_GetRpkt which causes assertion fail in u2 logger
+* dce_rpc: reassembling out of bounds packets
+* decoder: improved decoding fails error message on tracer
+* decompress: added check for mini_fat_persector to not to be zero
+* decompress: fixed VBA decompression unhandled mem alloc exception
+* file_api: file cache sharing to use ref count for file inspector
+* file_api: set file size when file size is middle and data flushed
+* flow: continue retrying when the retry processing is still pending
+* host_tracker: acquire lock on host tracker cache before read access of member variables
+* host_tracker: iterate over network protocol vectors with reverse iterators instead of while loop
+* http_inspect,pub_sub: provide an API in HttpEvent to find whether the HTTP response is using a supported encoding type.
+* log: use batched logger for all kinds of log messages in prod when log_buffer config enabled
+* main: add message when unable to set affinity
+* memory: combine main and first pkt thread memory stats; resolve race condition
+* module_manager: use std::move to improve performance when assigning string variables
+* pub_sub: add quic logging events
+* s7comm: added stream splitter abort checks
+* stream: do not clear a session on a rebuilt packet
+* stream_tcp: do not generate established event on RST if 3whs is not complete
+* trace: print n-tuple for other packet types with IP layer set
+
 2025-09-03: 3.9.5.0
 
 * appid: first packet API fixes for using asd instead of odp

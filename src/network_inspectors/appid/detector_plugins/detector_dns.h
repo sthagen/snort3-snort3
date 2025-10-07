@@ -49,6 +49,7 @@ public:
     DnsTcpServiceDetector(ServiceDiscovery*);
 
     int validate(AppIdDiscoveryArgs&) override;
+    int validate_doq(AppIdDiscoveryArgs& args);
 };
 
 class DnsUdpServiceDetector : public ServiceDetector, public DnsValidator
@@ -57,6 +58,7 @@ public:
     DnsUdpServiceDetector(ServiceDiscovery*);
 
     int validate(AppIdDiscoveryArgs&) override;
+    int validate_doh(AppIdDiscoveryArgs&);
 };
 #endif
 

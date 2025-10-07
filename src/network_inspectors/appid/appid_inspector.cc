@@ -35,6 +35,7 @@
 #include "packet_io/packet_tracer.h"
 #include "profiler/profiler.h"
 #include "pub_sub/appid_event_ids.h"
+#include "pub_sub/dns_events.h"
 #include "pub_sub/intrinsic_event_ids.h"
 
 #include "appid_cip_event_handler.h"
@@ -42,6 +43,7 @@
 #include "appid_dcerpc_event_handler.h"
 #include "appid_debug.h"
 #include "appid_discovery.h"
+#include "appid_dns_payload_event_handler.h"
 #include "appid_eve_process_event_handler.h"
 #include "appid_ha.h"
 #include "appid_http_event_handler.h"
@@ -150,6 +152,7 @@ bool AppIdInspector::configure(SnortConfig* sc)
         new HttpEventHandler(HttpEventHandler::RESPONSE_EVENT, *this), *sc);
 
     DataBus::subscribe_global(http_pub_key, HttpEventIds::REQUEST_BODY, new AppIdHttpXReqBodyEventHandler(), *sc);
+    DataBus::subscribe_global(intrinsic_pub_key, IntrinsicEventIds::DNS_PAYLOAD, new AppIdDnsPayloadEventHandler(*this), *sc);
     DataBus::subscribe_global(sip_pub_key, SipEventIds::DIALOG, new SipEventHandler(*this), *sc);
     DataBus::subscribe_global(dce_tcp_pub_key, DceTcpEventIds::EXP_SESSION, new DceExpSsnEventHandler(), *sc);
     DataBus::subscribe_global(ssh_pub_key, SshEventIds::STATE_CHANGE, new SshEventHandler(), *sc);

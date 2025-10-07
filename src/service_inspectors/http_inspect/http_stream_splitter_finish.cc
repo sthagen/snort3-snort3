@@ -220,7 +220,7 @@ bool HttpStreamSplitter::finish(Flow* flow)
 #endif
             }
 
-            if ((source_id == SRC_CLIENT) and (session_data->publish_octets[source_id] < REQUEST_PUBLISH_DEPTH))
+            if ((source_id == SRC_CLIENT) and (session_data->publish_octets[source_id] < BODY_PUBLISH_DEPTH))
             {
                 HttpRequestBodyEvent http_request_body_event(nullptr, 0,
                     session_data->publish_octets[source_id], true, session_data);

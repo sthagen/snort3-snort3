@@ -17,3 +17,7 @@ add_cpputest( detector_sip_test
 add_cpputest( detector_pop3_test
     SOURCES
         ../../../../utils/util_cstring.cc )
+
+add_cpputest( detector_dns_test
+    SOURCES
+        ../../../../utils/util_cstring.cc )

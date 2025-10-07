@@ -567,6 +567,27 @@ int DnsValidator::validate_packet(const uint8_t* data, uint16_t size, const int,
     return APPID_SUCCESS;
 }
 
+int DnsUdpServiceDetector::validate_doh(AppIdDiscoveryArgs& args)
+{
+    int rval;
+
+    if (!args.size)
+        return APPID_INPROCESS;
+
+    if (args.size < sizeof(DNSHeader))
+        return APPID_NOMATCH;
+
+    if ((rval = dns_validate_header(args.dir, (const DNSHeader*)args.data,
+        args.asd.get_odp_ctxt().dns_host_reporting, args.asd)) != APPID_SUCCESS)
+        return rval;
+
+    // Coverity doesn't realize that validate_packet() checks the packet data for valid values
+    // coverity[tainted_scalar]
+    rval = validate_packet(args.data, args.size, args.dir,
+        args.asd.get_odp_ctxt().dns_host_reporting, args.asd, args.change_bits);
+    return rval;
+}
+
 int DnsUdpServiceDetector::validate(AppIdDiscoveryArgs& args)
 {
     int rval;
@@ -651,6 +672,125 @@ inprocess:
     default:
         return rval;
     }
+}
+int DnsTcpServiceDetector::validate_doq(AppIdDiscoveryArgs& args)
+{
+    int rval;
+    uint8_t* reallocated_data = nullptr;
+    const uint8_t* data = args.data;
+    uint16_t size = args.size;
+    ServiceDNSData* dd = static_cast<ServiceDNSData*>(data_get(args.asd));
+    {
+        if (!args.size)
+            goto inprocess;
+
+        if (args.size < sizeof(DNSTCPHeader))
+        {
+            if (args.dir == APP_ID_FROM_INITIATOR)
+                goto not_compatible;
+            else
+                goto fail;
+        }
+
+        if (!dd)
+        {
+            dd = new ServiceDNSData;
+            data_add(args.asd, dd);
+        }
+
+        if (dd->cached_data and dd->cached_len and args.dir == APP_ID_FROM_INITIATOR)
+        {
+            reallocated_data = static_cast<uint8_t*>(snort_calloc(dd->cached_len + args.size, sizeof(uint8_t)));
+            memcpy(reallocated_data, dd->cached_data, dd->cached_len);
+            memcpy(reallocated_data + dd->cached_len, args.data, args.size);
+            size = dd->cached_len + args.size;
+            dd->free_dns_cache();
+            data = reallocated_data;
+        }
+
+        const DNSTCPHeader* hdr = (const DNSTCPHeader*)data;
+        data = data + sizeof(DNSTCPHeader);
+        size = size - sizeof(DNSTCPHeader);
+        uint16_t tmp = ntohs(hdr->length);
+
+        if (tmp > size and args.dir == APP_ID_FROM_INITIATOR)
+        {
+            dd->save_dns_cache(args.size, args.data);
+            goto inprocess;
+        } else if (tmp > size and args.dir == APP_ID_FROM_RESPONDER) {
+            goto not_compatible;
+        }
+
+        if (tmp < sizeof(DNSHeader) || dns_validate_header(args.dir, (const DNSHeader*)data,
+            args.asd.get_odp_ctxt().dns_host_reporting, args.asd))
+        {
+            if (args.dir == APP_ID_FROM_INITIATOR)
+                goto not_compatible;
+            else
+                goto fail;
+        }
+
+        // Coverity doesn't realize that validate_packet() checks the packet data for valid values
+        // coverity[tainted_scalar]
+        rval = validate_packet(data, size, args.dir,
+            args.asd.get_odp_ctxt().dns_host_reporting, args.asd, args.change_bits);
+        if (rval != APPID_SUCCESS)
+            goto tcp_done;
+
+        if (dd->state == DNS_STATE_QUERY || dd->state == DNS_STATE_MULTI_QUERY)
+        {
+            if (args.dir != APP_ID_FROM_INITIATOR)
+                goto fail;
+            dd->id = ((const DNSHeader*)data)->id;
+            DNSState current_state = dd->state;
+            dd->state = DNS_STATE_RESPONSE;
+            if (current_state == DNS_STATE_QUERY)
+                goto inprocess;
+            goto success;
+        }
+        else if (args.dir == APP_ID_FROM_RESPONDER && dd->id == ((const DNSHeader*)data)->id)
+            dd->state = DNS_STATE_MULTI_QUERY;
+        else
+            goto fail;
+    }
+
+tcp_done:
+    switch (rval)
+    {
+    case APPID_SUCCESS:
+        goto success;
+    case APPID_INVALID_CLIENT:
+        goto not_compatible;
+    case APPID_NOMATCH:
+        goto fail;
+    case APPID_INPROCESS:
+        goto inprocess;
+    default:
+        dd->free_dns_cache();
+        return rval;
+    }
+
+success:
+    if (reallocated_data)
+        snort_free(reallocated_data);
+    args.asd.set_session_flags(APPID_SESSION_CONTINUE);
+    return APPID_SUCCESS;
+
+not_compatible:
+    if (reallocated_data)
+        snort_free(reallocated_data);
+    return APPID_NOT_COMPATIBLE;
+
+fail:
+    if (reallocated_data)
+        snort_free(reallocated_data);
+    return APPID_NOMATCH;
+
+inprocess:
+    if (reallocated_data)
+        snort_free(reallocated_data);
+    return APPID_INPROCESS;
+
 }
 
 int DnsTcpServiceDetector::validate(AppIdDiscoveryArgs& args)

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2022-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2025-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -16,35 +16,27 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-// http_event_ids.h author Russ Combs <rucombs@cisco.com>
+// dns_payload_event_handler.h author Shibin K V <shikv@cisco.com>
 
-// Inspection events published by the Http Inspector. Modules can subscribe
-// to receive the events.
-
-#ifndef HTTP_EVENT_IDS_H
-#define HTTP_EVENT_IDS_H
+#ifndef DNS_PAYLOAD_EVENT_HANDLER_H
+#define DNS_PAYLOAD_EVENT_HANDLER_H
 
 #include "framework/data_bus.h"
 
-namespace snort
+#include "dns.h"
+#include "dns_module.h"
+
+class DnsPayloadEventHandler : public snort::DataHandler
 {
-// These are common values between the HTTP inspector and the subscribers.
-struct HttpEventIds
-{ enum : unsigned {
+public:
+    DnsPayloadEventHandler(snort::Inspector& inspector_) : 
+        snort::DataHandler(DNS_NAME), inspector(inspector_)
+    {
+        order = 200;
+    }
+    void handle(snort::DataEvent& event, snort::Flow* flow) override;
+private:
+    snort::Inspector& inspector;
+};
 
-    REQUEST_HEADER,
-    RESPONSE_HEADER,
-    REQUEST_BODY,
-    BODY,
-    DOH_BODY,
-    END_OF_TRANSACTION,
-    HTTP_PUBLISH_LENGTH,
-
-    num_ids
-}; };
-
-const PubKey http_pub_key { "http_inspect", HttpEventIds::num_ids };
-
-}
-#endif
-
+#endif // DNS_PAYLOAD_EVENT_HANDLER_H

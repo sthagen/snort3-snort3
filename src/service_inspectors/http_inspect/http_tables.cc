@@ -174,6 +174,7 @@ const StrCode HttpMsgHeadShared::content_code_list[] =
 
 const StrCode HttpMsgHeadShared::content_type_list[] =
 {
+    { CT_APPLICATION_DNS,          "application/dns-message" },
     { CT_APPLICATION_PDF,          "application/pdf" },
     { CT_APPLICATION_OCTET_STREAM, "application/octet-stream" },
     { CT_APPLICATION_JAVASCRIPT,   "application/javascript" },

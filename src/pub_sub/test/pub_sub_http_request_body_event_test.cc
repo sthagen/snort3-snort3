@@ -151,7 +151,7 @@ TEST(pub_sub_http_request_body_event_test, last_event)
 {
     int32_t msg_len = 500;
     int32_t max_pub_len = 2000;
-    int32_t in_offset = REQUEST_PUBLISH_DEPTH - msg_len;
+    int32_t in_offset = BODY_PUBLISH_DEPTH - msg_len;
     int32_t length, offset;
     uint32_t stream_id = 3;
     mock().setData("stream_id", stream_id);

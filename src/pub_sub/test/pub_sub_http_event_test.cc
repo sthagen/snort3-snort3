@@ -56,6 +56,12 @@ const Field& HttpMsgSection::get_classic_buffer(unsigned buffer_type, uint64_t, 
     return (*out);
 }
 
+bool HttpMsgHeader::has_supported_encoding() const
+{
+    mock().actualCall("has_supported_encoding");
+    return (bool) mock().getData("has_supported_encoding").getIntValue();
+}
+
 const Field& HttpMsgHeader::get_true_ip_addr()
 {
     Field *out = (Field*)mock().getData("output").getObjectPointer();
@@ -72,9 +78,28 @@ TEST_GROUP(pub_sub_http_event_test)
 
     void teardown() override
     {
+        mock().checkExpectations();
         mock().clear();
     }
 };
+
+TEST(pub_sub_http_event_test, has_supported_encoding_true)
+{
+    mock().expectOneCall("has_supported_encoding");
+    mock().setData("has_supported_encoding", (int)true);
+    HttpEvent event(nullptr, false, 0);
+
+    CHECK(event.has_supported_encoding());
+}
+
+TEST(pub_sub_http_event_test, has_supported_encoding_false)
+{
+    mock().expectOneCall("has_supported_encoding");
+    mock().setData("has_supported_encoding", (int)false);
+    HttpEvent event(nullptr, false, 0);
+
+    CHECK_FALSE(event.has_supported_encoding());
+}
 
 TEST(pub_sub_http_event_test, http_traffic)
 {
@@ -102,7 +127,6 @@ TEST(pub_sub_http_event_test, no_true_ip_addr)
     header_start = event.get_trueip_addr(header_length);
     CHECK(header_length == 0);
     CHECK(header_start == nullptr);
-    mock().checkExpectations();
 }
 
 TEST(pub_sub_http_event_test, true_ip_addr)
@@ -115,7 +139,6 @@ TEST(pub_sub_http_event_test, true_ip_addr)
     header_start = event.get_trueip_addr(header_length);
     CHECK(header_length == 7);
     CHECK(memcmp(header_start, "1.1.1.1", 7) == 0);
-    mock().checkExpectations();
 }
 
 TEST(pub_sub_http_event_test, get_method)
@@ -130,7 +153,6 @@ TEST(pub_sub_http_event_test, get_method)
     header_start = event.get_method(header_length);
     CHECK(7 == header_length);
     CHECK(memcmp(header_start, "CONNECT", 7) == 0);
-    mock().checkExpectations();
 }
 
 TEST(pub_sub_http_event_test, get_response_phrase)
@@ -146,7 +168,6 @@ TEST(pub_sub_http_event_test, get_response_phrase)
     header_start = event.get_response_phrase(header_length);
     CHECK(7 == header_length);
     CHECK(memcmp(header_start, "CONNECT", 7) == 0);
-    mock().checkExpectations();
 }
 
 TEST(pub_sub_http_event_test, get_all_raw_headers)
@@ -164,7 +185,6 @@ TEST(pub_sub_http_event_test, get_all_raw_headers)
     header_start = event.get_all_raw_headers(discovered_length);
     CHECK(discovered_length == header_length);
     CHECK(memcmp(header_start, headers, header_length) == 0);
-    mock().checkExpectations();
 }
 
 int main(int argc, char** argv)

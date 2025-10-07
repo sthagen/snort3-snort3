@@ -196,3 +196,9 @@ int64_t HttpEvent::get_httpx_stream_id() const
 {
     return httpx_stream_id;
 }
+
+bool HttpEvent::has_supported_encoding() const
+{
+    return http_msg_header->has_supported_encoding();
+}
+

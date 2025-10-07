@@ -120,15 +120,17 @@ bool PPPoECodec::decode(const RawData& raw,
  ******************************************************************/
 
 bool PPPoECodec::encode(const uint8_t* const raw_in, const uint16_t raw_len,
-    EncState&, Buffer& buf, Flow*)
+    EncState& enc, Buffer& buf, Flow*)
 {
     if (!buf.allocate(raw_len))
         return false;
 
     memcpy(buf.data(), raw_in, raw_len);
     PPPoEHdr* const ppph = reinterpret_cast<PPPoEHdr*>(buf.data());
-    ppph->length = htons((uint16_t)buf.size());
+    ppph->length = htons((uint16_t)buf.size() - raw_len);
 
+    enc.next_ethertype = ProtocolId::ETHERTYPE_NOT_SET;
+    enc.next_proto = IpProtocol::PROTO_NOT_SET;
     return true;
 }
 

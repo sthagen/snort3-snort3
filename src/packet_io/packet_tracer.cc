@@ -160,16 +160,21 @@ void PacketTracer::dump(Packet* p)
         const char* drop_reason = p->active->get_drop_reason();
         if (drop_reason)
             PacketTracer::log("Verdict Reason: %s, %s\n", drop_reason, p->active->get_action_string() );
-        if (s_pkt_trace->buff_len < max_buff_size - 1)
-            s_pkt_trace->buffer[s_pkt_trace->buff_len++] = '\n';
-        if (s_pkt_trace->log_fh && s_pkt_trace->log_fh != stdout)
-        {
-            fprintf(s_pkt_trace->log_fh, "%.*s", s_pkt_trace->buff_len, s_pkt_trace->buffer);
-            fflush(s_pkt_trace->log_fh);
-        }
+        if(!snort::SnortConfig::get_conf()->use_log_buffered())
+            LogMessage(s_pkt_trace->log_fh, "%s\n", s_pkt_trace->buffer);
         else
-            BatchedLogger::BatchedLogManager::log(s_pkt_trace->log_fh, SnortConfig::log_syslog(),
-                s_pkt_trace->buffer, s_pkt_trace->buff_len);
+        {
+            if (s_pkt_trace->buff_len < max_buff_size - 1)
+                s_pkt_trace->buffer[s_pkt_trace->buff_len++] = '\n';
+            if (s_pkt_trace->log_fh && s_pkt_trace->log_fh != stdout)
+            {
+                fprintf(s_pkt_trace->log_fh, "%.*s", s_pkt_trace->buff_len, s_pkt_trace->buffer);
+                fflush(s_pkt_trace->log_fh);
+            }
+            else
+                BatchedLogger::BatchedLogManager::log(s_pkt_trace->log_fh, SnortConfig::log_syslog(),
+                    s_pkt_trace->buffer, s_pkt_trace->buff_len);
+        }
     }
 
     s_pkt_trace->reset(false);

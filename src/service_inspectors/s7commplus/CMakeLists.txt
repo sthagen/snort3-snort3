@@ -1,3 +1,5 @@
+add_subdirectory(test)
+
 set( FILE_LIST
     s7comm.cc
     s7comm.h

@@ -259,6 +259,11 @@ static int nntp_validate_data(const uint8_t* data, uint16_t* offset, uint16_t si
                 break;
             }
         }
+
+        if(*offset == std::numeric_limits<uint16_t>::max())
+        {
+            return 0;
+        }
     }
     return 0;
 }

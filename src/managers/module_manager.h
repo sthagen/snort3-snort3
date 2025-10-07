@@ -96,7 +96,6 @@ public:
 
     static void reset_stats(SnortConfig*);
     static void reset_stats(clear_counter_type_t);
-    static void reset_module_stats(const char* name);
 
     static void clear_global_active_counters();
     static bool is_parallel_cmd(std::string control_cmd);

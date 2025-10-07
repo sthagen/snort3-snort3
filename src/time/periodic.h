@@ -33,6 +33,7 @@ public:
     static void register_handler(PeriodicHook, void*, uint16_t priority, uint32_t);
     static void check();
 
+    static void unregister_handler(PeriodicHook hook);
     static void unregister_all();
 };
 

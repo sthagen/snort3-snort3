@@ -229,8 +229,12 @@ bool ControlConn::respond(const char* format, va_list& ap)
     char buf[STD_BUF];
     int response_len = vsnprintf(buf, sizeof(buf), format, ap);
 
-    if (response_len < 0 || response_len == sizeof(buf))
+    if (response_len < 0 || (size_t)response_len >= sizeof(buf))
+    {
+        LogMessage("ControlConn::respond: Unable to create response buffer. buf_size=%zu,"
+            " response_len=%d, format=%s\n", sizeof(buf), response_len, format);
         return false;
+    }
 
     buf[response_len] = '\0';
 

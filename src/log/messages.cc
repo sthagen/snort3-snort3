@@ -29,6 +29,7 @@
 #include <cassert>
 #include <cstring>
 
+#include "log/batched_logger.h"
 #include "main/snort_config.h"
 #include "main/thread.h"
 #include "parser/parser.h"
@@ -178,15 +179,25 @@ void ReloadError(const char* format, ...)
 
 static void WriteLogMessage(FILE* fh, bool prefer_fh, const char* format, va_list& ap)
 {
-    if ( prefer_fh or !SnortConfig::log_syslog() )
-    {
-        vfprintf(fh, format, ap);
-        return;
-    }
-    char buf[STD_BUF+1];
-    vsnprintf(buf, STD_BUF, format, ap);
-    buf[STD_BUF] = '\0';
-    syslog(LOG_DAEMON | LOG_NOTICE, "%s", buf);
+    const SnortConfig* sc = SnortConfig::get_conf();
+    
+    if ( sc && sc->use_log_buffered() )
+        {
+            bool syslog_option = ( prefer_fh or !SnortConfig::log_syslog() ) ? false : true;
+            BatchedLogger::BatchedLogManager::log(fh, syslog_option, format, ap);
+        }
+    else
+        {
+            if ( prefer_fh or !SnortConfig::log_syslog() )
+            {
+                vfprintf(fh, format, ap);
+                return;
+            }
+            char buf[STD_BUF+1];
+            vsnprintf(buf, STD_BUF, format, ap);
+            buf[STD_BUF] = '\0';
+            syslog(LOG_DAEMON | LOG_NOTICE, "%s", buf);
+        }
 }
 
 // print an info message to stdout or syslog

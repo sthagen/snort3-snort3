@@ -146,7 +146,7 @@ bool ACGetStats::execute(Analyzer&, void**)
 
 ACGetStats::~ACGetStats()
 {
-    ModuleManager::accumulate_module("memory");
+
     // FIXIT-L This should track the owner so it can dump stats to the
     // shell instead of the logs when initiated by a shell command
     DropStats(ctrlcon);
@@ -163,18 +163,6 @@ bool ACResetStats::execute(Analyzer&, void**)
 
 ACResetStats::ACResetStats(clear_counter_type_t requested_type_l) : requested_type(
         requested_type_l) { }
-
-ACResetStats::~ACResetStats()
-{
-    // Destructor is called only from main thread,
-    // main-thread stats are reset here.
-
-    if (requested_type == TYPE_MODULE or requested_type == TYPE_ALL)
-        ModuleManager::reset_module_stats("memory");
-
-    if (requested_type == TYPE_SNORT or requested_type == TYPE_ALL)
-        ModuleManager::reset_module_stats("snort");
-}
 
 bool ACSwap::execute(Analyzer& analyzer, void** ac_state)
 {

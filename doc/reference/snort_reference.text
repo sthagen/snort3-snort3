@@ -8,7 +8,7 @@ Snort 3 Reference Manual
 The Snort Team
 
 Revision History
-Revision 3.9.5.0 2025-09-03 21:10:35 EDT TST
+Revision 3.9.6.0 2025-10-06 12:42:39 EDT TST
 
 ---------------------------------------------------------------------
 
@@ -1273,6 +1273,8 @@ Configuration:
   * bool output.verbose = false: be verbose (same as -v)
   * bool output.obfuscate = false: obfuscate the logged IP addresses
     (same as -O)
+  * bool output.log_buffered = false: enable buffered logging for all
+    output
   * bool output.wide_hex_dump = false: output 20 bytes per lines
     instead of 16 when dumping buffers
 
@@ -10683,6 +10685,8 @@ libraries see the Getting Started section of the manual.
     starting at link layer (same as -X)
   * int output.event_trace.max_data = 0: maximum amount of packet
     data to capture { 0:65535 }
+  * bool output.log_buffered = false: enable buffered logging for all
+    output
   * string output.logdir = .: where to put log files (same as -l)
   * bool output.obfuscate = false: obfuscate the logged IP addresses
     (same as -O)

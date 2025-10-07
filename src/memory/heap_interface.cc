@@ -46,7 +46,7 @@ class JemallocInterface : public HeapInterface
     void main_init() override;
     void thread_init() override;
 
-    void get_process_total(uint64_t&, uint64_t&) override;
+    void get_process_total(uint64_t&, uint64_t&, bool bump_epoch) override;
     void get_thread_allocs(uint64_t&, uint64_t&) override;
 
     void print_stats(ControlConn*) override;
@@ -98,11 +98,22 @@ void JemallocInterface::thread_init()
     // __STRDUMP_ENABLE__
 }
 
-void JemallocInterface::get_process_total(uint64_t& epoch, uint64_t& utotal)
+void JemallocInterface::get_process_total(uint64_t& epoch, uint64_t& utotal, bool bump_epoch)
 {
     uint64_t cycle = 13;
     size_t sz = sizeof(epoch);
-    mallctl("epoch", (void*)&epoch, &sz, (void*)&cycle, sizeof(cycle));
+
+    if (!bump_epoch)
+    {
+        // Don't perform the mallctl as it'll bump the epoch, return 0 for epoch and the value for the total
+        epoch = 0;
+        mallctl("epoch", nullptr, nullptr, nullptr, 0);
+
+    }
+    else
+    {
+        mallctl("epoch", (void*)&epoch, &sz, (void*)&cycle, sizeof(cycle));
+    }
 
     size_t total;
     sz = sizeof(total);
@@ -195,8 +206,8 @@ public:
     void main_init() override { }
     void thread_init() override { }
 
-    void get_process_total(uint64_t& e, uint64_t& t) override
-    { e = t = 0; }
+    void get_process_total(uint64_t& e, uint64_t& t, bool bump_epoch) override
+    { e = t = 0; UNUSED(bump_epoch); }
 
     void get_thread_allocs(uint64_t& a, uint64_t& d) override
     { a = d = 0; }

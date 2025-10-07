@@ -164,7 +164,14 @@ AppIdSession::~AppIdSession()
     if (!in_expected_cache)
     {
         if (config.log_stats)
-            AppIdStatistics::get_stats_manager()->update(*this);
+        {
+            AppIdStatistics::stats_manager_lock.lock();
+            if (AppIdStatistics::get_stats_manager() != nullptr)
+            {
+                AppIdStatistics::get_stats_manager()->update(*this);
+            }
+            AppIdStatistics::stats_manager_lock.unlock();
+        }
 
         // fail any service detection that is in process for this flow
         if (!get_session_flags(APPID_SESSION_SERVICE_DETECTED |
@@ -604,9 +611,9 @@ void AppIdSession::examine_ssl_metadata(AppidChangeBits& change_bits, bool parti
                 tsession->set_tls_host_published(false);
             tsession->set_matched_tls_type(MatchedTlsType::MATCHED_TLS_CNAME);
         }
-        scan_flags &= ~SCAN_SSL_CERTIFICATE_FLAG;    
+        scan_flags &= ~SCAN_SSL_CERTIFICATE_FLAG;
     }
-    
+
     if (!match_found and (scan_flags & SCAN_SSL_ORG_UNIT_FLAG) and (tls_str = tsession->get_tls_org_unit()) )
     {
         size_t size = strlen(tls_str);
@@ -647,7 +654,7 @@ void AppIdSession::examine_ssl_metadata(AppidChangeBits& change_bits, bool parti
             change_bits.set(APPID_TLSHOST_BIT);
         }
     }
-    else if (tsession->is_tls_host_mismatched() and 
+    else if (tsession->is_tls_host_mismatched() and
             (api.get_tls_host() and (strcmp(api.get_tls_host(), tsession->get_tls_host()) != 0)))
     {
         api.set_tls_host(tsession->get_tls_host());
@@ -1303,28 +1310,28 @@ void AppIdSession::publish_shadow_traffic_event(const uint32_t& shadow_traffic_b
 
     if (app_name == nullptr)
     {
-        if ((shadow_traffic_bits & ShadowTraffic_Type_Domain_Fronting) && 
+        if ((shadow_traffic_bits & ShadowTraffic_Type_Domain_Fronting) &&
             !(shadow_traffic_bits & ~ShadowTraffic_Type_Domain_Fronting))
-        { 
-            app_name = "unknown"; 
+        {
+            app_name = "unknown";
         }
-        else 
+        else
         {
             APPID_LOG(curr_packet, TRACE_DEBUG_LEVEL, "Appname is invalid, not publishing shadow traffic event without appname\n");
-            return; 
+            return;
         }
     }
 
     shadow_traffic_pub_id = DataBus::get_id(shadowtraffic_pub_key);
-  
+
     ShadowTrafficEvent shadow_event(shadow_traffic_bits, "", "", app_name);
-    DataBus::publish(shadow_traffic_pub_id, ShadowTrafficEventIds::SHADOWTRAFFIC_FLOW_DETECTED, shadow_event, flow); 
+    DataBus::publish(shadow_traffic_pub_id, ShadowTrafficEventIds::SHADOWTRAFFIC_FLOW_DETECTED, shadow_event, flow);
 
     if (appidDebug and appidDebug->is_active())
         change_shadow_traffic_bits_to_string(shadow_traffic_bits, str_print);
-    
-    APPID_LOG(curr_packet, TRACE_DEBUG_LEVEL, 
-        "AppID: ShadowTraffic Published event for: %s, application_name: %s(%d)\n", 
+
+    APPID_LOG(curr_packet, TRACE_DEBUG_LEVEL,
+        "AppID: ShadowTraffic Published event for: %s, application_name: %s(%d)\n",
         str_print.c_str(), app_name, publishing_appid);
 
     set_previous_shadow_traffic_bits(shadow_traffic_bits);
@@ -1396,7 +1403,7 @@ void AppIdSession::check_shadow_traffic_bits(AppId id, uint32_t& shadow_bits, Ap
 {
    if (id > APP_ID_NONE)
    {
-        uint32_t attributeBits = api.asd->get_odp_ctxt().get_app_info_mgr().getAttributeBits(id); 
+        uint32_t attributeBits = api.asd->get_odp_ctxt().get_app_info_mgr().getAttributeBits(id);
         if (attributeBits & ATTR_APPENCRYPTEDDNS)
         {
             shadow_bits |= ShadowTraffic_Type_Encrypted_DNS;
@@ -1439,21 +1446,21 @@ void AppIdSession::process_shadow_traffic_appids()
 
     if (service_id > 0)
         check_shadow_traffic_bits(service_id, shadow_bits, publishing_appid, is_publishing_set);
-    if (payload_id > 0) 
+    if (payload_id > 0)
         check_shadow_traffic_bits(payload_id, shadow_bits, publishing_appid, is_publishing_set);
     if (client_id > 0)
         check_shadow_traffic_bits(client_id, shadow_bits, publishing_appid, is_publishing_set);
-    if (misc_id > 0) 
-        check_shadow_traffic_bits(misc_id, shadow_bits, publishing_appid, is_publishing_set); 
+    if (misc_id > 0)
+        check_shadow_traffic_bits(misc_id, shadow_bits, publishing_appid, is_publishing_set);
 
     if (shadow_bits != 0)
     {
         set_shadow_traffic_bits(shadow_bits);
         set_shadow_traffic_publishing_appid(publishing_appid);
-    } 
+    }
 }
 
-void AppIdSession::check_domain_fronting_status(const std::string& host)  
+void AppIdSession::check_domain_fronting_status(const std::string& host)
 {
     TLSDomainFrontCheckEvent domain_front_event(api.asd->get_cert_key(), host);
     DataBus::publish(AppIdInspector::get_pub_id(), AppIdEventIds::DOMAIN_FRONTING, domain_front_event);

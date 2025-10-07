@@ -57,6 +57,7 @@ public:
     bool contains_webdav_method();
     bool get_is_httpx() const;
     int64_t get_httpx_stream_id() const;
+    bool has_supported_encoding() const;
 
 private:
     HttpMsgHeader* const http_msg_header;

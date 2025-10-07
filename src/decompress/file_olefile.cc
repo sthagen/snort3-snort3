@@ -238,6 +238,8 @@ int32_t OleFile :: get_mini_fat_offset(int32_t sec_id)
 
     if (sec_id >=  mini_fat_persector)
     {
+        if (mini_fat_persector == 0)
+            return -1;
         sec_position = sec_id/mini_fat_persector;
         mini_sec_position = sec_id % mini_fat_persector;
     }
@@ -301,7 +303,19 @@ void OleFile :: get_file_data(FileProperty* node, uint8_t*& file_data, uint32_t&
         starting_sector = node->get_starting_sector();
         stream_size = node->get_stream_size();
 
-        file_data = new uint8_t[stream_size];
+        if (stream_size == 0 || stream_size > MAX_STREAM_SIZE) {
+            VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+                "Requested stream_size %u is invalid or too large (max %u). Allocation aborted.\n", stream_size, MAX_STREAM_SIZE);
+            file_data = nullptr;
+            return;
+        }
+
+        file_data = new (std::nothrow) uint8_t[stream_size];
+        if (!file_data) {
+            VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+                "Memory allocation failed for stream_size %u.\n", stream_size);
+            return;
+        }
         temp_data = file_data;
         if (stream_size <= header->get_minifat_cutoff())
             is_fat = MINIFAT_SECTOR;
@@ -381,16 +395,23 @@ void OleFile :: populate_fat_list()
     VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, CURRENT_PACKET,
         "Reading the FAT list array.\n");
     fat_list_len = ( header->get_fat_sector_count() * header->get_sector_size() ) / 4;
-    if (fat_list_len < 1)
+
+    if (fat_list_len < 1 || fat_list_len > MAX_STREAM_SIZE)
     {
-        VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, CURRENT_PACKET,
-            "FAT list array is empty.\n");
+        VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+            "FAT list length %d is invalid or too large (max %d). Allocation aborted.\n", fat_list_len, MAX_STREAM_SIZE);
+        fat_list = nullptr;
         return;
     }
 
-    fat_list = new int32_t[fat_list_len];
+    fat_list = new (std::nothrow) int32_t[fat_list_len];
+    if (!fat_list) {
+        VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+            "Memory allocation failed for FAT list length %d.\n", fat_list_len);
+        return;
+    }
 
-    memset(fat_list, -1, fat_list_len);
+    memset(fat_list, -1, fat_list_len * sizeof(int32_t));
 
     current_sector = fat_sector;
     while (current_sector > INVALID_SECTOR)
@@ -444,16 +465,23 @@ void OleFile :: populate_mini_fat_list()
     VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, CURRENT_PACKET,
         "Reading the Mini-FAT list array.\n");
     mini_fat_list_len = ( header->get_minifat_count() * header->get_sector_size() )  / 4;
-    if (mini_fat_list_len < 1)
+
+    if (mini_fat_list_len < 1 || mini_fat_list_len > MAX_STREAM_SIZE)
     {
-        VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_INFO_LEVEL, CURRENT_PACKET,
-            "Mini-FAT list array is empty.\n");
+        VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+            "Mini-FAT list length %d is invalid or too large (max %d). Allocation aborted.\n", mini_fat_list_len, MAX_STREAM_SIZE);
+        mini_fat_list = nullptr;
         return;
     }
 
-    mini_fat_list = new int32_t[mini_fat_list_len];
+    mini_fat_list = new (std::nothrow) int32_t[mini_fat_list_len];
+    if (!mini_fat_list) {
+        VBA_DEBUG(vba_data_trace, DEFAULT_TRACE_OPTION_ID, TRACE_ERROR_LEVEL, CURRENT_PACKET,
+            "Memory allocation failed for Mini-FAT list length %d.\n", mini_fat_list_len);
+        return;
+    }
 
-    memset(mini_fat_list, -1, mini_fat_list_len);
+    memset(mini_fat_list, -1, mini_fat_list_len * sizeof(int32_t));
 
     current_sector = minifat_sector;
     int32_t minfat_curr_cnt = 0;

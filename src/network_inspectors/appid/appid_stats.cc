@@ -33,6 +33,9 @@
 #include "app_info_table.h"
 #include "appid_inspector.h"
 #include "appid_session.h"
+#include <mutex>
+
+std::mutex AppIdStatistics::stats_manager_lock;
 
 using namespace snort;
 
@@ -159,6 +162,7 @@ AppIdStatistics* AppIdStatistics::initialize_manager(const AppIdConfig& config)
     if ( !config.log_stats )
         return nullptr;
 
+    std::lock_guard<std::mutex> lock(AppIdStatistics::stats_manager_lock);
     appid_stats_manager = new AppIdStatistics(config);
     return appid_stats_manager;
 }
@@ -167,7 +171,11 @@ AppIdStatistics* AppIdStatistics::get_stats_manager()
 { return appid_stats_manager; }
 
 void AppIdStatistics::cleanup()
-{ delete appid_stats_manager; }
+{
+    std::lock_guard<std::mutex> lock(AppIdStatistics::stats_manager_lock);
+    delete appid_stats_manager;
+    appid_stats_manager = nullptr;
+}
 
 static void update_stats(const AppIdSession& asd, AppId app_id, StatsBucket* bucket)
 {

@@ -721,7 +721,7 @@ void AppInfoManager::load_odp_config(OdpContext& odp_ctxt, const char* path)
                 const std::string user_table(conf_val);
                 const std::string user_key(token);
                 const std::string user_value(token2);
-                odp_ctxt.get_user_data_map().add_user_data(user_table, user_key, user_value);
+                odp_ctxt.get_user_data_map().add_user_data(user_table, user_key, user_value, false);
             }
             else
                 ParseWarning(WARN_CONF, "appid: unsupported configuration: %s\n", conf_key);

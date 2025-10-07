@@ -35,7 +35,6 @@
 #include "main/snort_config.h"
 #include "main/snort_types.h"
 #include "main/thread.h"
-#include "managers/module_manager.h"
 #include "time/periodic.h"
 #include "trace/trace_api.h"
 #include "utils/stats.h"
@@ -60,6 +59,11 @@ static size_t limit = 0;
 
 static bool over_limit = false;
 static std::atomic<uint64_t> current_epoch { 0 };
+static std::atomic<uint64_t> start_up_use { 0 };
+static std::atomic<uint64_t> max_in_use { 0 };
+
+// The most recent epoch reported by jemalloc
+static std::atomic<uint64_t> latest_epoch { 0 };
 
 static THREAD_LOCAL uint64_t start_dealloc = 0;
 static THREAD_LOCAL uint64_t start_alloc = 0;
@@ -71,7 +75,7 @@ static PruneHandler pruner;
 static void epoch_check(void*)
 {
     uint64_t epoch, total;
-    heap->get_process_total(epoch, total);
+    heap->get_process_total(epoch, total, true);
 
     bool prior = over_limit;
     over_limit = limit and total > limit;
@@ -83,33 +87,13 @@ static void epoch_check(void*)
     else
         current_epoch = 0;
 
-#ifndef REG_TEST
-    MemoryCounts& mc = MemoryCap::get_mem_stats();
-#else
-    auto orig_type = get_thread_type();
+    if ( !start_up_use )
+        start_up_use = total;
 
-    // Due to call of epoch_check in first pthread
-    // for build with REG_TEST, we need make that
-    // pthread think that we're main thread
-    set_thread_type(STHREAD_TYPE_MAIN);
-    MemoryCounts& mc = MemoryCap::get_mem_stats();
-    set_thread_type(orig_type);
-#endif
+    if ( total > max_in_use )
+        max_in_use = total;
 
-    if ( total > mc.max_in_use )
-        mc.max_in_use = total;
-
-    mc.cur_in_use = total;
-    mc.epochs++;
-
-    // for reporting / tracking only
-    uint64_t all, act, res, ret;
-    heap->get_aux_counts(all, act, res, ret);
-
-    mc.app_all = all;
-    mc.active = act;
-    mc.resident = res;
-    mc.retained = ret;
+    latest_epoch = epoch;
 }
 
 // -----------------------------------------------------------------------------
@@ -156,7 +140,7 @@ void MemoryCap::test_main_check()
 void MemoryCap::init(unsigned n)
 {
     assert(in_main_thread());
-    pkt_mem_stats.resize(n + 1);
+    pkt_mem_stats.resize(n);
 
 #ifdef UNIT_TEST
     pkt_mem_stats[0] = { };
@@ -202,13 +186,13 @@ void MemoryCap::start(const MemoryConfig& c, PruneHandler ph)
 #endif
 
     epoch_check(nullptr);
-
-    MemoryCounts& mc = get_mem_stats();
-    mc.start_up_use = mc.cur_in_use;
 }
 
 void MemoryCap::stop()
-{ epoch_check(nullptr); }
+{ 
+    epoch_check(nullptr);
+    update_global_stats();
+}
 
 void MemoryCap::thread_init()
 {
@@ -225,11 +209,11 @@ void MemoryCap::thread_term()
 
 MemoryCounts& MemoryCap::get_mem_stats()
 {
-    // main thread stats do not overlap with packet threads
+    // main thread stats overlap with packet thread 1
     if ( in_main_thread() )
         return pkt_mem_stats[0];
 
-    auto id = get_instance_id() + 1;
+    auto id = get_instance_id();
     return pkt_mem_stats[id];
 }
 
@@ -315,10 +299,51 @@ void MemoryCap::free_space()
 
 // required to capture any update in final epoch
 // which happens after packet threads have stopped
-void MemoryCap::update_pegs()
+void MemoryCap::update_pegs(PegCount* pc)
 {
+    MemoryCounts* mp = (MemoryCounts*)pc;
+    const MemoryCounts& mc = get_mem_stats();
+
     if ( config.enabled )
-        ModuleManager::accumulate_module("memory");
+    {
+        mp->epochs = mc.epochs;
+        mp->cur_in_use = mc.cur_in_use;
+    }
+    else
+    {
+        mp->allocated = 0;
+        mp->deallocated = 0;
+    }
+}
+
+void MemoryCap::update_global_stats()
+{
+    if ( !pkt_mem_stats.size() )
+        return;
+
+    MemoryCounts& mc = pkt_mem_stats[0];
+
+    uint64_t epoch, total;
+    heap->get_process_total(epoch, total, false);
+
+    mc.max_in_use = max_in_use;
+
+    mc.cur_in_use = total;
+
+    if ( epoch > latest_epoch )
+        latest_epoch = epoch;
+
+    mc.epochs = latest_epoch;
+    mc.start_up_use = start_up_use;
+
+    // for reporting / tracking only
+    uint64_t all, act, res, ret;
+    heap->get_aux_counts(all, act, res, ret);
+
+    mc.app_all = all;
+    mc.active = act;
+    mc.resident = res;
+    mc.retained = ret;
 }
 
 // called at startup and shutdown

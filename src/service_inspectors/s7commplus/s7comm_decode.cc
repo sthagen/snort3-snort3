@@ -116,7 +116,7 @@ bool S7commplusDecode(Packet* p, S7commplusFlowData* mfd)
     const S7commplusHeader* s7commplus_header;
     uint16_t tpkt_length;
 
-    if (p->dsize < TPKT_MIN_HDR_LEN)
+    if (p->dsize < TPKT_MIN_PACKET_LEN)
         return false;
 
     tpkt_header = (const TpktHeader*)p->data;
@@ -124,11 +124,11 @@ bool S7commplusDecode(Packet* p, S7commplusFlowData* mfd)
     tpkt_length = ntohs(tpkt_header->length);
 
     /* It might be a TPKT/COTP packet for other purpose, e.g. connect */
-    if (cotp_header->length != COTP_HDR_LEN_FOR_S7COMMPLUS||
-        cotp_header->pdu_type != COTP_HDR_PDU_TYPE_DATA)
+    if (cotp_header->length != COTP_MIN_PACKET_LEN ||
+        (cotp_header->pdu_type >> 4) != COTP_DATA_TRANSFER_TPDU)
         return true;
     /* It might be COTP fragment data */
-    if (tpkt_length == TPKT_MIN_HDR_LEN)
+    if (tpkt_length == TPKT_MIN_PACKET_LEN)
     {
         mfd->reset();
         return true;

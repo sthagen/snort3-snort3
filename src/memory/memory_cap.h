@@ -80,9 +80,10 @@ public:
 
     // main and packet threads
     static MemoryCounts& get_mem_stats();
+    static void update_global_stats();
 
     // main thread - shutdown
-    static void update_pegs();
+    static void update_pegs(PegCount*);
 
     static void dump_mem_stats(ControlConn*);
     static void heap_profile_config(bool enable, uint64_t sample_rate);

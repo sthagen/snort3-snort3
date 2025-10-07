@@ -189,6 +189,8 @@ public:
     void reset();
     void set_config(FileConfig* fc) { config = fc; }
     FileConfig* get_config() { return config; }
+    void set_inspector(FileInspect* ins) { inspector = ins; }
+    FileInspect* get_inspector() { return inspector; }
 private:
     uint64_t processed_bytes = 0;
     void* file_type_context;

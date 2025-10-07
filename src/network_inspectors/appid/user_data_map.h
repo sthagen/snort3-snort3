@@ -23,9 +23,9 @@
 
 /* User Data Map uses an unordered map to store arbitrary user-defined key value pairs
  * used in lua detectors. Mappings are loaded from appid.conf or userappid.conf using a
- * key that is hardcoded in the detector. The user supplies the value. At runtime, if the lua
- * detector's conditions are met during validation, the lua detector can use its key to
- * retrieve the customer data.
+ * key that is hardcoded in the detector or loaded from lua detectors that utilize setUserDetectorDataItem API.
+ * The user supplies the value. At runtime, if the lua detector's conditions are met during validation,
+ * the lua detector can use its key to retrieve the customer data.
  */
 
 #include <string>
@@ -42,9 +42,11 @@ class UserDataMap
 {
 public:
     ~UserDataMap();
-    void add_user_data(const std::string& table, const std::string& key,
-        const std::string& item);
+    bool add_user_data(const std::string& table, const std::string& key,
+        const std::string& item, bool override_existing = false);
     const char* get_user_data_value_str(const std::string& table, const std::string& key);
+
+    void set_configuration_completed(bool completed);
 private:
     UserDataMaps user_data_maps;
 };

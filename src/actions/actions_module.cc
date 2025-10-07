@@ -127,3 +127,11 @@ const PegInfo* ActionsModule::get_pegs() const
     return (PegInfo*)&peg_info_array[0];
 }
 
+void ActionsModule::reset_stats()
+{
+    std::fill(std::begin(peg_count_array), std::end(peg_count_array), 0);
+    std::fill(std::begin(prev_peg_count_array), std::end(prev_peg_count_array), 0);
+
+    Module::reset_stats();
+}
+

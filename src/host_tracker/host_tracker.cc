@@ -1120,11 +1120,11 @@ void HostTracker::remove_flows()
 
 void HostTracker::update_cache_interface(uint8_t idx)
 {
+    std::lock_guard<std::mutex> lock(host_tracker_lock);
 
     if (idx == cache_idx and cache_interface == host_cache.seg_list[idx])
         return;
 
-    std::lock_guard<std::mutex> lock(host_tracker_lock);
     cache_idx = idx;
     cache_interface = host_cache.seg_list[idx];
 
@@ -1278,11 +1278,10 @@ void HostTracker::stringify(string& str)
     {
         str += "\nnetwork proto: ";
         auto total = network_protos.size();
-        while ( total-- )
+        for (auto proto = network_protos.crbegin(); proto != network_protos.crend(); ++proto)
         {
-            const auto& proto = network_protos[total];
-            if ( proto.second == true )
-                str += to_string(proto.first) + (total? ", " : "");
+            if ( proto->second == true )
+                str += to_string(proto->first) + (--total ? ", " : "");
         }
     }
 
@@ -1291,11 +1290,10 @@ void HostTracker::stringify(string& str)
     {
         str += "\ntransport proto: ";
         auto total = xport_protos.size();
-        while ( total-- )
+        for (auto proto = xport_protos.crbegin(); proto != xport_protos.crend(); ++proto)
         {
-            const auto& proto = xport_protos[total];
-            if ( proto.second == true )
-                str += to_string(proto.first) + (total? ", " : "");
+            if ( proto->second == true )
+                str += to_string(proto->first) + (--total ? ", " : "");
         }
     }
 

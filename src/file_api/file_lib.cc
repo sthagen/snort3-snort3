@@ -1044,6 +1044,10 @@ void FileContext::update_file_size(int data_size, FilePosition position)
         processed_bytes = 0;
         processing_complete = true;
     }
+    else if ((position == SNORT_FILE_MIDDLE) and sha256)
+    {
+        file_size = processed_bytes;
+    }
 }
 
 uint64_t FileContext::get_processed_bytes()

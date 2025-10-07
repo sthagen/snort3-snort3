@@ -28,6 +28,7 @@
 #include "framework/module.h"
 #include "hash/hash_key_operations.h"
 #include "profiler/profiler.h"
+#include "dce_co.h"
 
 #include "dce_common.h"
 
@@ -95,6 +96,45 @@ IpsOption::EvalStatus Dce2StubDataOption::eval(Cursor& c, Packet* p)
 
     if (ropts->stub_data != nullptr)
     {
+        if (p->is_udp() || p->pseudo_type == PSEUDO_PKT_DCE_FRAG)
+        {
+              c.set(s_name, ropts->stub_data, (uint16_t)(p->dsize - (ropts->stub_data -
+                p->data)));
+            return MATCH;
+        }
+        else if (ropts->stub_data < p->data || ropts->stub_data >= p->data + p->dsize)
+        {
+            // Out of bounds for regular packets - create a reassembly packet.
+            auto dce2_tcp_rbuf = std::make_unique<uint8_t[]>(IP_MAXPACKET);
+            DceEndianness* endianness = (DceEndianness*)p->endianness;
+            uint16_t stub_len = 0;
+
+            if (endianness && endianness->stub_data_offset != DCE2_SENTINEL) 
+            {
+                stub_len = endianness->stub_data_offset;
+            } 
+            else if(p->dsize>0)
+            {
+                stub_len = p->dsize;
+            }
+            else
+            {
+                stub_len = DCE2_GetRpktMaxData(DCE2_RPKT_TYPE__TCP_CO_FRAG);
+            }
+
+            Packet* rpkt = DCE2_GetRpkt(p, DCE2_RPKT_TYPE__TCP_CO_FRAG, dce2_tcp_rbuf.get(), stub_len);
+
+            if (rpkt) 
+            {
+                c.set(s_name, rpkt->data + DCE2_MOCK_HDR_LEN__CO_CLI, (uint16_t)(rpkt->dsize - DCE2_MOCK_HDR_LEN__CO_CLI));
+                return MATCH;
+            } 
+            else 
+            {
+                return NO_MATCH;
+            }
+        }
+        
         c.set(s_name, ropts->stub_data, (uint16_t)(p->dsize - (ropts->stub_data -
             p->data)));
         return MATCH;

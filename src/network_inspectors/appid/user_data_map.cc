@@ -24,23 +24,44 @@
 
 #include "user_data_map.h"
 
+#include "main/thread.h"
+
+static THREAD_LOCAL bool configuration_completed;
+
 UserDataMap::~UserDataMap()
 {
     user_data_maps.clear();
 }
 
-void UserDataMap::add_user_data(const std::string& table, const std::string& key,
-    const std::string& item)
+bool UserDataMap::add_user_data(const std::string &table, const std::string &key,
+                                const std::string &item, bool override_existing)
 {
-    if (user_data_maps.find(table) != user_data_maps.end())
+
+    if (snort::get_thread_type() != SThreadType::STHREAD_TYPE_MAIN)
     {
-        if (user_data_maps[table].find(key) != user_data_maps[table].end())
-        {
-            APPID_LOG(nullptr, TRACE_WARNING_LEVEL,"ignoring duplicate key %s in table %s",
+        if (configuration_completed)
+            APPID_LOG(nullptr, TRACE_WARNING_LEVEL, "AppId: ignoring user data with key %s in table %s from non-main thread\n",
                 key.c_str(), table.c_str());
-            return;
+        return false;
+    }
+
+    auto table_it = user_data_maps.find(table);
+    if (table_it != user_data_maps.end())
+    {
+        if (override_existing)
+        {
+            table_it->second[key] = item;
         }
-        user_data_maps[table][key] = item;
+        else
+        {
+            auto insert_result = table_it->second.try_emplace(key, item);
+            if (insert_result.second == false)
+            {
+                APPID_LOG(nullptr, TRACE_WARNING_LEVEL, "AppId: ignoring duplicate key %s in table %s\n",
+                    key.c_str(), table.c_str());
+                return false;
+            }
+        }
     }
     else
     {
@@ -48,16 +69,27 @@ void UserDataMap::add_user_data(const std::string& table, const std::string& key
         user_map[key] = item;
         user_data_maps[table] = user_map;
     }
+
+    return true;
 }
 
 const char* UserDataMap::get_user_data_value_str(const std::string& table,
     const std::string& key)
 {
-    if (user_data_maps.find(table) != user_data_maps.end() and
-        user_data_maps[table].find(key) != user_data_maps[table].end())
+    auto table_it = user_data_maps.find(table);
+    if (table_it != user_data_maps.end())
     {
-        return user_data_maps[table][key].c_str();
+        auto key_it = table_it->second.find(key);
+        if (key_it != table_it->second.end())
+        {
+            return key_it->second.c_str();
+        }
     }
-    else
-        return nullptr;
+    
+    return nullptr;
+}
+
+void UserDataMap::set_configuration_completed(bool completed)
+{
+    configuration_completed = completed;
 }

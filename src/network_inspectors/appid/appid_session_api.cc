@@ -32,6 +32,7 @@
 #include "appid_types.h"
 #include "service_plugins/service_bootp.h"
 #include "service_plugins/service_netbios.h"
+#include "network_inspectors/appid/service_plugins/service_ssl.h"
 
 #define SSL_ALLOWLIST_PKT_LIMIT 20
 
@@ -248,6 +249,15 @@ bool AppIdSessionApi::is_appid_inspecting_session() const
         if (!pkt_thread_odp_ctxt or
             (pkt_thread_odp_ctxt->get_version() != asd->get_odp_ctxt_version()))
             return false;
+    }
+
+    // service is a TLS-wrapped service or SNI has been observed
+    if ( (is_service_over_ssl(get_service_app_id()) or (get_tls_host() != nullptr)) and
+         !asd->get_session_flags(APPID_SESSION_DECRYPTED) and
+         !asd->get_odp_ctxt().check_host_port_app_cache and
+         (asd->session_packet_count >= SSL_ALLOWLIST_PKT_LIMIT) )
+    {
+        return false;
     }
 
     if ( (get_service_app_id() == APP_ID_QUIC or  get_service_app_id() == APP_ID_HTTP3) and

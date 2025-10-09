@@ -1401,6 +1401,9 @@ JSTokenizer::JSTokenizer(std::istream& in, std::ostream& out,
 
 JSTokenizer::~JSTokenizer()
 {
+    if (tmp_buffer)
+        yy_switch_to_buffer((YY_BUFFER_STATE)cur_buffer);
+
     yy_delete_buffer((YY_BUFFER_STATE)tmp_buffer);
     delete[] tmp_buf;
     tmp_buf = nullptr;

@@ -95,7 +95,8 @@ HttpTransaction* HttpTransaction::attach_my_transaction(HttpFlowData* session_da
     // 4. returns the current transaction
 
     // Request section: replace the old request transaction with a new transaction.
-    if (session_data->section_type[source_id] == SEC_REQUEST)
+    if (session_data->section_type[source_id] == SEC_REQUEST &&
+        session_data->infractions[SRC_CLIENT] != nullptr)
     {
         // If the HTTP request and response messages are alternating (usual situation) the old
         // request transaction will have been moved to the server side when the last response
@@ -276,6 +277,14 @@ void HttpTransaction::delete_transaction(HttpTransaction* transaction, HttpFlowD
         else
             transaction->shared_ownership = false;
     }
+}
+
+void HttpTransaction::set_request(HttpMsgRequest* request_)
+{
+    // section is already cleared
+    // check when clear_section() needs to be called
+    delete request;
+    request = request_;
 }
 
 void HttpTransaction::set_header(HttpMsgHeader* header_, HttpCommon::SourceId source_id)

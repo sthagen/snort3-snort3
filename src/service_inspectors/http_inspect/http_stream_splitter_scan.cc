@@ -222,7 +222,7 @@ StreamSplitter::Status HttpStreamSplitter::call_cutter(Flow* flow, HttpFlowData*
             int64_t partial_depth = 0;
             auto params = my_inspector->params;
 
-            if (type == SEC_HEADER)
+            if (type == SEC_HEADER || type == SEC_REQUEST)
             {
                 if (params->partial_depth_header != 0 && !session_data->for_httpx)
                     partial_depth = params->partial_depth_header;

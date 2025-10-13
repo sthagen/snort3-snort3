@@ -204,6 +204,7 @@ TEST(http_transaction_test, simple_pipeline)
         type_expected[SRC_CLIENT] = SEC_HEADER;
         section_type[SRC_CLIENT] = SEC_HEADER;
         CHECK(trans[k] == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+        HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
         for (unsigned j=0; j < k; j++)
         {
             CHECK(trans[k] != trans[j]);
@@ -268,6 +269,7 @@ TEST(http_transaction_test, pipeline_underflow)
     type_expected[SRC_CLIENT] = SEC_HEADER;
     section_type[SRC_CLIENT] = SEC_HEADER;
     CHECK(trans == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+    HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
     type_expected[SRC_CLIENT] = SEC_REQUEST;
 
     section_type[SRC_SERVER] = SEC_STATUS;
@@ -287,6 +289,7 @@ TEST(http_transaction_test, pipeline_underflow)
     type_expected[SRC_CLIENT] = SEC_HEADER;
     section_type[SRC_CLIENT] = SEC_HEADER;
     CHECK(trans2 == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+    HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
     type_expected[SRC_CLIENT] = SEC_REQUEST;
 
     section_type[SRC_SERVER] = SEC_STATUS;
@@ -482,6 +485,7 @@ TEST(http_transaction_test, pipeline_continue_pipeline)
         type_expected[SRC_CLIENT] = SEC_HEADER;
         section_type[SRC_CLIENT] = SEC_HEADER;
         CHECK(trans[k] == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+        HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
         for (unsigned j=0; j < k; j++)
         {
             CHECK(trans[k] != trans[j]);
@@ -521,6 +525,7 @@ TEST(http_transaction_test, pipeline_continue_pipeline)
         type_expected[SRC_CLIENT] = SEC_HEADER;
         section_type[SRC_CLIENT] = SEC_HEADER;
         CHECK(trans[k] == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+        HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
         for (unsigned j=5; j < k; j++)
         {
             CHECK(trans[k] != trans[j]);

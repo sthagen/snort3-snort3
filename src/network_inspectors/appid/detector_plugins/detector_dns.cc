@@ -509,6 +509,12 @@ int DnsValidator::validate_packet(const uint8_t* data, uint16_t size, const int,
 
     offset = sizeof(DNSHeader);
 
+    if (!hdr->QDCount and !hdr->QR and !hdr->ARCount)
+    {
+        // Query with no questions and cookies is invalid (RFC1035 and RFC7873)
+        return APPID_NOMATCH;
+    }
+
     if (hdr->QDCount)
     {
         count = ntohs(hdr->QDCount);

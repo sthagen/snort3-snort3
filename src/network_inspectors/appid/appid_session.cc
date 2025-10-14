@@ -361,6 +361,8 @@ void AppIdSession::sync_with_snort_protocol_id(AppId newAppId, Packet* p, AppidC
     case APP_ID_FTPS:
     case APP_ID_FTPSDATA:
 
+    case APP_ID_ARCSERVE:
+
     // These all are variants of HTTPS
     case APP_ID_DDM_SSL:
     case APP_ID_MSFT_GC_SSL:

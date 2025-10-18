@@ -40,9 +40,6 @@ TcpStateNone::TcpStateNone(TcpStateMachine& tsm) :
 
 bool TcpStateNone::syn_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    Flow* flow = tsd.get_flow();
-    flow->ssn_state.direction = FROM_CLIENT;
-
     trk.init_on_syn_sent(tsd);
     trk.session->init_new_tcp_session(tsd);
     return true;
@@ -84,13 +81,7 @@ bool TcpStateNone::data_seg_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& tr
 
 bool TcpStateNone::rst_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    if ( trk.update_on_rst_recv(tsd) )
-    {
-        trk.session->update_session_on_rst(tsd, false);
-        trk.session->update_perf_base_state(TcpStreamTracker::TCP_CLOSING);
-        trk.session->set_pkt_action_flag(ACTION_RST);
-    }
-
+    trk.handle_rst_packet(tsd, false);
     return true;
 }
 

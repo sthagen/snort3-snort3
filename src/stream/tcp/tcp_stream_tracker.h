@@ -220,10 +220,6 @@ public:
         return valid;
     }
 
-    // ack number must ack syn
-    bool is_rst_valid_in_syn_sent(const TcpSegmentDescriptor& tsd) const
-    { return tsd.get_ack() == snd_una; }
-
     uint32_t get_ts_last() const
     { return ts_last; }
 
@@ -293,7 +289,10 @@ public:
     void update_tracker_no_ack_recv(const TcpSegmentDescriptor&);
     void update_tracker_no_ack_sent(const TcpSegmentDescriptor&);
     bool update_on_3whs_ack(TcpSegmentDescriptor&);
-    bool update_on_rst_recv(TcpSegmentDescriptor&);
+    void update_on_bad_rst(TcpSegmentDescriptor&);
+    TcpNormalizer::RstStatus is_rst_valid_syn_sent(TcpSegmentDescriptor&);
+    TcpNormalizer::RstStatus handle_rst_packet(TcpSegmentDescriptor&, bool flush,
+        TcpStreamTracker::TcpState next_state = TcpStreamTracker::TCP_CLOSED);
     void update_on_rst_sent();
     bool update_on_fin_recv(TcpSegmentDescriptor&);
     bool update_on_fin_sent(TcpSegmentDescriptor&);

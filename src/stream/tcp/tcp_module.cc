@@ -99,7 +99,13 @@ const PegInfo tcp_pegs[] =
     { CountType::NOW, "closing", "number of sessions currently closing" },
     { CountType::SUM, "syns", "number of syn packets" },
     { CountType::SUM, "syn_acks", "number of syn-ack packets" },
-    { CountType::SUM, "resets", "number of reset packets" },
+    { CountType::SUM, "rsts", "number of rst packets" },
+    { CountType::SUM, "rsts_ok_rfc793", "number of valid rst packets per RFC 793" },
+    { CountType::SUM, "rsts_ok_rfc5961", "number of valid rst packets per RFC 5961" },
+    { CountType::SUM, "rsts_in_window", "number of rst packets in window per RFC 5961" },
+    { CountType::SUM, "rsts_bad_seq", "number of invalid rst packets, seq out of window" },
+    { CountType::SUM, "rsts_ack_ok", "number of valid rst packets good ack (RST in syn sent)" },
+    { CountType::SUM, "rsts_ack_bad", "number of invalid rst packets bad ack (RST in syn sent)" },
     { CountType::SUM, "fins", "number of fin packets" },
     { CountType::SUM, "meta_acks", "number of meta acks processed" },
     { CountType::SUM, "packets_held", "number of packets held" },
@@ -417,7 +423,7 @@ const PegInfo* StreamTcpModule::get_pegs() const
 { return tcp_pegs; }
 
 PegCount* StreamTcpModule::get_counts() const
-{ return (PegCount*)&tcpStats; }
+{ return reinterpret_cast<PegCount*>(&tcpStats); }
 
 void StreamTcpModule::reset_stats()
 {

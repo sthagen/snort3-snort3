@@ -173,19 +173,18 @@ bool TcpStateSynSent::fin_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 
 bool TcpStateSynSent::rst_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    if ( trk.update_on_rst_recv(tsd) )
+    if ( trk.is_rst_valid_syn_sent(tsd) == TcpNormalizer::RST_OK )
     {
-        trk.session->update_session_on_rst(tsd, false);
+        tsd.get_talker()->update_on_rst_sent();
         trk.set_tcp_state(TcpStreamTracker::TCP_CLOSED);
         trk.session->update_perf_base_state(TcpStreamTracker::TCP_CLOSED);
         trk.session->set_pkt_action_flag(ACTION_RST);
         tsd.get_flow()->session_state |= STREAM_STATE_CLOSED;
+
+        if ( tsd.is_data_segment() )
+            trk.session->tel.set_tcp_event(EVENT_DATA_AFTER_RST_RCVD);
     }
-
-    // FIXIT-L might be good to create alert specific to RST with data
-    if ( tsd.is_data_segment() )
-        trk.session->tel.set_tcp_event(EVENT_DATA_AFTER_RST_RCVD);
-
+    
     return true;
 }
 

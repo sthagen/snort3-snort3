@@ -97,7 +97,13 @@ struct TcpStats
     PegCount sessions_closing;
     PegCount syns;
     PegCount syn_acks;
-    PegCount resets;
+    PegCount rsts;
+    PegCount rsts_ok_rfc793;
+    PegCount rsts_ok_rfc5961;
+    PegCount rsts_in_window;
+    PegCount rsts_bad_seq;
+    PegCount rsts_ack_ok;
+    PegCount rsts_ack_bad;
     PegCount fins;
     PegCount meta_acks;
     PegCount total_packets_held;

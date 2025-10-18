@@ -115,17 +115,12 @@ bool TcpStateFinWait1::fin_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk
 
 bool TcpStateFinWait1::rst_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    if ( trk.update_on_rst_recv(tsd) )
-    {
-        trk.session->update_session_on_rst(tsd, true);
-        trk.session->update_perf_base_state(TcpStreamTracker::TCP_CLOSING);
-        trk.session->set_pkt_action_flag(ACTION_RST);
-        tsd.get_flow()->session_state |= STREAM_STATE_CLOSED;
-    }
-
-    // FIXIT-L might be good to create alert specific to RST with data
     if ( tsd.is_data_segment() )
         trk.session->tel.set_tcp_event(EVENT_DATA_AFTER_RST_RCVD);
+
+    if ( trk.handle_rst_packet(tsd, true) == TcpNormalizer::RST_OK )
+        tsd.get_flow()->session_state |= STREAM_STATE_CLOSED;
+
     return true;
 }
 

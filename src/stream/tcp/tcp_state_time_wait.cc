@@ -82,15 +82,10 @@ bool TcpStateTimeWait::fin_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk
 
 bool TcpStateTimeWait::rst_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    if ( trk.update_on_rst_recv(tsd) )
-    {
-        trk.session->update_session_on_rst(tsd, false);
-        trk.session->update_perf_base_state(TcpStreamTracker::TCP_CLOSING);
-        trk.session->set_pkt_action_flag(ACTION_RST);
-    }
-
     if ( tsd.is_data_segment() )
         trk.session->tel.set_tcp_event(EVENT_DATA_AFTER_RST_RCVD);
+
+    trk.handle_rst_packet(tsd, false);
 
     return true;
 }

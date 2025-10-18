@@ -86,11 +86,11 @@ public:
     TcpStreamTracker::TcpState get_peer_state(const TcpStreamTracker& me)
     { return me.client_tracker ? server.get_tcp_state() : client.get_tcp_state(); }
 
-    void init_new_tcp_session(TcpSegmentDescriptor&);
+    void init_new_tcp_session(const TcpSegmentDescriptor&);
     void update_perf_base_state(char new_state);
     void update_timestamp_tracking(TcpSegmentDescriptor&);
-    void update_paws_timestamps(TcpSegmentDescriptor&);
-    void update_session_on_rst(const TcpSegmentDescriptor&, bool);
+    void update_paws_timestamps(const TcpSegmentDescriptor&);
+    void update_session_on_rst(TcpSegmentDescriptor&, bool, TcpStreamTracker::TcpState);
     bool handle_syn_on_reset_session(TcpSegmentDescriptor&);
     void handle_data_on_syn(TcpSegmentDescriptor&);
     void update_ignored_session(TcpSegmentDescriptor&);
@@ -113,7 +113,7 @@ public:
     bool is_data_transferred_asymmetrically() const;
 
     void check_for_repeated_syn(TcpSegmentDescriptor&);
-    void check_for_session_hijack(TcpSegmentDescriptor&);
+    void check_for_session_hijack(const TcpSegmentDescriptor&);
     bool check_for_window_slam(TcpSegmentDescriptor& tsd);
     void mark_packet_for_drop(TcpSegmentDescriptor&);
     void handle_data_segment(TcpSegmentDescriptor&, bool flush = true);

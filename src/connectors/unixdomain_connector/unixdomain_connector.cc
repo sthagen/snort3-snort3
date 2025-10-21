@@ -597,7 +597,7 @@ void UnixDomainConnectorListener::start_accepting_connections(UnixDomainConnecto
     assert(sock_path);
 
     should_accept = true;
-    accept_thread = new std::thread([this, handler, config]()
+    accept_thread = new std::thread([this, handler = std::move(handler), config]()
     {
         sock_fd = socket(AF_UNIX, SOCK_STREAM, 0);
         if (sock_fd == -1) {

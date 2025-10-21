@@ -268,6 +268,7 @@ void MPDataBus::process_event_queue()
 
     std::unique_lock<std::mutex> u_lock(queue_mutex);
 
+    // coverity[wait_not_in_locked_loop:FALSE]
     if( (std::cv_status::timeout == queue_cv.wait_for(u_lock, std::chrono::milliseconds(WORKER_THREAD_SLEEP))) and
         mp_event_queue->empty() )
         return;
@@ -328,7 +329,7 @@ void MPDataBus::stop_worker_thread()
     worker_thread.reset();
 }
 
-static bool compare(DataHandler* a, DataHandler* b)
+static bool compare(const DataHandler* a, const DataHandler* b)
 {
     if ( a->order and b->order )
         return a->order < b->order;
@@ -424,13 +425,13 @@ void MPDataBus::dump_stats(ControlConn *ctrlconn, const char *module_name)
         auto mod_stats = mp_pub_stats[mod_id->second];
 
         LogMessage("MPDataBus Stats for %s\n", module_name);
-        show_stats((PegCount*)&mod_stats, mp_databus_pegs, array_size(mp_databus_pegs)-1);
+        show_stats(reinterpret_cast<PegCount*>(&mod_stats), mp_databus_pegs, array_size(mp_databus_pegs)-1);
     }
     else
     {
         sum_stats();
         
-        show_stats((PegCount*)&mp_global_stats, mp_databus_pegs, array_size(mp_databus_pegs)-1);
+        show_stats(reinterpret_cast<PegCount*>(&mp_global_stats), mp_databus_pegs, array_size(mp_databus_pegs)-1);
 
         auto transport_module = ModuleManager::get_module(transport.c_str());
         if(transport_module)
@@ -525,6 +526,7 @@ void snort::MPDataBus::show_channel_status(ControlConn *ctrlconn)
     for (unsigned int i = 0; i < size; i++)
     {
         const auto& channel = transport_status[i];
+        // coverity[missing_lock:SUPPRESS]
         response += "Channel ID: " + std::to_string(channel.id) + ", Name: " + channel.name + ", Status: " + channel.get_status_string() + "\n";
     }
 

@@ -61,7 +61,7 @@ static bool search_for_command(PopPafData* pfdata, const uint8_t ch)
             return true;
         }
     }
-    else if (toupper(ch) == toupper(val) )
+    else if (toupper(ch) == toupper(val) && val != '\0')
     {
         pfdata->cmd_state.next_letter++;
     }

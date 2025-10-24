@@ -25,10 +25,6 @@
 
 #include <cassert>
 
-#ifdef HAVE_LIBML
-#include <libml.h>
-#endif
-
 #include "detection/detection_engine.h"
 #include "log/messages.h"
 #include "managers/inspector_manager.h"
@@ -51,13 +47,14 @@ THREAD_LOCAL ProfileStats snort_ml_prof;
 class HttpBodyHandler : public DataHandler
 {
 public:
-    HttpBodyHandler(SnortML& ml)
-        : DataHandler(SNORT_ML_NAME), inspector(ml) {}
+    HttpBodyHandler(const SnortMLEngine& eng, const SnortML& ins)
+        : DataHandler(SNORT_ML_NAME), engine(eng), inspector(ins) {}
 
     void handle(DataEvent& de, Flow*) override;
 
 private:
-    SnortML& inspector;
+    const SnortMLEngine& engine;
+    const SnortML& inspector;
 };
 
 void HttpBodyHandler::handle(DataEvent& de, Flow*)
@@ -65,9 +62,7 @@ void HttpBodyHandler::handle(DataEvent& de, Flow*)
     // cppcheck-suppress unreadVariable
     Profile profile(snort_ml_prof);
 
-    libml::BinaryClassifierSet* classifiers = SnortMLEngine::get_classifiers();
-    SnortMLConfig config = inspector.get_config();
-    HttpRequestBodyEvent* he = (HttpRequestBodyEvent*)&de;
+    HttpRequestBodyEvent* he = reinterpret_cast<HttpRequestBodyEvent*>(&de);
 
     if (he->is_mime())
         return;
@@ -78,23 +73,23 @@ void HttpBodyHandler::handle(DataEvent& de, Flow*)
     if (!body || body_len <= 0)
         return;
 
-    const size_t len = std::min((size_t)config.client_body_depth, (size_t)body_len);
+    const SnortMLConfig& conf = inspector.get_config();
 
-    assert(classifiers);
+    const size_t len = std::min((size_t)conf.client_body_depth, (size_t)body_len);
 
-    float output = 0.0;
-
-    snort_ml_stats.libml_calls++;
-
-    if (!classifiers->run(body, len, output))
+    float output = 0;
+    if (!engine.scan(body, len, output))
         return;
 
     snort_ml_stats.client_body_bytes += len;
 
-    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "input (body): %.*s\n", (int)len, body);
-    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "output: %f\n", static_cast<double>(output));
+    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
+        "input (body): %.*s\n", (int)len, body);
 
-    if ((double)output > config.http_param_threshold)
+    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
+        "output: %f\n", static_cast<double>(output));
+
+    if ((double)output > conf.http_param_threshold)
     {
         snort_ml_stats.client_body_alerts++;
         debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "<ALERT>\n");
@@ -109,13 +104,14 @@ void HttpBodyHandler::handle(DataEvent& de, Flow*)
 class HttpUriHandler : public DataHandler
 {
 public:
-    HttpUriHandler(SnortML& ml)
-        : DataHandler(SNORT_ML_NAME), inspector(ml) {}
+    HttpUriHandler(const SnortMLEngine& eng, const SnortML& ins)
+        : DataHandler(SNORT_ML_NAME), engine(eng), inspector(ins) {}
 
     void handle(DataEvent&, Flow*) override;
 
 private:
-    SnortML& inspector;
+    const SnortMLEngine& engine;
+    const SnortML& inspector;
 };
 
 void HttpUriHandler::handle(DataEvent& de, Flow*)
@@ -123,9 +119,7 @@ void HttpUriHandler::handle(DataEvent& de, Flow*)
     // cppcheck-suppress unreadVariable
     Profile profile(snort_ml_prof);
 
-    libml::BinaryClassifierSet* classifiers = SnortMLEngine::get_classifiers();
-    SnortMLConfig config = inspector.get_config();
-    HttpEvent* he = (HttpEvent*)&de;
+    HttpEvent* he = reinterpret_cast<HttpEvent*>(&de);
 
     int32_t query_len = 0;
     const char* query = (const char*)he->get_uri_query(query_len);
@@ -133,23 +127,23 @@ void HttpUriHandler::handle(DataEvent& de, Flow*)
     if (!query || query_len <= 0)
         return;
 
-    const size_t len = std::min((size_t)config.uri_depth, (size_t)query_len);
+    const SnortMLConfig& conf = inspector.get_config();
 
-    assert(classifiers);
+    const size_t len = std::min((size_t)conf.uri_depth, (size_t)query_len);
 
-    float output = 0.0;
-
-    snort_ml_stats.libml_calls++;
-
-    if (!classifiers->run(query, len, output))
+    float output = 0;
+    if (!engine.scan(query, len, output))
         return;
 
     snort_ml_stats.uri_bytes += len;
 
-    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "input (query): %.*s\n", (int)len, query);
-    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "output: %f\n", static_cast<double>(output));
+    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
+        "input (query): %.*s\n", (int)len, query);
 
-    if ((double)output > config.http_param_threshold)
+    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
+        "output: %f\n", static_cast<double>(output));
+
+    if ((double)output > conf.http_param_threshold)
     {
         snort_ml_stats.uri_alerts++;
         debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "<ALERT>\n");
@@ -163,23 +157,34 @@ void HttpUriHandler::handle(DataEvent& de, Flow*)
 
 void SnortML::show(const SnortConfig*) const
 {
-    ConfigLogger::log_limit("uri_depth", config.uri_depth, -1);
-    ConfigLogger::log_limit("client_body_depth", config.client_body_depth, -1);
-    ConfigLogger::log_value("http_param_threshold", config.http_param_threshold);
+    ConfigLogger::log_limit("uri_depth", conf.uri_depth, -1);
+    ConfigLogger::log_limit("client_body_depth", conf.client_body_depth, -1);
+    ConfigLogger::log_value("http_param_threshold", conf.http_param_threshold);
 }
 
 bool SnortML::configure(SnortConfig* sc)
 {
-    if (config.uri_depth != 0)
-        DataBus::subscribe(http_pub_key, HttpEventIds::REQUEST_HEADER, new HttpUriHandler(*this));
+    auto engine = reinterpret_cast<const SnortMLEngine*>(
+        InspectorManager::get_inspector(SNORT_ML_ENGINE_NAME, true, sc));
 
-    if (config.client_body_depth != 0)
-        DataBus::subscribe(http_pub_key, HttpEventIds::REQUEST_BODY, new HttpBodyHandler(*this));
-
-    if(!InspectorManager::get_inspector(SNORT_ML_ENGINE_NAME, true, sc))
+    if (!engine)
     {
-        ParseError("snort_ml requires %s to be configured in the global policy.", SNORT_ML_ENGINE_NAME);
+        ParseError("snort_ml requires %s to be configured in the global policy.",
+            SNORT_ML_ENGINE_NAME);
+
         return false;
+    }
+
+    if (conf.uri_depth != 0)
+    {
+        DataBus::subscribe(http_pub_key, HttpEventIds::REQUEST_HEADER,
+            new HttpUriHandler(*engine, *this));
+    }
+
+    if (conf.client_body_depth != 0)
+    {
+        DataBus::subscribe(http_pub_key, HttpEventIds::REQUEST_BODY,
+            new HttpBodyHandler(*engine, *this));
     }
 
     return true;
@@ -197,8 +202,8 @@ static void mod_dtor(Module* m)
 
 static Inspector* snort_ml_ctor(Module* m)
 {
-    SnortMLModule* km = (SnortMLModule*)m;
-    return new SnortML(km->get_conf());
+    const SnortMLModule* mod = reinterpret_cast<const SnortMLModule*>(m);
+    return new SnortML(mod->get_config());
 }
 
 static void snort_ml_dtor(Inspector* p)

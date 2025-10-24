@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2023-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2025-2025 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -15,33 +15,27 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
-// snort_ml_inspector.h author Brandon Stultz <brastult@cisco.com>
+// fnv.h author Brandon Stultz <brastult@cisco.com>
+// based on https://datatracker.ietf.org/doc/html/draft-eastlake-fnv
 
-#ifndef SNORT_ML_INSPECTOR_H
-#define SNORT_ML_INSPECTOR_H
+#ifndef FNV_H
+#define FNV_H
 
-#include <string>
-#include <utility>
+#define FNV_PRIME 0x00000100000001B3
+#define FNV_BASIS 0xCBF29CE484222325
 
-#include "framework/inspector.h"
+//--------------------------------------------------------------------------
+// FNV-1a Hash
+//--------------------------------------------------------------------------
 
-#include "snort_ml_module.h"
-
-class SnortML : public snort::Inspector
+inline uint64_t fnv1a(const char* buf, const size_t len)
 {
-public:
-    SnortML(const SnortMLConfig& c) : conf(c) {}
+    uint64_t result = FNV_BASIS;
 
-    void show(const snort::SnortConfig*) const override;
-    void eval(snort::Packet*) override {}
-    bool configure(snort::SnortConfig*) override;
+    for (size_t i = 0; i < len; i++)
+        result = (result ^ static_cast<uint8_t>(buf[i])) * FNV_PRIME;
 
-    const SnortMLConfig& get_config() const
-    { return conf; }
-
-private:
-    SnortMLConfig conf;
-};
+    return result;
+}
 
 #endif
-

@@ -21,67 +21,23 @@
 #ifndef SNORT_ML_ENGINE_H
 #define SNORT_ML_ENGINE_H
 
-#include "framework/module.h"
+#ifdef HAVE_LIBML
+#include <libml.h>
+#endif
+
+#include <memory>
+#include <unordered_map>
+#include <utility>
+
 #include "framework/inspector.h"
+#include "framework/module.h"
+#include "hash/lru_cache_local.h"
+#include "search_engines/search_tool.h"
 
 #define SNORT_ML_ENGINE_NAME "snort_ml_engine"
 #define SNORT_ML_ENGINE_HELP "configure machine learning engine settings"
 
-namespace libml
-{
-    class BinaryClassifierSet;
-}
-
-struct SnortMLEngineConfig
-{
-    std::string http_param_model_path;
-};
-
-class SnortMLEngineModule : public snort::Module
-{
-public:
-    SnortMLEngineModule();
-
-    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
-
-    Usage get_usage() const override
-    { return GLOBAL; }
-
-    const SnortMLEngineConfig& get_config()
-    { return conf; }
-
-private:
-    SnortMLEngineConfig conf;
-};
-
-class SnortMLEngine : public snort::Inspector
-{
-public:
-    SnortMLEngine(const SnortMLEngineConfig&);
-
-    void show(const snort::SnortConfig*) const override;
-    void eval(snort::Packet*) override {}
-
-    void tinit() override;
-    void tterm() override;
-
-    void install_reload_handler(snort::SnortConfig*) override;
-
-    static libml::BinaryClassifierSet* get_classifiers();
-
-private:
-    bool read_models();
-    bool read_model(const std::string&);
-
-    bool validate_models();
-
-    SnortMLEngineConfig config;
-    std::vector<std::string> http_param_models;
-};
-
-// Mock BinaryClassifierSet for tests if LibML is absent.
-// The code below won't be executed if REG_TEST is undefined.
-// Check the plugin type provided in the snort_ml_engine.cc file.
+// Mock BinaryClassifierSet for tests if LibML is absent
 #ifndef HAVE_LIBML
 namespace libml
 {
@@ -110,5 +66,88 @@ private:
 
 }
 #endif
+
+struct SnortMLEngineStats : public LruCacheLocalStats
+{
+    PegCount filter_searches;
+    PegCount filter_matches;
+    PegCount filter_allows;
+    PegCount libml_calls;
+};
+
+typedef LruCacheLocal<uint64_t, float, std::hash<uint64_t>> SnortMLCache;
+typedef std::unordered_map<std::string, bool> SnortMLFilterMap;
+
+struct SnortMLContext
+{
+    libml::BinaryClassifierSet classifiers;
+    std::unique_ptr<SnortMLCache> cache;
+};
+
+struct SnortMLEngineConfig
+{
+    std::string http_param_model_path;
+    std::vector<std::string> http_param_models;
+    SnortMLFilterMap http_param_filters;
+    bool has_allow = false;
+    size_t cache_memcap = 0;
+};
+
+struct SnortMLSearch
+{
+    bool match = false;
+    bool allow = false;
+    bool has_allow = false;
+};
+
+class SnortMLEngineModule : public snort::Module
+{
+public:
+    SnortMLEngineModule();
+
+    bool begin(const char*, int, snort::SnortConfig*) override;
+    bool set(const char*, snort::Value&, snort::SnortConfig*) override;
+
+    const PegInfo* get_pegs() const override;
+    PegCount* get_counts() const override;
+
+    Usage get_usage() const override
+    { return GLOBAL; }
+
+    SnortMLEngineConfig get_config()
+    {
+        SnortMLEngineConfig out;
+        std::swap(conf, out);
+        return out;
+    }
+
+private:
+    SnortMLEngineConfig conf;
+};
+
+class SnortMLEngine : public snort::Inspector
+{
+public:
+    SnortMLEngine(SnortMLEngineConfig c) : conf(std::move(c)) {}
+    ~SnortMLEngine() override
+    { delete mpse; }
+
+    bool configure(snort::SnortConfig*) override;
+    void show(const snort::SnortConfig*) const override;
+
+    void tinit() override;
+    void tterm() override;
+
+    void install_reload_handler(snort::SnortConfig*) override;
+
+    bool scan(const char*, const size_t, float&) const;
+
+private:
+    bool read_models();
+    bool read_model(const std::string&);
+
+    SnortMLEngineConfig conf;
+    snort::SearchTool* mpse = nullptr;
+};
 
 #endif

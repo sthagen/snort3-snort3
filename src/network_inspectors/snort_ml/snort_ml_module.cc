@@ -56,7 +56,6 @@ static const PegInfo peg_names[] =
     { CountType::SUM, "client_body_alerts", "total number of alerts triggered on HTTP client body" },
     { CountType::SUM, "uri_bytes", "total number of HTTP URI bytes processed" },
     { CountType::SUM, "client_body_bytes", "total number of HTTP client body bytes processed" },
-    { CountType::SUM, "libml_calls", "total libml calls" },
     { CountType::END, nullptr, nullptr }
 };
 
@@ -72,13 +71,17 @@ static const TraceOption snort_ml_trace_options[] =
 // module
 //--------------------------------------------------------------------------
 
-SnortMLModule::SnortMLModule() : Module(SNORT_ML_NAME, SNORT_ML_HELP, snort_ml_params) {}
+SnortMLModule::SnortMLModule()
+    : Module(SNORT_ML_NAME, SNORT_ML_HELP, snort_ml_params) {}
 
 bool SnortMLModule::set(const char*, Value& v, SnortConfig*)
 {
-    static_assert(std::is_same<decltype((Field().length())), decltype(conf.uri_depth)>::value,
+    static_assert(std::is_same<decltype((Field().length())),
+        decltype(conf.uri_depth)>::value,
         "Field::length maximum value should not exceed uri_depth type range");
-    static_assert(std::is_same<decltype((Field().length())), decltype(conf.client_body_depth)>::value,
+
+    static_assert(std::is_same<decltype((Field().length())),
+        decltype(conf.client_body_depth)>::value,
         "Field::length maximum value should not exceed client_body_depth type range");
 
     if (v.is("uri_depth"))
@@ -107,7 +110,7 @@ const PegInfo* SnortMLModule::get_pegs() const
 { return peg_names; }
 
 PegCount* SnortMLModule::get_counts() const
-{ return (PegCount*)&snort_ml_stats; }
+{ return reinterpret_cast<PegCount*>(&snort_ml_stats); }
 
 ProfileStats* SnortMLModule::get_profile() const
 { return &snort_ml_prof; }
@@ -115,11 +118,7 @@ ProfileStats* SnortMLModule::get_profile() const
 void SnortMLModule::set_trace(const Trace* trace) const
 { snort_ml_trace = trace; }
 
+#ifdef DEBUG_MSGS
 const TraceOption* SnortMLModule::get_trace_options() const
-{
-#ifndef DEBUG_MSGS
-    return nullptr;
-#else
-    return snort_ml_trace_options;
+{ return snort_ml_trace_options; }
 #endif
-}

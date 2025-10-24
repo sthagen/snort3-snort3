@@ -3,12 +3,14 @@ pkg_check_modules(PC_ML libml_static>=2.0.0)
 
 find_path(ML_INCLUDE_DIRS
     libml.h
-    HINTS ${ML_INCLUDE_DIR_HINT} ${PC_ML_INCLUDEDIR}
+    PATHS ${ML_INCLUDE_DIR_HINT} ${PC_ML_INCLUDEDIR}
+    NO_DEFAULT_PATH
 )
 
 find_library(ML_LIBRARIES
     NAMES ml_static
-    HINTS ${ML_LIBRARIES_DIR_HINT} ${PC_ML_LIBDIR}
+    PATHS ${ML_LIBRARIES_DIR_HINT} ${PC_ML_LIBDIR}
+    NO_DEFAULT_PATH
 )
 
 include(FindPackageHandleStandardArgs)

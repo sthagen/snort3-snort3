@@ -151,7 +151,6 @@ class DummyCache : public FlowCache
     public:
         DummyCache(const FlowCacheConfig& cfg) : FlowCache(cfg) {}
         ~DummyCache() = default;
-        void output_flow(std::fstream& stream, const Flow& flow, const struct timeval& now) const override { (void)stream, (void)flow, (void)now; };
         bool filter_flows(const Flow& flow, const FilterFlowCriteria& ffc) const override { (void)flow; (void)ffc; return true; };
 };
 
@@ -160,7 +159,6 @@ class DummyCacheWithFilter : public FlowCache
     public:
         DummyCacheWithFilter(const FlowCacheConfig& cfg) : FlowCache(cfg) {}
         ~DummyCacheWithFilter() = default;
-        void output_flow(std::fstream& stream, const Flow& flow, const struct timeval& now) const override { (void)stream, (void)flow, (void)now; };
 };
 
 TEST_GROUP(flow_prune) { };

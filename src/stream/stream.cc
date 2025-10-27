@@ -81,8 +81,8 @@ Flow* Stream::new_flow(const FlowKey* key)
 void Stream::delete_flow(const FlowKey* key)
 { flow_con->release_flow(key); }
 
-void Stream::delete_flow(Flow* flow)
-{ flow_con->release_flow(flow, PruneReason::NONE); }
+void Stream::delete_flow(Flow* flow, PruneReason reason)
+{ flow_con->release_flow(flow, reason); }
 
 //-------------------------------------------------------------------------
 // key foo
@@ -194,7 +194,7 @@ void Stream::check_flow_closed(Packet* p)
         // eventually all onloads will occur and delete will be called
         if ( not flow->is_suspended() )
         {
-            flow_con->release_flow(flow, PruneReason::NONE);
+            flow_con->release_flow(flow, PruneReason::STREAM_CLOSED);
             return;
         }
     }

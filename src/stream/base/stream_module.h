@@ -77,6 +77,7 @@ struct BaseStats
      PegCount memcap_prunes;
      PegCount ha_prunes;
      PegCount stale_prunes;
+     PegCount closed_prunes;
      PegCount expected_flows;
      PegCount expected_realized;
      PegCount expected_pruned;
@@ -104,6 +105,14 @@ struct BaseStats
      PegCount file_memcap_prunes;
      PegCount pdu_memcap_prunes;
      PegCount allowlist_memcap_prunes;
+     PegCount ip_eof_prunes;
+     PegCount tcp_eof_prunes;
+     PegCount udp_eof_prunes;
+     PegCount icmp_eof_prunes;
+     PegCount user_eof_prunes;
+     PegCount file_eof_prunes;
+     PegCount pdu_eof_prunes;
+     PegCount allowlist_eof_prunes;
      PegCount excess_to_allowlist;
 
      // Keep the NOW stats at the bottom as it requires special sum_stats logic

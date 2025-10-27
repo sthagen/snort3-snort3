@@ -57,6 +57,13 @@
 
 #endif
 
+#ifdef __GNUC__
+#define UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+#define UNLIKELY(x) (x)
+#endif
+
+
 #define TIMEBUF_SIZE 27
 
 #define SECONDS_PER_DAY  86400  /* number of seconds in a day  */

@@ -132,6 +132,26 @@ void PacketTracer::thread_init()
 
 void PacketTracer::thread_term()
 {
+    if ( s_pkt_trace and s_pkt_trace->buff_len > 0 
+        and ( s_pkt_trace->user_enabled or s_pkt_trace->shell_enabled ) )
+    {
+        if ( !snort::SnortConfig::get_conf()->use_log_buffered() ) 
+            LogMessage(s_pkt_trace->log_fh, "%s\n", s_pkt_trace->buffer);
+        else
+        {
+            if ( s_pkt_trace->log_fh and s_pkt_trace->log_fh != stdout )
+            {
+                fprintf(s_pkt_trace->log_fh, "%.*s\n", s_pkt_trace->buff_len, s_pkt_trace->buffer);
+                fflush(s_pkt_trace->log_fh);
+            }
+            else
+            {
+                BatchedLogger::BatchedLogManager::log(s_pkt_trace->log_fh, SnortConfig::log_syslog(),
+                    s_pkt_trace->buffer, s_pkt_trace->buff_len);
+            }
+        }
+    }
+
     BatchedLogger::BatchedLogManager::flush_thread_buffers();
     delete s_pkt_trace;
     s_pkt_trace = nullptr;

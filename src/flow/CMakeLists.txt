@@ -6,6 +6,7 @@ set (FLOW_INCLUDES
     flow_key.h
     flow_stash.h
     ha.h
+    prune_stats.h
     session.h
     stream_flow.h
 )

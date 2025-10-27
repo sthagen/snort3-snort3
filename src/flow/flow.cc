@@ -483,7 +483,8 @@ bool Flow::handle_allowlist()
     {
         if ( flow_con->move_to_allowlist(this) )
         {
-            PacketTracer::log("Flow: flow has been moved to allowlist cache\n");
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("Flow: flow has been moved to allowlist cache\n");
             return true;
         }
     }

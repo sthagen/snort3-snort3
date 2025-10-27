@@ -70,6 +70,7 @@ const PegInfo base_pegs[] =
     { CountType::SUM, "memcap_prunes", "sessions pruned due to memcap" },
     { CountType::SUM, "ha_prunes", "sessions pruned by high availability sync" },
     { CountType::SUM, "stale_prunes", "sessions pruned due to stale connection" },
+    { CountType::SUM, "closed_prunes", "sessions pruned due to stream closed" },
     { CountType::SUM, "expected_flows", "total expected flows created within snort" },
     { CountType::SUM, "expected_realized", "number of expected flows realized" },
     { CountType::SUM, "expected_pruned", "number of expected flows pruned" },
@@ -97,6 +98,14 @@ const PegInfo base_pegs[] =
     { CountType::SUM, "file_memcap_prunes", "number of FILE flows pruned due to memcap" },
     { CountType::SUM, "pdu_memcap_prunes", "number of PDU flows pruned due to memcap" },
     { CountType::SUM, "allowlist_memcap_prunes", "number of allowlist flows pruned due to memcap" },
+    { CountType::SUM, "ip_eof_prunes", "number of IP flows pruned due to EOF" },
+    { CountType::SUM, "tcp_eof_prunes", "number of TCP flows pruned due to EOF" },
+    { CountType::SUM, "udp_eof_prunes", "number of UDP flows pruned due to EOF" },
+    { CountType::SUM, "icmp_eof_prunes", "number of ICMP flows pruned due to EOF" },
+    { CountType::SUM, "user_eof_prunes", "number of USER flows pruned due to EOF" },
+    { CountType::SUM, "file_eof_prunes", "number of FILE flows pruned due to EOF" },
+    { CountType::SUM, "pdu_eof_prunes", "number of PDU flows pruned due to EOF" },
+    { CountType::SUM, "allowlist_eof_prunes", "number of allowlist flows pruned due to EOF" },
     { CountType::SUM, "excess_to_allowlist", "number of flows moved to the allowlist due to excess" },
 
     // Keep the NOW stats at the bottom as it requires special sum_stats logic
@@ -124,6 +133,7 @@ void base_prep()
     stream_base_stats.memcap_prunes = flow_con->get_prunes(PruneReason::MEMCAP);
     stream_base_stats.ha_prunes = flow_con->get_prunes(PruneReason::HA);
     stream_base_stats.stale_prunes = flow_con->get_prunes(PruneReason::STALE);
+    stream_base_stats.closed_prunes = flow_con->get_prunes(PruneReason::STREAM_CLOSED);
     stream_base_stats.reload_freelist_flow_deletes = flow_con->get_deletes(FlowDeleteState::FREELIST);
     stream_base_stats.reload_allowed_flow_deletes = flow_con->get_deletes(FlowDeleteState::ALLOWED);
     stream_base_stats.reload_offloaded_flow_deletes= flow_con->get_deletes(FlowDeleteState::OFFLOADED);
@@ -143,6 +153,14 @@ void base_prep()
     stream_base_stats.file_memcap_prunes = flow_con->get_proto_prune_count(PruneReason::MEMCAP, PktType::FILE);
     stream_base_stats.pdu_memcap_prunes = flow_con->get_proto_prune_count(PruneReason::MEMCAP, PktType::PDU);
     stream_base_stats.allowlist_memcap_prunes = flow_con->get_proto_prune_count(PruneReason::MEMCAP, static_cast<PktType>(allowlist_lru_index));
+    stream_base_stats.ip_eof_prunes = flow_con->get_proto_prune_count(PruneReason::END_OF_FLOW, PktType::IP);
+    stream_base_stats.tcp_eof_prunes = flow_con->get_proto_prune_count(PruneReason::END_OF_FLOW, PktType::TCP);
+    stream_base_stats.udp_eof_prunes = flow_con->get_proto_prune_count(PruneReason::END_OF_FLOW, PktType::UDP);
+    stream_base_stats.icmp_eof_prunes = flow_con->get_proto_prune_count(PruneReason::END_OF_FLOW, PktType::ICMP);
+    stream_base_stats.user_eof_prunes = flow_con->get_proto_prune_count(PruneReason::END_OF_FLOW, PktType::USER);
+    stream_base_stats.file_eof_prunes = flow_con->get_proto_prune_count(PruneReason::END_OF_FLOW, PktType::FILE);
+    stream_base_stats.pdu_eof_prunes = flow_con->get_proto_prune_count(PruneReason::END_OF_FLOW, PktType::PDU);
+    stream_base_stats.allowlist_eof_prunes = flow_con->get_proto_prune_count(PruneReason::END_OF_FLOW, static_cast<PktType>(allowlist_lru_index));
     stream_base_stats.excess_to_allowlist = flow_con->get_excess_to_allowlist_count();
 
     stream_base_stats.allowlist_flows = flow_con->get_allowlist_flow_count();

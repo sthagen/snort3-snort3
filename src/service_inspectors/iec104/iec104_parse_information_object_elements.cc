@@ -190,7 +190,7 @@ void parseIec104Afq(const Iec104AfqType* afq)
     }
 }
 
-uint32_t parseIec104Vsq(const Iec104ApciI* apci)
+uint32_t parseIec104Vsq(const Iec104ApciI* apci, const uint16_t& data_size)
 {
     // number of elements == 0 is caught in check apdu
 
@@ -547,7 +547,7 @@ uint32_t parseIec104Vsq(const Iec104ApciI* apci)
     if (informationObjectSubgroupSize)
     {
         uint32_t reported_msg_len = apci->header.length;
-        if (reported_msg_len >= IEC104_APCI_TYPE_I_MIN_LEN) {
+        if (reported_msg_len >= IEC104_APCI_TYPE_I_MIN_LEN and reported_msg_len <= data_size) {
             if (apci->asdu.variableStructureQualifier.sq == 0)
             {
                 uint32_t informationObjectGroupSize = informationObjectSubgroupSize + sizeof(const Iec104InformationObjectAddressThreeOctetType);
@@ -1074,6 +1074,11 @@ void parseIec104Lof(const Iec104LofType* lof)
 // LOS: Length of Segment Structure
 bool parseIec104Los(const Iec104LosType* los, uint16_t apduSize)
 {
+    if (!los)
+    {
+        DetectionEngine::queue_event(GID_IEC104, IEC104_NULL_LOS_VALUE);
+        return false;
+    }
     // flag to prevent debug parsing of the segments when an alert is thrown
     // doing this via a flag so that the debug messages for the LOS field still print
     bool losValid = true;

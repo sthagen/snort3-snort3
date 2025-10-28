@@ -32,10 +32,14 @@
 #include "iec104_module.h"
 #include "iec104_parse_information_object_elements.h"
 
+#ifdef UNIT_TEST
+void (*genericGroupPtr)(const void* genericIOGroup) = nullptr;
+#endif
+
 using namespace snort;
 
 // perform some checks on the ASDU
-static bool checkIec104Asdu(Iec104AsduCheck curAsduCheck)
+static bool checkIec104Asdu(const Iec104AsduCheck& curAsduCheck)
 {
     // keep a flag to indicate whether we should exit after executing
     // taking this approach instead of returning directly as multiple of these
@@ -487,6 +491,19 @@ static bool checkIec104Asdu(Iec104AsduCheck curAsduCheck)
 // This should not be called directly by anything other than parseGenericAsdu
 static void parseIec104GenericIOGroup(const GenericIec104AsduIOGroup* genericIOGroup)
 {
+#ifdef UNIT_TEST
+    if (genericGroupPtr)
+    {
+        genericGroupPtr(genericIOGroup->m_sp_na_1IOSubgroup);
+    }
+#endif
+    if (!genericIOGroup->m_sp_na_1IOSubgroup)
+    {
+        // invalid subgroup pointers
+        if (genericIOGroup->asduType == IEC104_ASDU_F_SG_NA_1)
+            DetectionEngine::queue_event(GID_IEC104, IEC104_NULL_LOS_VALUE);
+        return;
+    }
     // determine which ASDU parsing logic to run based off of the passed type
     switch (genericIOGroup->asduType)
     {
@@ -1327,19 +1344,132 @@ static void parseIec104GenericIOGroup(const GenericIec104AsduIOGroup* genericIOG
     }
 }
 
-static void parseIec104GenericAsdu(uint32_t asduType, const Iec104ApciI* apci)
+#define ASDU_MAP_SIZE_ITEM 0
+#define ASDU_MAP_OFFSET_ITEM 1
+
+const std::unordered_map<uint32_t, std::tuple<int,int> > asdu_size_map =
 {
-    uint32_t verifiedNumberOfElements = parseIec104Vsq(apci);
+{ IEC104_ASDU_M_SP_NA_1 , { sizeof(Iec104M_SP_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_sp_na_1.subgroup) } },
+{ IEC104_ASDU_M_DP_NA_1 , { sizeof(Iec104M_DP_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_dp_na_1.subgroup) } },
+{ IEC104_ASDU_M_ST_NA_1 , { sizeof(Iec104M_ST_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_st_na_1.subgroup) } },
+{ IEC104_ASDU_M_BO_NA_1 , { sizeof(Iec104M_BO_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_bo_na_1.subgroup) } },
+{ IEC104_ASDU_M_ME_NA_1 , { sizeof(Iec104M_ME_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_me_na_1.subgroup) } },
+{ IEC104_ASDU_M_ME_NB_1 , { sizeof(Iec104M_ME_NB_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_me_nb_1.subgroup) } },
+{ IEC104_ASDU_M_ME_NC_1 , { sizeof(Iec104M_ME_NC_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_me_nc_1.subgroup) } },
+{ IEC104_ASDU_M_IT_NA_1 , { sizeof(Iec104M_IT_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_it_na_1.subgroup) } },
+{ IEC104_ASDU_M_PS_NA_1 , { sizeof(Iec104M_PS_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_ps_na_1.subgroup) } },
+{ IEC104_ASDU_M_ME_ND_1 , { sizeof(Iec104M_ME_ND_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_me_nd_1.subgroup) } },
+{ IEC104_ASDU_F_DR_TA_1 , { sizeof(Iec104F_DR_TA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.f_dr_ta_1.subgroup) } },
+{ IEC104_ASDU_M_SP_NA_1 , { sizeof(Iec104M_SP_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_sp_na_1) } },
+{ IEC104_ASDU_M_SP_TA_1 , { sizeof(Iec104M_SP_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_sp_ta_1) } },
+{ IEC104_ASDU_M_DP_NA_1 , { sizeof(Iec104M_DP_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_dp_na_1) } },
+{ IEC104_ASDU_M_DP_TA_1 , { sizeof(Iec104M_DP_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_dp_ta_1) } },
+{ IEC104_ASDU_M_ST_NA_1 , { sizeof(Iec104M_ST_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_st_na_1) } },
+{ IEC104_ASDU_M_ST_TA_1 , { sizeof(Iec104M_ST_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_st_ta_1) } },
+{ IEC104_ASDU_M_BO_NA_1 , { sizeof(Iec104M_BO_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_bo_na_1) } },
+{ IEC104_ASDU_M_BO_TA_1 , { sizeof(Iec104M_BO_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_bo_ta_1) } },
+{ IEC104_ASDU_M_ME_NA_1 , { sizeof(Iec104M_ME_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_na_1) } },
+{ IEC104_ASDU_M_ME_TA_1 , { sizeof(Iec104M_ME_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_ta_1) } },
+{ IEC104_ASDU_M_ME_NB_1 , { sizeof(Iec104M_ME_NB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_nb_1) } },
+{ IEC104_ASDU_M_ME_TB_1 , { sizeof(Iec104M_ME_TB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_tb_1) } },
+{ IEC104_ASDU_M_ME_NC_1 , { sizeof(Iec104M_ME_NC_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_nc_1) } },
+{ IEC104_ASDU_M_ME_TC_1 , { sizeof(Iec104M_ME_TC_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_tc_1) } },
+{ IEC104_ASDU_M_IT_NA_1 , { sizeof(Iec104M_IT_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_it_na_1) } },
+{ IEC104_ASDU_M_IT_TA_1 , { sizeof(Iec104M_IT_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_it_ta_1) } },
+{ IEC104_ASDU_M_EP_TA_1 , { sizeof(Iec104M_EP_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_ep_ta_1) } },
+{ IEC104_ASDU_M_EP_TB_1 , { sizeof(Iec104M_EP_TB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_ep_tb_1) } },
+{ IEC104_ASDU_M_EP_TC_1 , { sizeof(Iec104M_EP_TC_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_ep_tc_1) } },
+{ IEC104_ASDU_M_PS_NA_1 , { sizeof(Iec104M_PS_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_ps_na_1) } },
+{ IEC104_ASDU_M_ME_ND_1 , { sizeof(Iec104M_ME_ND_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_nd_1) } },
+{ IEC104_ASDU_M_SP_TB_1 , { sizeof(Iec104M_SP_TB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_sp_tb_1) } },
+{ IEC104_ASDU_M_DP_TB_1 , { sizeof(Iec104M_DP_TB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_dp_tb_1) } },
+{ IEC104_ASDU_M_ST_TB_1 , { sizeof(Iec104M_ST_TB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_st_tb_1) } },
+{ IEC104_ASDU_M_BO_TB_1 , { sizeof(Iec104M_BO_TB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_bo_tb_1) } },
+{ IEC104_ASDU_M_ME_TD_1 , { sizeof(Iec104M_ME_TD_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_td_1) } },
+{ IEC104_ASDU_M_ME_TE_1 , { sizeof(Iec104M_ME_TE_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_te_1) } },
+{ IEC104_ASDU_M_ME_TF_1 , { sizeof(Iec104M_ME_TF_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_me_tf_1) } },
+{ IEC104_ASDU_M_IT_TB_1 , { sizeof(Iec104M_IT_TB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_it_tb_1) } },
+{ IEC104_ASDU_M_EP_TD_1 , { sizeof(Iec104M_EP_TD_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_ep_td_1) } },
+{ IEC104_ASDU_M_EP_TE_1 , { sizeof(Iec104M_EP_TE_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_ep_te_1) } },
+{ IEC104_ASDU_M_EP_TF_1 , { sizeof(Iec104M_EP_TF_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_ep_tf_1) } },
+{ IEC104_ASDU_C_SC_NA_1 , { sizeof(Iec104C_SC_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_sc_na_1) } },
+{ IEC104_ASDU_C_DC_NA_1 , { sizeof(Iec104C_DC_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_dc_na_1) } },
+{ IEC104_ASDU_C_RC_NA_1 , { sizeof(Iec104C_RC_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_rc_na_1) } },
+{ IEC104_ASDU_C_SE_NA_1 , { sizeof(Iec104C_SE_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_se_na_1) } },
+{ IEC104_ASDU_C_SE_NB_1 , { sizeof(Iec104C_SE_NB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_se_nb_1) } },
+{ IEC104_ASDU_C_SE_NC_1 , { sizeof(Iec104C_SE_NC_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_se_nc_1) } },
+{ IEC104_ASDU_C_BO_NA_1 , { sizeof(Iec104C_BO_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_bo_na_1) } },
+{ IEC104_ASDU_C_SC_TA_1 , { sizeof(Iec104C_SC_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_sc_ta_1) } },
+{ IEC104_ASDU_C_DC_TA_1 , { sizeof(Iec104C_DC_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_dc_ta_1) } },
+{ IEC104_ASDU_C_RC_TA_1 , { sizeof(Iec104C_RC_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_rc_ta_1) } },
+{ IEC104_ASDU_C_SE_TA_1 , { sizeof(Iec104C_SE_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_se_ta_1) } },
+{ IEC104_ASDU_C_SE_TB_1 , { sizeof(Iec104C_SE_TB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_se_tb_1) } },
+{ IEC104_ASDU_C_SE_TC_1 , { sizeof(Iec104C_SE_TC_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_se_tc_1) } },
+{ IEC104_ASDU_C_BO_TA_1 , { sizeof(Iec104C_BO_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_bo_ta_1) } },
+{ IEC104_ASDU_M_EI_NA_1 , { sizeof(Iec104M_EI_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_ei_na_1) } },
+{ IEC104_ASDU_C_IC_NA_1 , { sizeof(Iec104C_IC_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_ic_na_1) } },
+{ IEC104_ASDU_C_CI_NA_1 , { sizeof(Iec104C_CI_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_ci_na_1) } },
+{ IEC104_ASDU_C_RD_NA_1 , { sizeof(Iec104C_RD_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_rd_na_1) } },
+{ IEC104_ASDU_C_CS_NA_1 , { sizeof(Iec104C_CS_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_cs_na_1) } },
+{ IEC104_ASDU_C_TS_NA_1 , { sizeof(Iec104C_TS_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_ts_na_1) } },
+{ IEC104_ASDU_C_RP_NA_1 , { sizeof(Iec104C_RP_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_rp_na_1) } },
+{ IEC104_ASDU_C_CD_NA_1 , { sizeof(Iec104C_CD_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_cd_na_1) } },
+{ IEC104_ASDU_C_TS_TA_1 , { sizeof(Iec104C_TS_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.c_ts_ta_1) } },
+{ IEC104_ASDU_P_ME_NA_1 , { sizeof(Iec104P_ME_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.p_me_na_1) } },
+{ IEC104_ASDU_P_ME_NB_1 , { sizeof(Iec104P_ME_NB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.p_me_nb_1) } },
+{ IEC104_ASDU_P_ME_NC_1 , { sizeof(Iec104P_ME_NC_1_IO_Group)    , offsetof(Iec104ApciI, asdu.p_me_nc_1) } },
+{ IEC104_ASDU_P_AC_NA_1 , { sizeof(Iec104P_AC_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.p_ac_na_1) } },
+{ IEC104_ASDU_F_FR_NA_1 , { sizeof(Iec104F_FR_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.f_fr_na_1) } },
+{ IEC104_ASDU_F_SR_NA_1 , { sizeof(Iec104F_SR_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.f_sr_na_1) } },
+{ IEC104_ASDU_F_SC_NA_1 , { sizeof(Iec104F_SC_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.f_sc_na_1) } },
+{ IEC104_ASDU_F_LS_NA_1 , { sizeof(Iec104F_LS_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.f_ls_na_1) } },
+{ IEC104_ASDU_F_AF_NA_1 , { sizeof(Iec104F_AF_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.f_af_na_1) } },
+{ IEC104_ASDU_F_SG_NA_1 , { sizeof(Iec104F_SG_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.f_sg_na_1) } },
+{ IEC104_ASDU_F_SC_NB_1 , { sizeof(Iec104F_SC_NB_1_IO_Group)    , offsetof(Iec104ApciI, asdu.f_sc_nb_1) } }
+};
+
+static void parseIec104GenericAsdu(uint32_t asduType, const Iec104ApciI* apci, const uint16_t& data_size)
+{
+    if (asdu_size_map.find(asduType) == asdu_size_map.end())
+    {
+        // ASDU parsing not implemented for this type
+        return;
+    }
+
+    uint32_t verifiedNumberOfElements = parseIec104Vsq(apci, data_size);
     parseIec104CauseOfTx(apci);
     parseIec104TwoOctetCommonAddress(apci);
 
     // Set up the generic group structure
     GenericIec104AsduIOGroup genericIOGroup;
+    memset(&genericIOGroup, 0, sizeof(GenericIec104AsduIOGroup));
     genericIOGroup.asduType = asduType;
     genericIOGroup.apduSize = apci->header.length;
 
     // make sure the number of elements value is acceptable
     if (verifiedNumberOfElements > 0 && verifiedNumberOfElements <= 255) {
+
+        if ((const uint8_t*)apci + std::get<ASDU_MAP_OFFSET_ITEM>(asdu_size_map.at(asduType)) + (verifiedNumberOfElements * std::get<ASDU_MAP_SIZE_ITEM>(asdu_size_map.at(asduType))) > (const uint8_t*)apci + data_size)
+        {
+            // number of elements exceeds the bounds of the data size, lowering to fit
+            if (std::get<ASDU_MAP_OFFSET_ITEM>(asdu_size_map.at(asduType)) > data_size)
+            {
+                // If the offset is already greater than the data size, we can't fit any elements
+                verifiedNumberOfElements = 0;
+            }
+            else
+            {
+                verifiedNumberOfElements = (data_size - std::get<ASDU_MAP_OFFSET_ITEM>(asdu_size_map.at(asduType))) / std::get<ASDU_MAP_SIZE_ITEM>(asdu_size_map.at(asduType));
+            }
+
+            if (verifiedNumberOfElements == 0)
+            {
+                // shortcut to parse call for DetectionEngine checks
+                parseIec104GenericIOGroup(&genericIOGroup);
+                return;
+            }
+        }
+
         // iterate over the reported number of elements overlaying the structures
         for (uint32_t i = 0; i < verifiedNumberOfElements; i++)
         {
@@ -2587,7 +2717,7 @@ void parseIec104ApciS(const Iec104ApciS* apci)
     }
 }
 
-void parseIec104ApciI(const Iec104ApciI* apci)
+void parseIec104ApciI(const Iec104ApciI* apci, const uint16_t& data_size)
 {
     // throw an alert if the start value is not 0x68
     if (apci->header.start != IEC104_START_BYTE)
@@ -2647,7 +2777,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_SP_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_SP_NA_1, apci, data_size);
             }
             break;
         }
@@ -2666,7 +2796,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_SP_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_SP_TA_1, apci, data_size);
             }
             break;
         }
@@ -2703,7 +2833,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_DP_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_DP_NA_1, apci, data_size);
             }
             break;
         }
@@ -2722,7 +2852,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_DP_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_DP_TA_1, apci, data_size);
             }
             break;
         }
@@ -2759,7 +2889,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ST_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ST_NA_1, apci, data_size);
             }
             break;
         }
@@ -2778,7 +2908,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ST_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ST_TA_1, apci, data_size);
             }
             break;
         }
@@ -2815,7 +2945,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_BO_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_BO_NA_1, apci, data_size);
             }
             break;
         }
@@ -2832,7 +2962,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_BO_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_BO_TA_1, apci, data_size);
             }
             break;
         }
@@ -2868,7 +2998,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_NA_1, apci, data_size);
             }
             break;
         }
@@ -2885,7 +3015,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TA_1, apci, data_size);
             }
             break;
         }
@@ -2921,7 +3051,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_NB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_NB_1, apci, data_size);
             }
             break;
         }
@@ -2938,7 +3068,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TB_1, apci, data_size);
             }
             break;
         }
@@ -2974,7 +3104,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_NC_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_NC_1, apci, data_size);
             }
             break;
         }
@@ -2991,7 +3121,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TC_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TC_1, apci, data_size);
             }
             break;
         }
@@ -3012,7 +3142,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_IT_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_IT_NA_1, apci, data_size);
             }
             break;
         }
@@ -3033,7 +3163,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_IT_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_IT_TA_1, apci, data_size);
             }
             break;
         }
@@ -3049,7 +3179,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TA_1, apci, data_size);
             }
             break;
         }
@@ -3065,7 +3195,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TB_1, apci, data_size);
             }
             break;
         }
@@ -3081,7 +3211,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TC_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TC_1, apci, data_size);
             }
             break;
         }
@@ -3118,7 +3248,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_PS_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_PS_NA_1, apci, data_size);
             }
             break;
         }
@@ -3154,7 +3284,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_ND_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_ND_1, apci, data_size);
             }
             break;
         }
@@ -3173,7 +3303,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_SP_TB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_SP_TB_1, apci, data_size);
             }
             break;
         }
@@ -3192,7 +3322,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_DP_TB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_DP_TB_1, apci, data_size);
             }
             break;
         }
@@ -3211,7 +3341,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ST_TB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ST_TB_1, apci, data_size);
             }
             break;
         }
@@ -3228,7 +3358,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_BO_TB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_BO_TB_1, apci, data_size);
             }
             break;
         }
@@ -3245,7 +3375,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TD_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TD_1, apci, data_size);
             }
             break;
         }
@@ -3262,7 +3392,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TE_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TE_1, apci, data_size);
             }
             break;
         }
@@ -3279,7 +3409,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TF_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_ME_TF_1, apci, data_size);
             }
             break;
         }
@@ -3300,7 +3430,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_IT_TB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_IT_TB_1, apci, data_size);
             }
             break;
         }
@@ -3316,7 +3446,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TD_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TD_1, apci, data_size);
             }
             break;
         }
@@ -3332,7 +3462,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TE_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TE_1, apci, data_size);
             }
             break;
         }
@@ -3348,7 +3478,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TF_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_EP_TF_1, apci, data_size);
             }
             break;
         }
@@ -3372,7 +3502,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_SC_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_SC_NA_1, apci, data_size);
             }
             break;
         }
@@ -3396,7 +3526,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_DC_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_DC_NA_1, apci, data_size);
             }
             break;
         }
@@ -3420,7 +3550,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_RC_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_RC_NA_1, apci, data_size);
             }
             break;
         }
@@ -3444,7 +3574,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_SE_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_SE_NA_1, apci, data_size);
             }
             break;
         }
@@ -3468,7 +3598,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_SE_NB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_SE_NB_1, apci, data_size);
             }
             break;
         }
@@ -3492,7 +3622,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_SE_NC_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_SE_NC_1, apci, data_size);
             }
             break;
         }
@@ -3516,7 +3646,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_BO_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_BO_NA_1, apci, data_size);
             }
             break;
         }
@@ -3540,7 +3670,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_SC_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_SC_TA_1, apci, data_size);
             }
             break;
         }
@@ -3564,7 +3694,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_DC_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_DC_TA_1, apci, data_size);
             }
             break;
         }
@@ -3588,7 +3718,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_RC_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_RC_TA_1, apci, data_size);
             }
             break;
         }
@@ -3612,7 +3742,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_SE_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_SE_TA_1, apci, data_size);
             }
             break;
         }
@@ -3636,7 +3766,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_SE_TB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_SE_TB_1, apci, data_size);
             }
             break;
         }
@@ -3660,7 +3790,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_SE_TC_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_SE_TC_1, apci, data_size);
             }
             break;
         }
@@ -3682,7 +3812,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_BO_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_BO_TA_1, apci, data_size);
             }
             break;
         }
@@ -3698,7 +3828,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_M_EI_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_M_EI_NA_1, apci, data_size);
             }
             break;
         }
@@ -3722,7 +3852,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_IC_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_IC_NA_1, apci, data_size);
             }
             break;
         }
@@ -3746,7 +3876,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_CI_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_CI_NA_1, apci, data_size);
             }
             break;
         }
@@ -3766,7 +3896,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_RD_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_RD_NA_1, apci, data_size);
             }
             break;
         }
@@ -3788,7 +3918,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_CS_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_CS_NA_1, apci, data_size);
             }
             break;
         }
@@ -3809,7 +3939,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_TS_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_TS_NA_1, apci, data_size);
             }
             break;
         }
@@ -3829,7 +3959,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_RP_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_RP_NA_1, apci, data_size);
             }
             break;
         }
@@ -3851,7 +3981,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_CD_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_CD_NA_1, apci, data_size);
             }
             break;
         }
@@ -3872,7 +4002,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_C_TS_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_C_TS_TA_1, apci, data_size);
             }
             break;
         }
@@ -3910,7 +4040,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_P_ME_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_P_ME_NA_1, apci, data_size);
             }
             break;
         }
@@ -3948,7 +4078,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_P_ME_NB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_P_ME_NB_1, apci, data_size);
             }
             break;
         }
@@ -3986,7 +4116,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_P_ME_NC_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_P_ME_NC_1, apci, data_size);
             }
             break;
         }
@@ -4009,7 +4139,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_P_AC_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_P_AC_NA_1, apci, data_size);
             }
             break;
         }
@@ -4029,7 +4159,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_F_FR_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_F_FR_NA_1, apci, data_size);
             }
             break;
         }
@@ -4049,7 +4179,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_F_SR_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_F_SR_NA_1, apci, data_size);
             }
             break;
         }
@@ -4070,7 +4200,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_F_SC_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_F_SC_NA_1, apci, data_size);
             }
             break;
         }
@@ -4090,7 +4220,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_F_LS_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_F_LS_NA_1, apci, data_size);
             }
             break;
         }
@@ -4110,7 +4240,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_F_AF_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_F_AF_NA_1, apci, data_size);
             }
             break;
         }
@@ -4130,7 +4260,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_F_SG_NA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_F_SG_NA_1, apci, data_size);
             }
             break;
         }
@@ -4147,7 +4277,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_F_DR_TA_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_F_DR_TA_1, apci, data_size);
             }
             break;
         }
@@ -4167,7 +4297,7 @@ void parseIec104ApciI(const Iec104ApciI* apci)
             if (checkIec104Asdu(curAsduCheck))
             {
                 // parse the asdu if checks pass
-                parseIec104GenericAsdu(IEC104_ASDU_F_SC_NB_1, apci);
+                parseIec104GenericAsdu(IEC104_ASDU_F_SC_NB_1, apci, data_size);
             }
             break;
         }
@@ -4180,4 +4310,3 @@ void parseIec104ApciI(const Iec104ApciI* apci)
         }
     }
 }
-

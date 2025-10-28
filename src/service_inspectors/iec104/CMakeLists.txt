@@ -24,3 +24,4 @@ else (STATIC_INSPECTORS)
 
 endif (STATIC_INSPECTORS)
 
+add_subdirectory ( test )

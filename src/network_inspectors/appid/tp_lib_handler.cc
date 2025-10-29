@@ -144,7 +144,7 @@ void TPLibHandler::tp_mp_init(ThirdPartyAppIdContext& tp_appid_ctxt)
 
     if (ret != 0)
     {
-        APPID_LOG(nullptr, TRACE_ERROR_LEVEL, "Could not subscribe to the appid tp syncevent\n", ret);
+        APPID_LOG(nullptr, TRACE_ERROR_LEVEL, "Could not subscribe to the appid tp syncevent ret = %d\n", ret);
         return;
     }
 

@@ -269,6 +269,8 @@ int SslServiceDetector::validate(AppIdDiscoveryArgs& args)
         if (ss->cached_data)
         {
             reallocated_data = (uint8_t*)snort_calloc(ss->cached_len + size, sizeof(uint8_t));
+            if (reallocated_data == nullptr)
+                goto inprocess;
             memcpy(reallocated_data, args.data, args.size);
             memcpy(reallocated_data + args.size, ss->cached_data, ss->cached_len);
             size = ss->cached_len + args.size;
@@ -288,6 +290,8 @@ int SslServiceDetector::validate(AppIdDiscoveryArgs& args)
         if ( (ss->cached_client_data and (args.dir == APP_ID_FROM_INITIATOR)) or (!ss->cached_client_data and (args.dir == APP_ID_FROM_RESPONDER)) )
         {
             reallocated_data = (uint8_t*)snort_calloc(ss->cached_len + size, sizeof(uint8_t));
+            if (reallocated_data == nullptr)
+                goto inprocess;
             memcpy(reallocated_data, ss->cached_data, ss->cached_len);
             memcpy(reallocated_data + ss->cached_len, args.data, args.size);
             size = ss->cached_len + args.size;

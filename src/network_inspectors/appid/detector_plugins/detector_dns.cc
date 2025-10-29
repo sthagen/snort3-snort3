@@ -353,7 +353,8 @@ APPID_STATUS_CODE DnsValidator::dns_validate_label(const uint8_t* data, uint16_t
             offset += offsetof(DNSLabel, name);
             if (!lbl->len)
             {
-                len--;    // take off the extra '.' at the end
+                if (len > 0)
+                    len--;    // take off the extra '.' at the end
                 return APPID_SUCCESS;
             }
             offset += lbl->len;

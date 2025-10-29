@@ -67,7 +67,7 @@ bool UserDataMap::add_user_data(const std::string &table, const std::string &key
     {
         std::unordered_map<std::string, std::string> user_map;
         user_map[key] = item;
-        user_data_maps[table] = user_map;
+        user_data_maps[table] = std::move(user_map);
     }
 
     return true;

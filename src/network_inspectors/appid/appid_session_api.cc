@@ -26,6 +26,8 @@
 #include "appid_session_api.h"
 
 #include "flow/ha.h"
+#include "flow/stream_flow.h"
+
 #include "appid_inspector.h"
 #include "appid_peg_counts.h"
 #include "appid_session.h"
@@ -374,7 +376,28 @@ uint16_t AppIdSessionApi::get_service_port() const
 
 const AppIdDnsSession* AppIdSessionApi::get_dns_session() const
 {
-    return dsession;
+    if (asd && asd->flow->stream_intf)
+    {
+        int64_t stream_id;
+        asd->flow->stream_intf->get_stream_id(asd->flow, stream_id);
+        if (stream_id == 0xFFFFFFFF || stream_id == -1) // no stream id is processing now, pick the last processed
+        {
+            if (!dsessions.empty())
+                return std::prev(dsessions.end())->second;
+            else
+                return nullptr;
+        }
+        auto it = dsessions.find(stream_id);
+        if (it != dsessions.end())
+        {
+            return it->second;
+        }
+        return nullptr;
+    }
+    else if (!dsessions.empty()) // flow data of inspector who handles stream_intf got deleted, take the last one
+        return std::prev(dsessions.end())->second;
+    else
+        return dsession;
 }
 
 bool AppIdSessionApi::is_http_inspection_done() const

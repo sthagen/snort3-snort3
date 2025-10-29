@@ -25,6 +25,8 @@
 
 #include "detector_dns.h"
 
+#include "flow/stream_flow.h"
+
 #include "appid_config.h"
 #include "appid_dns_session.h"
 #include "app_info_table.h"
@@ -176,6 +178,36 @@ void ServiceDNSData::free_dns_cache()
 ServiceDNSData::~ServiceDNSData()
 {
     free_dns_cache();
+}
+
+class ServiceDNSDoQData : public AppIdFlowData
+{
+public:
+    ServiceDNSDoQData() = default;
+    ~ServiceDNSDoQData() override;
+
+    std::unordered_map<int64_t, ServiceDNSData*> service_dns_data;
+    ServiceDNSData* get_stream_dns_data(int64_t stream_id)
+    {
+        auto it = service_dns_data.find(stream_id);
+        if (it != service_dns_data.end())
+            return it->second;
+        else
+            return nullptr;
+    }
+    ServiceDNSData* create_stream_dns_data(int64_t stream_id)
+    {
+        ServiceDNSData* dns_data = new ServiceDNSData();
+        service_dns_data[stream_id] = dns_data;
+        return dns_data;
+    }
+};
+
+ServiceDNSDoQData::~ServiceDNSDoQData()
+{
+    for (auto& it: service_dns_data)
+        delete it.second;
+    service_dns_data.clear();
 }
 
 DnsTcpServiceDetector::DnsTcpServiceDetector(ServiceDiscovery* sd)
@@ -685,7 +717,8 @@ int DnsTcpServiceDetector::validate_doq(AppIdDiscoveryArgs& args)
     uint8_t* reallocated_data = nullptr;
     const uint8_t* data = args.data;
     uint16_t size = args.size;
-    ServiceDNSData* dd = static_cast<ServiceDNSData*>(data_get(args.asd));
+    ServiceDNSDoQData* dd_doq;
+    ServiceDNSData* dd;
     {
         if (!args.size)
             goto inprocess;
@@ -697,13 +730,29 @@ int DnsTcpServiceDetector::validate_doq(AppIdDiscoveryArgs& args)
             else
                 goto fail;
         }
-
-        if (!dd)
+        if (args.asd.flow->stream_intf)
         {
-            dd = new ServiceDNSData;
-            data_add(args.asd, dd);
+            dd_doq = static_cast<ServiceDNSDoQData*>(data_get(args.asd));
+            if (!dd_doq)
+            {
+                dd_doq = new ServiceDNSDoQData;
+                data_add(args.asd, dd_doq);
+            }
+            int64_t stream_id;
+            args.asd.flow->stream_intf->get_stream_id(args.asd.flow, stream_id);
+            dd = dd_doq->get_stream_dns_data(stream_id);
+            if (!dd)
+                dd = dd_doq->create_stream_dns_data(stream_id);
         }
-
+        else
+        {
+            dd = static_cast<ServiceDNSData*>(data_get(args.asd));
+            if (!dd)
+            {
+                dd = new ServiceDNSData;
+                data_add(args.asd, dd);
+            }
+        }
         if (dd->cached_data and dd->cached_len and args.dir == APP_ID_FROM_INITIATOR)
         {
             reallocated_data = static_cast<uint8_t*>(snort_calloc(dd->cached_len + args.size, sizeof(uint8_t)));

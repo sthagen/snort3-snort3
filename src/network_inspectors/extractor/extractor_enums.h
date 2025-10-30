@@ -29,6 +29,7 @@ public:
     {
         HTTP,
         FTP,
+        SSL,
         CONN,
         DNS,
         IPS_BUILTIN,
@@ -52,6 +53,8 @@ public:
             return "http";
         case FTP:
             return "ftp";
+        case SSL:
+            return "ssl";
         case CONN:
             return "conn";
         case DNS:

@@ -20,6 +20,9 @@
 #define SSL_FLOW_DATA_H
 
 #include "flow/flow_data.h"
+#include "protocols/ssl.h"
+
+#include <string>
 
 #define GID_SSL 137
 
@@ -31,6 +34,7 @@
 struct SSLData
 {
     uint32_t ssn_flags;
+    uint32_t info_flags;
     uint16_t partial_rec_len[4];
 };
 

@@ -31,6 +31,7 @@ struct SslEventIds
     {
         CHELLO_SERVER_NAME,
         SERVER_COMMON_NAME,
+        SSL_TLS_METADATA_EVENT,
 
         num_ids
     };
@@ -72,6 +73,23 @@ public:
 private:
     const std::string server_common_name;
     const snort::Packet* packet;
+};
+
+class SslTlsMetadataBaseEvent : public snort::DataEvent
+{
+public:
+    SslTlsMetadataBaseEvent() = default;
+    virtual ~SslTlsMetadataBaseEvent() override = default;
+
+    /* Values expected to be in host machine byte order */
+    virtual uint16_t get_version() const = 0;
+    virtual uint16_t get_curve() const = 0;
+    virtual uint16_t get_cipher() const = 0;
+    virtual const std::string& get_server_name_identifier() const = 0;
+    virtual const std::string& get_subject() const = 0;
+    virtual const std::string& get_issuer() const = 0;
+    virtual const std::string& get_validation_status() const = 0;
+    virtual const std::string& get_module_identifier() const = 0;
 };
 
 #endif

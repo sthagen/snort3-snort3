@@ -195,20 +195,20 @@ ServiceSSLData::~ServiceSSLData()
     ssl_cache_free(cached_data, cached_len);
 }
 
-static ParseCHResult parse_client_initiation(const uint8_t* data, uint16_t size, ServiceSSLData* ss)
+static ParseHelloResult parse_client_initiation(const uint8_t* data, uint16_t size, ServiceSSLData* ss)
 {
     const ServiceSSLV3Hdr* hdr3;
     uint16_t ver;
 
     /* Sanity check header stuff. */
     if (size < sizeof(ServiceSSLV3Hdr))
-        return ParseCHResult::FAILED;
+        return ParseHelloResult::FAILURE;
     hdr3 = (const ServiceSSLV3Hdr*)data;
     ver = ntohs(hdr3->version);
     if (hdr3->type != SSL_HANDSHAKE || (ver != 0x0300 && ver != 0x0301 && ver != 0x0302 &&
         ver != 0x0303))
     {
-        return ParseCHResult::FAILED;
+        return ParseHelloResult::FAILURE;
     }
     data += sizeof(ServiceSSLV3Hdr);
     size -= sizeof(ServiceSSLV3Hdr);
@@ -308,14 +308,14 @@ int SslServiceDetector::validate(AppIdDiscoveryArgs& args)
             args.dir == APP_ID_FROM_INITIATOR)
         {
             auto parse_status = parse_client_initiation(data, size, ss);
-            if (parse_status == ParseCHResult::FRAGMENTED_PACKET)
+            if (parse_status == ParseHelloResult::FRAGMENTED_PACKET)
             {
                 save_ssl_cache(ss, size, data);
                 ss->cached_client_data = true;
                 ss->state = SSL_STATE_INITIATE;
                 goto inprocess;
             }
-            else if (parse_status == ParseCHResult::FAILED)
+            else if (parse_status == ParseHelloResult::FAILURE)
             {
                 goto inprocess;
             }

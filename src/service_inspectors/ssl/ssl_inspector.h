@@ -22,12 +22,37 @@
 // Implementation header with definitions, datatypes and flowdata class for SSL service inspector.
 
 #include "flow/flow.h"
+#include "pub_sub/ssl_events.h"
 #include "ssl_flow_data.h"
+
+class SslMetadataEvent : public SslTlsMetadataBaseEvent
+{
+public:
+    SslMetadataEvent(const TLSConnectionData& conn_data)
+        : tls_connection_data(conn_data)
+    { }
+
+    virtual ~SslMetadataEvent() override
+    { }
+
+    uint16_t get_version() const override;
+    uint16_t get_curve() const override;
+    uint16_t get_cipher() const override;
+    const std::string& get_server_name_identifier() const override;
+    const std::string& get_subject() const override;
+    const std::string& get_issuer() const override;
+    const std::string& get_validation_status() const override;
+    const std::string& get_module_identifier() const override;
+
+private:
+    TLSConnectionData tls_connection_data;
+    std::string validation_status;
+};
 
 class SslFlowData : public SslBaseFlowData
 {
 public:
-    SslFlowData();
+    SslFlowData(const snort::Flow* flow);
     ~SslFlowData() override;
 
     static void init()
@@ -35,6 +60,9 @@ public:
 
     SSLData& get_session() override
     { return session; }
+
+    TLSConnectionData& get_tls_connection_data()
+    { return tls_connection_data; }
 
 public:
     struct {
@@ -44,6 +72,8 @@ public:
 
 private:
     SSLData session;
+    TLSConnectionData tls_connection_data;
+    const snort::Flow* flow_handle;
 };
 
 #endif

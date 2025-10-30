@@ -27,6 +27,8 @@ set( FILE_LIST
     extractor_null_conn.h
     extractor_service.cc
     extractor_service.h
+    extractor_ssl.cc
+    extractor_ssl.h
     extractors.cc
     extractors.h
 )

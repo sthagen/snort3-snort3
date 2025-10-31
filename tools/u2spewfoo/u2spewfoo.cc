@@ -129,6 +129,7 @@ static bool get_record(u2iterator* it, u2record* record)
 
     s_pos = ftell(it->file);
 
+    // coverity[tainted_scalar]
     tmp = (uint8_t*)realloc(record->data, record->length);
 
     if (!tmp)
@@ -556,14 +557,19 @@ static int u2dump(char* file)
     while ( get_record(it, &record) )
     {
         if ( record.type == UNIFIED2_EVENT3 and record.length == sizeof(Unified2Event) )
+        {
             event3_dump(&record);
-
+        }
         else if ( (record.type == UNIFIED2_PACKET) or (record.type == UNIFIED2_BUFFER) )
+        {
+            // coverity[tainted_scalar]
             packet_dump(&record);
-
+        }
         else if (record.type == UNIFIED2_EXTRA_DATA)
+        {
+            // coverity[tainted_scalar]
             extradata_dump(&record);
-
+        }
         // deprecated
         else if ( record.type == UNIFIED2_IDS_EVENT_VLAN and
             record.length == sizeof(Unified2IDSEvent) )

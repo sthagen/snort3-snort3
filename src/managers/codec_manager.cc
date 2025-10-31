@@ -142,7 +142,10 @@ void CodecManager::instantiate(CodecApiWrapper& wrap, Module* m)
         static std::size_t codec_id = 1;
 
         if (codec_id >= s_protocols.size())
+        {
             ParseError("A maximum of 256 codecs can be registered");
+            return;
+        }
 
         if (cd_api->pinit)
             cd_api->pinit();

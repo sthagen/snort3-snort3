@@ -84,3 +84,14 @@ well enough below the actual hard limit, for example the limit enforced by cgrou
 processing of a single packet will not push us over. It must also allow for additional heap
 overhead.
 
+Note regarding statistics collection in the Memory module:
+
+Locking for statistics collection is minimized as the write operation (update_global_stats)
+is protected by a standard lock to ensure multiple threads don't update the global stats
+simultaneously. We are able to bail out if another thread is currently updating the statistics,
+as they will be approximately equal for either of the simulteneous callers.
+
+Read access (Module::sum_stats) can be protected via a shared lock, since
+all that we require here is that stats are not being updated while we are reading them.
+Thus, we never should block to acquire a writer lock, and the critical section is minimal for
+the Module::sum_stats call.

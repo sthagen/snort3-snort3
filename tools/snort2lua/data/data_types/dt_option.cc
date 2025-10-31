@@ -26,12 +26,12 @@ Option::Option(std::string val, int d)
     if (val.front() == '$')
     {
         val.erase(val.begin());
-        this->value = std::string(val);
+        this->value = std::string(std::move(val));
         this->type = OptionType::VAR;
     }
     else
     {
-        this->value = std::string(val);
+        this->value = std::string(std::move(val));
         this->type = OptionType::STRING;
     }
 }
@@ -39,7 +39,7 @@ Option::Option(std::string val, int d)
 Option::Option(const std::string& n, int val, int d)
 {
     this->name = n;
-    this->value = std::to_string(val);
+    this->value = std::to_string(std::move(val));
     this->depth = d;
     this->type = OptionType::INT;
 }
@@ -60,12 +60,12 @@ Option::Option(const std::string& opt_name, std::string val, int d)
     if (val.front() == '$')
     {
         val.erase(val.begin());
-        this->value = std::string(val);
+        this->value = std::string(std::move(val));
         this->type = OptionType::VAR;
     }
     else
     {
-        this->value = std::string(val);
+        this->value = std::string(std::move(val));
         this->type = OptionType::STRING;
     }
 }

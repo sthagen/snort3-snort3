@@ -144,7 +144,7 @@ static bool new_sig(int num_children, detection_option_tree_node_t** nodes, OptT
         if ( child->option_type != RULE_OPTION_TYPE_LEAF_NODE )
             continue;
 
-        OptTreeNode* cotn = (OptTreeNode*)child->option_data;
+        const OptTreeNode* cotn = (OptTreeNode*)child->option_data;
         const SigInfo& csi = cotn->sigInfo;
         const SigInfo& osi = otn->sigInfo;
 
@@ -1049,7 +1049,7 @@ static void fpCreatePortObject2RuleGroup(SnortConfig* sc, PortObject2* po, PortO
              node = pox->rule_hash->find_next())
         {
             unsigned sid, gid;
-            int* prindex = (int*)node->data;
+            const int* prindex = (int*)node->data;
 
             /* be safe - no rule index, ignore it */
             if (prindex == nullptr)
@@ -1089,7 +1089,7 @@ static void fpCreatePortObject2RuleGroup(SnortConfig* sc, PortObject2* po, PortO
 static void fpCreatePortTableRuleGroups(SnortConfig* sc, PortTable* p, PortObject2* poaa)
 {
     int cnt = 1;
-    FastPatternConfig* fp = sc->fast_pattern_config;
+    const FastPatternConfig* fp = sc->fast_pattern_config;
     if ( fp->get_debug_print_rule_group_build_details() )
         LogMessage("%d Port Groups in Port Table\n",p->pt_mpo_hash->get_count());
 
@@ -1510,7 +1510,7 @@ static bool fp_print_port_groups(RulePortTables* port_tables)
  */
 static void fpCreateServiceRuleGroups(SnortConfig* sc)
 {
-    FastPatternConfig* fp = sc->fast_pattern_config;
+    const FastPatternConfig* fp = sc->fast_pattern_config;
 
     sc->srmmTable = ServiceMapNew();
 

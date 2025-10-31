@@ -23,6 +23,8 @@
 
 #include "framework/module.h"
 
+#include <shared_mutex>
+
 class MemoryModule : public snort::Module
 {
 public:
@@ -40,6 +42,8 @@ public:
 
     void set_trace(const snort::Trace*) const override;
     const snort::TraceOption* get_trace_options() const override;
+
+    std::shared_mutex mem_global_stats_mutex;
 };
 
 extern THREAD_LOCAL const snort::Trace* memory_trace;

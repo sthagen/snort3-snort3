@@ -234,14 +234,14 @@ uncompleted queue*/
 #endif
     );
     SfIp src_ip,src_subnet;
-    if (!df->set_ip(source_ip, src_ip, src_subnet))
+    if (!df->set_ip(std::move(source_ip), src_ip, src_subnet))
     {
         LogRespond(ctrlcon, "Invalid source ip\n");
         delete df;
         return -1;
     }
     SfIp dst_ip,dst_subnet;
-    if (!df->set_ip(destination_ip, dst_ip, dst_subnet))
+    if (!df->set_ip(std::move(destination_ip), dst_ip, dst_subnet))
     {
         LogRespond(ctrlcon, "Invalid destination ip\n");
         delete df;
@@ -326,14 +326,14 @@ static int dump_flows_summary(lua_State* L)
     DumpFlowsSummary* dfs = new DumpFlowsSummary(ctrlcon);
 
     SfIp src_ip,src_subnet;
-    if (!dfs->set_ip(source_ip, src_ip, src_subnet))
+    if (!dfs->set_ip(std::move(source_ip), src_ip, src_subnet))
     {
         LogRespond(ctrlcon, "Invalid source ip\n");
         delete dfs;
         return -1;
     }
     SfIp dst_ip,dst_subnet;
-    if (!dfs->set_ip(destination_ip, dst_ip, dst_subnet))
+    if (!dfs->set_ip(std::move(destination_ip), dst_ip, dst_subnet))
     {
         LogRespond(ctrlcon, "Invalid destination ip\n");
         delete dfs;

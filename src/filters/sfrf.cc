@@ -117,15 +117,17 @@ static void SFRF_New(unsigned nbytes)
     nrows = nbytes / (SFRF_BYTES);
 
     /* Create global hash table for all of the IP Nodes */
+    std::lock_guard<std::mutex> lock(sfrf_hash_mutex);
     rf_hash = new XHash(nrows, sizeof(tSFRFTrackingNodeKey), sizeof(tSFRFTrackingNode), nbytes);
 }
 
 void SFRF_Delete()
 {
+    std::lock_guard<std::mutex> lock(sfrf_hash_mutex);
+
     if ( !rf_hash )
         return;
 
-    std::lock_guard<std::mutex> lock(sfrf_hash_mutex);
     delete rf_hash;
     rf_hash = nullptr;
 }
@@ -161,12 +163,21 @@ static void SFRF_SidNodeFree(void* item)
 
 int SFRF_Alloc(unsigned int memcap)
 {
-    if ( rf_hash == nullptr )
+    sfrf_hash_mutex.lock();
+    const XHash* current_rf_hash = rf_hash;
+    sfrf_hash_mutex.unlock();
+
+    if ( current_rf_hash == nullptr )
     {
         SFRF_New(memcap);
 
+        sfrf_hash_mutex.lock();
         if ( rf_hash == nullptr )
+        {
+            sfrf_hash_mutex.unlock();
             return -1;
+        }
+        sfrf_hash_mutex.unlock();
     }
     return 0;
 }
@@ -460,8 +471,8 @@ void SFRF_ShowObjects(RateFilterConfig* config)
             {
                 printf(".........SFRF_ID  =%d\n",cfgNode->tid);
                 printf(".........tracking =%d\n",cfgNode->tracking);
-                printf(".........count    =%u\n",cfgNode->count);
-                printf(".........seconds  =%u\n",cfgNode->seconds);
+                printf(".........count    =%u\n",cfgNode->count.load());
+                printf(".........seconds  =%lu\n",cfgNode->seconds);
             }
         }
     }
@@ -481,13 +492,13 @@ static int checkSamplingPeriod(tSFRFConfigNode* cfgNode, tSFRFTrackingNode* dynN
 {
     if ( cfgNode->seconds )
     {
-        unsigned dt = (unsigned)(curTime - dynNode->tstart);
+        time_t dt = curTime - dynNode->tstart;
 
         if ( dt >= cfgNode->seconds )
         {   // observation period is over, start a new one
             dynNode->tstart = curTime;
 
-            dt = (unsigned)(curTime - dynNode->tlast);
+            dt = curTime - dynNode->tlast;
             if ( dt > cfgNode->seconds )
                 dynNode->overRate = 0;
             else
@@ -534,7 +545,7 @@ static int checkThreshold(tSFRFConfigNode* cfgNode, tSFRFTrackingNode* dynNode, 
     if ( dynNode->filterState == FS_ON )
     {
         if ( (cfgNode->timeout != 0 )
-            && ((unsigned)(curTime - dynNode->revertTime) >= cfgNode->timeout))
+            && (curTime - dynNode->revertTime) >= cfgNode->timeout)
         {
             if ( dynNode->count > cfgNode->count || dynNode->overRate )
             {

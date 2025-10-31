@@ -367,7 +367,7 @@ bool DetectionEngine::get_replacement(std::string& s, unsigned& off)
     if ( Analyzer::get_switcher()->get_context()->rpl.empty() )
         return false;
 
-    auto rep = Analyzer::get_switcher()->get_context()->rpl.back();
+    const auto& rep = Analyzer::get_switcher()->get_context()->rpl.back();
 
     s = rep.data;
     off = rep.offset;

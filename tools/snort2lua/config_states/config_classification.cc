@@ -62,6 +62,7 @@ bool Classification::convert(std::istringstream& data_stream)
     if (!(data_stream >> priority))
         return false;
 
+    // coverity[tainted_scalar]
     table_api.add_option("priority", priority);
     return true;
 }

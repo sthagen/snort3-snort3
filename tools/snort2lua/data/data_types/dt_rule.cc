@@ -251,7 +251,7 @@ void Rule::resolve_pcre_buffer_options()
             name == "http_uri" ||
             name == "raw_data")
         {
-            curr_sticky_buffer = name;
+            curr_sticky_buffer = std::move(name);
             ++iter;
         }
         else if (name == "http_header" ||
@@ -266,7 +266,7 @@ void Rule::resolve_pcre_buffer_options()
             }
             else
             {
-                curr_sticky_buffer = name;
+                curr_sticky_buffer = std::move(name);
                 ++iter;
             }
         }

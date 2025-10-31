@@ -124,7 +124,10 @@ static void publish_netflow_event(const Packet* p, const NetFlowRule* match, Net
     // LAST_PKT_SECOND - if these aren't set, assume the current wire pkt time
     if (!record.first_pkt_second or !record.last_pkt_second)
     {
+        // Record structures are uint_32 so we must use that here
+        //coverity[y2k38_safety]
         record.first_pkt_second = static_cast<uint32_t>(packet_time());
+        //coverity[y2k38_safety]
         record.last_pkt_second = static_cast<uint32_t>(packet_time());
     }
 

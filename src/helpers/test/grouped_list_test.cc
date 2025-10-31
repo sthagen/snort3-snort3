@@ -72,7 +72,7 @@ TEST_CASE("Basic", "[Double list]")
     SECTION("1 element")
     {
         const Type data = {1, "one"};
-        Elem* el = new Elem(cont, group, data);
+        const Elem* el = new Elem(cont, group, data);
 
         CHECK(el != nullptr);
 
@@ -84,9 +84,9 @@ TEST_CASE("Basic", "[Double list]")
         const Type data1 = {1, "one"};
         const Type data2 = {2, "two"};
         const Type data3 = {3, "three"};
-        Elem* el1 = new Elem(cont, group, data1);
-        Elem* el2 = new Elem(cont, group, data2);
-        Elem* el3 = new Elem(cont, group, data3);
+        const Elem* el1 = new Elem(cont, group, data1);
+        const Elem* el2 = new Elem(cont, group, data2);
+        const Elem* el3 = new Elem(cont, group, data3);
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);
@@ -107,11 +107,11 @@ TEST_CASE("Groups", "[Double list]")
         const Type data3 = {3, "three"};
         Elem* group_a = nullptr;
 
-        Elem* el1 = new Elem(cont, group_a, data1);
+        const Elem* el1 = new Elem(cont, group_a, data1);
         CHECK(group_a == el1);
-        Elem* el2 = new Elem(cont, group_a, data2);
+        const Elem* el2 = new Elem(cont, group_a, data2);
         CHECK(group_a == el2);
-        Elem* el3 = new Elem(cont, group_a, data3);
+        const Elem* el3 = new Elem(cont, group_a, data3);
         CHECK(group_a == el3);
 
         check_container(cont, data1, data2, data3);
@@ -132,11 +132,11 @@ TEST_CASE("Groups", "[Double list]")
         Elem* group_b = nullptr;
         Elem* group_c = nullptr;
 
-        Elem* el1 = new Elem(cont, group_a, data1);
+        const Elem* el1 = new Elem(cont, group_a, data1);
         CHECK(group_a == el1);
-        Elem* el2 = new Elem(cont, group_b, data2);
+        const Elem* el2 = new Elem(cont, group_b, data2);
         CHECK(group_b == el2);
-        Elem* el3 = new Elem(cont, group_c, data3);
+        const Elem* el3 = new Elem(cont, group_c, data3);
         CHECK(group_c == el3);
 
         check_container(cont, data1, data2, data3);
@@ -207,11 +207,11 @@ TEST_CASE("Groups", "[Double list]")
         const Type data3 = {3, "three"};
         Elem* group_a = nullptr;
 
-        Elem* el1 = new Elem(cont, group_a, data1);
+        const Elem* el1 = new Elem(cont, group_a, data1);
         CHECK(group_a == el1);
         Elem* el2 = new Elem(cont, group_a, data2);
         CHECK(group_a == el2);
-        Elem* el3 = new Elem(cont, group_a, data3);
+        const Elem* el3 = new Elem(cont, group_a, data3);
         CHECK(group_a == el3);
 
         check_container(cont, data1, data2, data3);
@@ -238,9 +238,9 @@ TEST_CASE("Groups", "[Double list]")
 
         Elem* el1 = new Elem(cont, group_a, data1);
         CHECK(group_a == el1);
-        Elem* el2 = new Elem(cont, group_a, data2);
+        const Elem* el2 = new Elem(cont, group_a, data2);
         CHECK(group_a == el2);
-        Elem* el3 = new Elem(cont, group_a, data3);
+        const Elem* el3 = new Elem(cont, group_a, data3);
         CHECK(group_a == el3);
 
         check_container(cont, data1, data2, data3);
@@ -265,9 +265,9 @@ TEST_CASE("Groups", "[Double list]")
         const Type data3 = {3, "three"};
         Elem* group_a = nullptr;
 
-        Elem* el1 = new Elem(cont, group_a, data1);
+        const Elem* el1 = new Elem(cont, group_a, data1);
         CHECK(group_a == el1);
-        Elem* el2 = new Elem(cont, group_a, data2);
+        const Elem* el2 = new Elem(cont, group_a, data2);
         CHECK(group_a == el2);
         Elem* el3 = new Elem(cont, group_a, data3);
         CHECK(group_a == el3);
@@ -381,7 +381,7 @@ TEST_CASE("Memory management (value by copy)", "[Double list]")
     SECTION("delete group")
     {
         const Type data = {1, "one"};
-        Elem* el = new Elem(cont, group_a, data);
+        const Elem* el = new Elem(cont, group_a, data);
 
         CHECK(el != nullptr);
 
@@ -397,8 +397,8 @@ TEST_CASE("Memory management (value by copy)", "[Double list]")
     {
         const Type data1 = {1, "one"};
         const Type data2 = {2, "two"};
-        Elem* el1 = new Elem(cont, group_a, data1);
-        Elem* el2 = new Elem(cont, group_b, data2);
+        const Elem* el1 = new Elem(cont, group_a, data1);
+        const Elem* el2 = new Elem(cont, group_b, data2);
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);
@@ -418,8 +418,8 @@ TEST_CASE("Memory management (value by copy)", "[Double list]")
     {
         const Type data1 = {1, "one"};
         const Type data2 = {2, "two"};
-        Elem* el1 = new Elem(cont, group_a, data1);
-        Elem* el2 = new Elem(cont, group_b, data2);
+        const Elem* el1 = new Elem(cont, group_a, data1);
+        const Elem* el2 = new Elem(cont, group_b, data2);
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);
@@ -439,9 +439,9 @@ TEST_CASE("Memory management (value by copy)", "[Double list]")
         const Type data1 = {1, "one"};
         const Type data2 = {2, "two"};
         const Type data3 = {3, "three"};
-        Elem* el1 = new Elem(cont, group_a, data1);
-        Elem* el2 = new Elem(cont, group_b, data2);
-        Elem* el3 = new Elem(cont, group_b, data3);
+        const Elem* el1 = new Elem(cont, group_a, data1);
+        const Elem* el2 = new Elem(cont, group_b, data2);
+        const Elem* el3 = new Elem(cont, group_b, data3);
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);
@@ -463,9 +463,9 @@ TEST_CASE("Memory management (value by copy)", "[Double list]")
         const Type data1 = {1, "one"};
         const Type data2 = {2, "two"};
         const Type data3 = {3, "three"};
-        Elem* el1 = new Elem(cont, group_a, data1);
-        Elem* el2 = new Elem(cont, group_b, data2);
-        Elem* el3 = new Elem(cont, group_b, data3);
+        const Elem* el1 = new Elem(cont, group_a, data1);
+        const Elem* el2 = new Elem(cont, group_b, data2);
+        const Elem* el3 = new Elem(cont, group_b, data3);
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);
@@ -503,7 +503,7 @@ TEST_CASE("Memory management (value in-place)", "[Double list]")
 
     SECTION("delete group")
     {
-        Elem* el = new Elem(cont, group_a, 1, "one");
+        const Elem* el = new Elem(cont, group_a, 1, "one");
 
         CHECK(el != nullptr);
 
@@ -517,8 +517,8 @@ TEST_CASE("Memory management (value in-place)", "[Double list]")
 
     SECTION("delete element, then delete group")
     {
-        Elem* el1 = new Elem(cont, group_a, 1, "one");
-        Elem* el2 = new Elem(cont, group_b, 2, "two");
+        const Elem* el1 = new Elem(cont, group_a, 1, "one");
+        const Elem* el2 = new Elem(cont, group_b, 2, "two");
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);
@@ -536,8 +536,8 @@ TEST_CASE("Memory management (value in-place)", "[Double list]")
 
     SECTION("delete group, then delete element")
     {
-        Elem* el1 = new Elem(cont, group_a, 1, "one");
-        Elem* el2 = new Elem(cont, group_b, 2, "two");
+        const Elem* el1 = new Elem(cont, group_a, 1, "one");
+        const Elem* el2 = new Elem(cont, group_b, 2, "two");
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);
@@ -554,9 +554,9 @@ TEST_CASE("Memory management (value in-place)", "[Double list]")
 
     SECTION("delete elements (remain), then delete group")
     {
-        Elem* el1 = new Elem(cont, group_a, 1, "one");
-        Elem* el2 = new Elem(cont, group_b, 2, "two");
-        Elem* el3 = new Elem(cont, group_b, 3, "three");
+        const Elem* el1 = new Elem(cont, group_a, 1, "one");
+        const Elem* el2 = new Elem(cont, group_b, 2, "two");
+        const Elem* el3 = new Elem(cont, group_b, 3, "three");
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);
@@ -575,9 +575,9 @@ TEST_CASE("Memory management (value in-place)", "[Double list]")
 
     SECTION("delete group, then delete elements (remain)")
     {
-        Elem* el1 = new Elem(cont, group_a, 1, "one");
-        Elem* el2 = new Elem(cont, group_b, 2, "two");
-        Elem* el3 = new Elem(cont, group_b, 3, "three");
+        const Elem* el1 = new Elem(cont, group_a, 1, "one");
+        const Elem* el2 = new Elem(cont, group_b, 2, "two");
+        const Elem* el3 = new Elem(cont, group_b, 3, "three");
 
         CHECK(el1 != nullptr);
         CHECK(el2 != nullptr);

@@ -65,6 +65,7 @@ bool AlertFull::convert(std::istringstream& data_stream)
     else
         limit = (limit + 1024*1024 - 1) / (1024*1024);
 
+     // coverity[tainted_scalar]
     retval = table_api.add_option("limit", limit) && retval;
     retval = table_api.add_comment("limit now in MB, converted") && retval;
     retval = table_api.add_deleted_comment("units") && retval;

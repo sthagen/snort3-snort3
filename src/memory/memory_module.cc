@@ -120,8 +120,15 @@ PegCount* MemoryModule::get_counts() const
 
 void MemoryModule::sum_stats(bool dump_stats)
 {
-    memory::MemoryCap::update_global_stats();
+    if (mem_global_stats_mutex.try_lock())
+    {
+        memory::MemoryCap::update_global_stats();
+        mem_global_stats_mutex.unlock();
+    }
+
+    mem_global_stats_mutex.lock_shared();
     Module::sum_stats(dump_stats);
+    mem_global_stats_mutex.unlock();
 }
 
 void MemoryModule::set_trace(const Trace* trace) const

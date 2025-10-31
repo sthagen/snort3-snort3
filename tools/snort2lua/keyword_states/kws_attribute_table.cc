@@ -386,7 +386,7 @@ void AttributeTable::parse_entry()
 
     // add this pair to the map.
     if (!id.empty() && !value.empty())
-        attr_map[id] = value;
+        attr_map[id] = std::move(value);
 }
 
 void AttributeTable::parse_map_entries()
@@ -435,7 +435,7 @@ bool AttributeTable::convert(std::istringstream& data_stream)
             data_api.failed_conversion(data_stream, error_string);
             return false;
         }
-        file = full_file;
+        file = std::move(full_file);
     }
 
     table_api.open_table("hosts");

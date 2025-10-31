@@ -499,8 +499,10 @@ StreamSplitter* Stream::get_splitter(Flow* flow, bool to_server)
 void Stream::log_extra_data(
     Flow* flow, uint32_t mask, const AlertInfo& alert_info)
 {
+    std::lock_guard<std::mutex> xtra_lock(stream_xtra_mutex);
     if ( mask && stream.extra_data_log )
     {
+
         stream.extra_data_log(
             flow, stream.extra_data_context, stream.xtradata_map,
             stream.xtradata_func_count, mask, alert_info);
@@ -777,7 +779,7 @@ uint16_t Stream::get_mss(Flow* flow, bool to_server)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
     return tcp_session->get_mss(to_server);
 }
 
@@ -785,7 +787,7 @@ uint8_t Stream::get_tcp_options_len(Flow* flow, bool to_server)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
     return tcp_session->get_tcp_options_len(to_server);
 }
 
@@ -801,7 +803,7 @@ bool Stream::can_set_no_ack_mode(Flow* flow)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
     return tcp_session->can_set_no_ack();
 }
 
@@ -809,7 +811,7 @@ bool Stream::set_no_ack_mode(Flow* flow, bool on_off)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
     return tcp_session->set_no_ack(on_off);
 }
 
@@ -818,9 +820,9 @@ void Stream::partial_flush(Flow* flow, bool to_server)
     if ( flow->pkt_type == PktType::TCP )
     {
         if ( to_server )
-            ((TcpSession*)flow->session)->server.perform_partial_flush();
+            reinterpret_cast<TcpSession*>(flow->session)->server.perform_partial_flush();
         else
-            ((TcpSession*)flow->session)->client.perform_partial_flush();
+            reinterpret_cast<TcpSession*>(flow->session)->client.perform_partial_flush();
     }
 }
 
@@ -829,7 +831,7 @@ bool Stream::get_held_pkt_seq(Flow* flow, uint32_t& seq)
     if (!flow or !flow->session or !(flow->pkt_type == PktType::TCP))
         return false;
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
 
     if (tcp_session->held_packet_dir == SSN_DIR_NONE)
         return false;

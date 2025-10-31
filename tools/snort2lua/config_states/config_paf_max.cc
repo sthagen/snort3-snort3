@@ -54,7 +54,7 @@ bool PafMax::convert(std::istringstream& data_stream)
 
         if (!(data_stream >> val))
             return true;
-
+        // coverity[tainted_scalar]
         data_api.failed_conversion(data_stream, std::to_string(val));
     }
     else

@@ -183,7 +183,7 @@ const char* get_config_file(const char* arg, std::string& file)
     if ( relative_to_include_dir(arg, file) )
         return "I";
 
-    file = hint;
+    file = std::move(hint);
 
     if ( relative_to_parse_dir(arg, file) )
         return "F";

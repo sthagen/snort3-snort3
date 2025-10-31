@@ -205,6 +205,8 @@ static int GetRecord(FILE* input, u2record* rec)
     /* Read in the data portion of the record */
     if (rec->length > buffer_size)
     {
+        // If we fail to allocate here, we simply error out
+        // coverity[tainted_scalar]
         tmp = (uint8_t*)malloc(rec->length * sizeof(uint8_t));
         if (tmp == nullptr)
         {
@@ -221,6 +223,7 @@ static int GetRecord(FILE* input, u2record* rec)
             buffer_size = rec->length;
         }
     }
+    // coverity[tainted_scalar]
     items_read = fread(rec->data, sizeof(uint8_t), rec->length, input);
     if (items_read != rec->length)
     {

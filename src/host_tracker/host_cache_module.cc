@@ -79,7 +79,7 @@ static int host_cache_get_segment_stats(lua_State* L)
 
 static int host_cache_delete_host(lua_State* L)
 {
-    HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
+    const HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
     if ( mod )
     {
         const char* ips = luaL_optstring(L, 1, nullptr);
@@ -111,7 +111,7 @@ static int host_cache_delete_host(lua_State* L)
 
 static int host_cache_delete_network_proto(lua_State* L)
 {
-    HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
+    const HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
     if ( mod )
     {
         const char* ips = luaL_optstring(L, 1, nullptr);
@@ -151,7 +151,7 @@ static int host_cache_delete_network_proto(lua_State* L)
 
 static int host_cache_delete_transport_proto(lua_State* L)
 {
-    HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
+    const HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
     if ( mod )
     {
         const char* ips = luaL_optstring(L, 1, nullptr);
@@ -190,7 +190,7 @@ static int host_cache_delete_transport_proto(lua_State* L)
 
 static int host_cache_delete_service(lua_State* L)
 {
-    HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
+    const HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
     if ( mod )
     {
         const char* ips = luaL_optstring(L, 1, nullptr);
@@ -237,7 +237,7 @@ static int host_cache_delete_service(lua_State* L)
 
 static int host_cache_delete_client(lua_State* L)
 {
-    HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
+    const HostCacheModule* mod = (HostCacheModule*) ModuleManager::get_module(HOST_CACHE_NAME);
     if ( mod )
     {
         const char* ips = luaL_optstring(L, 1, nullptr);
@@ -496,7 +496,7 @@ string HostCacheModule::get_host_cache_segment_stats(int seg_idx)
             + to_string(lru_data.size()) + " trackers, memcap: " + to_string(host_cache.get_max_size())
             + " bytes\n";
 
-        PegCount* counts = (PegCount*) host_cache.get_counts();
+        const PegCount* counts = (PegCount*) host_cache.get_counts();
         for ( int i = 0; pegs[i].type != CountType::END; i++ )
         {
             if ( counts[i] )
@@ -551,7 +551,7 @@ string HostCacheModule::get_host_cache_stats()
         + to_string(lru_data.size()) + " trackers, memcap: " + to_string(host_cache.get_max_size())
         + " bytes\n";
 
-    PegCount* counts = (PegCount*) host_cache.get_counts();
+    const PegCount* counts = (PegCount*) host_cache.get_counts();
     const PegInfo* pegs = host_cache.get_pegs();
 
     for ( int i = 0; pegs[i].type != CountType::END; i++ )

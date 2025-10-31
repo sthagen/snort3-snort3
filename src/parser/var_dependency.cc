@@ -62,7 +62,7 @@ static std::list<std::string> extract_variable_names(const char* input)
             ;
 
         std::string variable(input + begin + 1, end - begin - 1);
-        variable_names.push_back(variable);
+        variable_names.push_back(std::move(variable));
         begin = end - 1;
     }
 

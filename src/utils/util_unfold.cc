@@ -95,7 +95,8 @@ int sf_unfold_header(const uint8_t* inbuf, uint32_t inbuf_size, uint8_t* outbuf,
     if (n < outbuf_size)
         *outbuf_ptr = '\0';
     else
-        outbuf[outbuf_size - 1] = '\0';
+        if (outbuf_size)
+            outbuf[outbuf_size - 1] = '\0';
 
     *output_bytes = outbuf_ptr - outbuf;
     if (folded)

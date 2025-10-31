@@ -73,7 +73,7 @@ bool Variable::add_value(std::string elem)
 
     if (elem.size() <= 1)
     {
-        s = elem;
+        s = std::move(elem);
         end = "";
     }
     else
@@ -81,7 +81,7 @@ bool Variable::add_value(std::string elem)
         const std::size_t pos = elem.find('$', 1);
         if (pos == std::string::npos)
         {
-            s = elem;
+            s = std::move(elem);
             end = "";
         }
         else
@@ -121,7 +121,7 @@ bool Variable::add_value(std::string elem)
 
         VarData* vd = new VarData();
         vd->type = VarType::VARIABLE;
-        vd->data = s;
+        vd->data = std::move(s);
         vars.push_back(vd);
     }
     else if (!vars.empty() && vars.back()->type == VarType::STRING)
@@ -138,12 +138,12 @@ bool Variable::add_value(std::string elem)
         if (!vars.empty() and s != " ")
             s.insert(0, " ");
 
-        vd->data = s;
+        vd->data = std::move(s);
         vars.push_back(vd);
     }
 
     if (!end.empty())
-        return add_value(end);
+        return add_value(std::move(end));
 
     return true;
 }

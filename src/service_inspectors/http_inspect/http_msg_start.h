@@ -35,6 +35,9 @@ public:
     bool detection_required() const override { return false; }
     const Field& get_version() const { return version; }
     HttpEnums::VersionId get_version_id() const { return version_id; }
+    uint32_t get_length() const override
+    // +2 to account for \r\n at the end of the section that was removed by the splitter
+    { auto len = HttpMsgSection::get_length(); return (len > 0) ? len + 2 : 0; }
 
 protected:
     HttpMsgStart(const uint8_t* buffer, const uint16_t buf_size, HttpFlowData* session_data_,

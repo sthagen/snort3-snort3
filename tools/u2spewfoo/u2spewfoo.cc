@@ -349,6 +349,21 @@ static void event3_dump(u2record* record)
 
     printf("\tApp Name: %s\n", event.app_name[0] ? event.app_name : "none");
 
+    if (event.http_method[0])
+        printf("\tHTTP Method: %s\n", event.http_method);
+    if (event.request_size)
+        printf("\tRequest Size: %u\n", htonl(event.request_size));
+    if (event.response_size)
+        printf("\tResponse Size: %u\n", htonl(event.response_size));
+    if (event.http_version[0])
+        printf("\tHTTP Version: %s\n", event.http_version);
+    if (event.http_user_agent[0])
+        printf("\tHTTP User-Agent: %s\n", event.http_user_agent);
+    if (event.http_referer[0])
+        printf("\tHTTP Referer: %s\n", event.http_referer);
+    if (event.message_detail[0])
+        printf("\tMessage Detail: %s\n", event.message_detail);
+
     printf(
         "\tStatus: %s\tAction: %s\n",
         get_status(event.snort_status), get_action(event.snort_action));

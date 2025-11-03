@@ -411,6 +411,7 @@ void AppIdDiscovery::do_port_based_discovery(Packet* p, AppIdSession& asd, IpPro
     // Do port-based detection only for responder packets.
     if (asd.get_session_flags(APPID_SESSION_PORT_SERVICE_DONE) or
         !asd.get_session_flags(APPID_SESSION_PAYLOAD_SEEN) or
+        asd.get_session_flags(APPID_SESSION_WAIT_FOR_EXTERNAL) or
         (direction != APP_ID_FROM_RESPONDER))
         return;
 

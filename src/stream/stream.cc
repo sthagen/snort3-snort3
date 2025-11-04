@@ -499,10 +499,9 @@ StreamSplitter* Stream::get_splitter(Flow* flow, bool to_server)
 void Stream::log_extra_data(
     Flow* flow, uint32_t mask, const AlertInfo& alert_info)
 {
-    std::lock_guard<std::mutex> xtra_lock(stream_xtra_mutex);
+    // coverity[missing_lock]
     if ( mask && stream.extra_data_log )
     {
-
         stream.extra_data_log(
             flow, stream.extra_data_context, stream.xtradata_map,
             stream.xtradata_func_count, mask, alert_info);

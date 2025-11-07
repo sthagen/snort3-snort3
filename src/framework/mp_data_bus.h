@@ -151,7 +151,15 @@ public:
     static bool valid(unsigned pub_id)
     { return pub_id != 0; }
 
+    static bool is_ready();
+
     static void subscribe(const PubKey& key, unsigned id, DataHandler* handler); 
+
+    // Optional API for unsubscribing from DataEvents in a multiprocess environment
+    // In general, this should not be needed as subscriptions are typically maintained
+    // for the lifetime of the process, but can be helpful in certain cases
+    // Note: This will delete the handler when unsubscribing
+    static void unsubscribe(const PubKey& key, unsigned id, DataHandler* handler);
 
     // API for publishing the DataEvent to the peer Snort processes
     // The user needs to pass a shared_ptr to the DataEvent object as the third argument
@@ -184,6 +192,8 @@ public:
 private: 
     void _subscribe(unsigned pid, unsigned eid, DataHandler* h);
     void _subscribe(const PubKey& key, unsigned eid, DataHandler* h);
+    void _unsubscribe(unsigned pid, unsigned eid, DataHandler* h);
+    void _unsubscribe(const PubKey& key, unsigned eid, DataHandler* h);
 
     bool _publish(unsigned pid, unsigned eid, DataEvent& e, Flow* f);
     bool _enqueue_event(std::shared_ptr<MPEventInfo> ev_info);

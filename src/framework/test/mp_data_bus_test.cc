@@ -452,6 +452,38 @@ TEST(mp_data_bus, two_subscribers_same_event_and_receive)
     CHECK_EQUAL(1, h2->evt_msg);
 }
 
+TEST(mp_data_bus, unsubscribe_single_handler)
+{
+    UTestHandler1* h1 = new UTestHandler1();
+    MPDataBus::subscribe(pub_key1, DbUtIds::EVENT1, h1);
+
+    std::shared_ptr<UTestEvent> event1 = std::make_shared<UTestEvent>(100);
+    MPEventInfo event_info1(event1, MPEventType(DbUtIds::EVENT1), pub_id1);
+    SnortConfig::get_conf()->mp_dbus->receive_message(event_info1);
+    CHECK_EQUAL(100, h1->evt_msg);
+
+    MPDataBus::unsubscribe(pub_key1, DbUtIds::EVENT1, h1);
+}
+
+TEST(mp_data_bus, unsubscribe_nonexistent_handler)
+{
+    UTestHandler1* h1 = new UTestHandler1();
+    UTestHandler2* h2 = new UTestHandler2();
+
+    MPDataBus::subscribe(pub_key1, DbUtIds::EVENT1, h1);
+    MPDataBus::unsubscribe(pub_key1, DbUtIds::EVENT1, h2);
+
+    std::shared_ptr<UTestEvent> event1 = std::make_shared<UTestEvent>(100);
+    MPEventInfo event_info1(event1, MPEventType(DbUtIds::EVENT1), pub_id1);
+    SnortConfig::get_conf()->mp_dbus->receive_message(event_info1);
+    CHECK_EQUAL(100, h1->evt_msg);
+    CHECK_EQUAL(1, h2->evt_msg);
+
+    MPDataBus::unsubscribe(pub_key1, DbUtIds::EVENT1, h1);
+
+    delete h2;
+}
+
 TEST_GROUP(mp_data_bus_clone)
 {
     unsigned pub_id1 = 0, pub_id2 = 0;  // cppcheck-suppress variableScope

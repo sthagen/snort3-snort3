@@ -8,7 +8,7 @@ Snort 3 Reference Manual
 The Snort Team
 
 Revision History
-Revision 3.9.6.0 2025-10-06 12:42:39 EDT TST
+Revision 3.9.7.0 2025-11-05 22:23:59 EST TST
 
 ---------------------------------------------------------------------
 
@@ -3682,7 +3682,7 @@ Configuration:
   * enum extractor.default_filter = pick: default action for protocol
     with no filter provided { pick | skip }
   * enum extractor.protocols[].service: service to extract from { 
-    http | ftp | conn | dns | weird | notice }
+    http | ftp | ssl | conn | dns | weird | notice }
   * int extractor.protocols[].tenant_id = 0: tenant_id of target
     tenant { 0:max32 }
   * string extractor.protocols[].on_events: specify events to log
@@ -5764,7 +5764,6 @@ Peg counts:
     (sum)
   * snort_ml.client_body_bytes: total number of HTTP client body
     bytes processed (sum)
-  * snort_ml.libml_calls: total libml calls (sum)
 
 
 5.46. snort_ml_engine
@@ -5782,6 +5781,33 @@ Instance Type: global
 Configuration:
 
   * string snort_ml_engine.http_param_model: path to model file(s)
+  * string snort_ml_engine.http_param_filter[].filter_pattern:
+    pattern that triggers ML classification
+  * string snort_ml_engine.http_param_ignore[].ignore_pattern:
+    pattern that skips ML classification
+  * int snort_ml_engine.cache_memcap = 0: maximum memory for verdict
+    cache in bytes, 0 = disabled { 0:maxSZ }
+
+Peg counts:
+
+  * snort_ml_engine.cache_adds: snort_ml_engine cache added new entry
+    (sum)
+  * snort_ml_engine.cache_hits: snort_ml_engine cache found existing
+    entry (sum)
+  * snort_ml_engine.cache_misses: snort_ml_engine cache did not find
+    entry (sum)
+  * snort_ml_engine.cache_replaces: snort_ml_engine cache found entry
+    and replaced its value (sum)
+  * snort_ml_engine.cache_max: snort_ml_engine cache’s maximum byte
+    usage (max)
+  * snort_ml_engine.cache_prunes: snort_ml_engine cache pruned entry
+    to make space for new entry (sum)
+  * snort_ml_engine.cache_removes: snort_ml_engine cache removed
+    existing entry (sum)
+  * snort_ml_engine.filter_searches: total filter searches (sum)
+  * snort_ml_engine.filter_matches: total filter matches (sum)
+  * snort_ml_engine.filter_allows: total filter allows (sum)
+  * snort_ml_engine.libml_calls: total libml calls (sum)
 
 
 5.47. so_proxy
@@ -5959,6 +5985,7 @@ Peg counts:
   * stream.ha_prunes: sessions pruned by high availability sync (sum)
   * stream.stale_prunes: sessions pruned due to stale connection
     (sum)
+  * stream.closed_prunes: sessions pruned due to stream closed (sum)
   * stream.expected_flows: total expected flows created within snort
     (sum)
   * stream.expected_realized: number of expected flows realized (sum)
@@ -6011,6 +6038,21 @@ Peg counts:
     memcap (sum)
   * stream.allowlist_memcap_prunes: number of allowlist flows pruned
     due to memcap (sum)
+  * stream.ip_eof_prunes: number of IP flows pruned due to EOF (sum)
+  * stream.tcp_eof_prunes: number of TCP flows pruned due to EOF
+    (sum)
+  * stream.udp_eof_prunes: number of UDP flows pruned due to EOF
+    (sum)
+  * stream.icmp_eof_prunes: number of ICMP flows pruned due to EOF
+    (sum)
+  * stream.user_eof_prunes: number of USER flows pruned due to EOF
+    (sum)
+  * stream.file_eof_prunes: number of FILE flows pruned due to EOF
+    (sum)
+  * stream.pdu_eof_prunes: number of PDU flows pruned due to EOF
+    (sum)
+  * stream.allowlist_eof_prunes: number of allowlist flows pruned due
+    to EOF (sum)
   * stream.excess_to_allowlist: number of flows moved to the
     allowlist due to excess (sum)
   * stream.allowlist_flows: number of flows moved to the allowlist
@@ -6292,7 +6334,19 @@ Peg counts:
   * stream_tcp.closing: number of sessions currently closing (now)
   * stream_tcp.syns: number of syn packets (sum)
   * stream_tcp.syn_acks: number of syn-ack packets (sum)
-  * stream_tcp.resets: number of reset packets (sum)
+  * stream_tcp.rsts: number of rst packets (sum)
+  * stream_tcp.rsts_ok_rfc793: number of valid rst packets per RFC
+    793 (sum)
+  * stream_tcp.rsts_ok_rfc5961: number of valid rst packets per RFC
+    5961 (sum)
+  * stream_tcp.rsts_in_window: number of rst packets in window per
+    RFC 5961 (sum)
+  * stream_tcp.rsts_bad_seq: number of invalid rst packets, seq out
+    of window (sum)
+  * stream_tcp.rsts_ack_ok: number of valid rst packets good ack (RST
+    in syn sent) (sum)
+  * stream_tcp.rsts_ack_bad: number of invalid rst packets bad ack
+    (RST in syn sent) (sum)
   * stream_tcp.fins: number of fin packets (sum)
   * stream_tcp.meta_acks: number of meta acks processed (sum)
   * stream_tcp.packets_held: number of packets held (sum)
@@ -10001,7 +10055,7 @@ libraries see the Getting Started section of the manual.
   * string extractor.protocols[].fields: specify fields to log
   * string extractor.protocols[].on_events: specify events to log
   * enum extractor.protocols[].service: service to extract from { 
-    http | ftp | conn | dns | weird | notice }
+    http | ftp | ssl | conn | dns | weird | notice }
   * int extractor.protocols[].tenant_id = 0: tenant_id of target
     tenant { 0:max32 }
   * enum extractor.time = unix: output format for timestamp values { 
@@ -11347,6 +11401,12 @@ libraries see the Getting Started section of the manual.
     containing filter string in metadata if set
   * int snort_ml.client_body_depth = 0: number of input HTTP client
     body bytes to scan (-1 unlimited) { -1:max31 }
+  * int snort_ml_engine.cache_memcap = 0: maximum memory for verdict
+    cache in bytes, 0 = disabled { 0:maxSZ }
+  * string snort_ml_engine.http_param_filter[].filter_pattern:
+    pattern that triggers ML classification
+  * string snort_ml_engine.http_param_ignore[].ignore_pattern:
+    pattern that skips ML classification
   * string snort_ml_engine.http_param_model: path to model file(s)
   * real snort_ml.http_param_threshold = 0.95: alert threshold for
     http_param_model { 0:1 }
@@ -12799,7 +12859,24 @@ libraries see the Getting Started section of the manual.
     HTTP client body (sum)
   * snort_ml.client_body_bytes: total number of HTTP client body
     bytes processed (sum)
-  * snort_ml.libml_calls: total libml calls (sum)
+  * snort_ml_engine.cache_adds: snort_ml_engine cache added new entry
+    (sum)
+  * snort_ml_engine.cache_hits: snort_ml_engine cache found existing
+    entry (sum)
+  * snort_ml_engine.cache_max: snort_ml_engine cache’s maximum byte
+    usage (max)
+  * snort_ml_engine.cache_misses: snort_ml_engine cache did not find
+    entry (sum)
+  * snort_ml_engine.cache_prunes: snort_ml_engine cache pruned entry
+    to make space for new entry (sum)
+  * snort_ml_engine.cache_removes: snort_ml_engine cache removed
+    existing entry (sum)
+  * snort_ml_engine.cache_replaces: snort_ml_engine cache found entry
+    and replaced its value (sum)
+  * snort_ml_engine.filter_allows: total filter allows (sum)
+  * snort_ml_engine.filter_matches: total filter matches (sum)
+  * snort_ml_engine.filter_searches: total filter searches (sum)
+  * snort_ml_engine.libml_calls: total libml calls (sum)
   * snort_ml.uri_alerts: total number of alerts triggered on HTTP URI
     (sum)
   * snort_ml.uri_bytes: total number of HTTP URI bytes processed
@@ -12841,10 +12918,13 @@ libraries see the Getting Started section of the manual.
     attempted for transmission but overflowed (sum)
   * std_connector.messages_transmitted: total number of messages
     transmitted (sum)
+  * stream.allowlist_eof_prunes: number of allowlist flows pruned due
+    to EOF (sum)
   * stream.allowlist_flows: number of flows moved to the allowlist
     (now)
   * stream.allowlist_memcap_prunes: number of allowlist flows pruned
     due to memcap (sum)
+  * stream.closed_prunes: sessions pruned due to stream closed (sum)
   * stream.current_flows: current number of flows in cache (now)
   * stream.excess_prunes: sessions pruned due to excess (sum)
   * stream.excess_to_allowlist: number of flows moved to the
@@ -12855,6 +12935,8 @@ libraries see the Getting Started section of the manual.
     (sum)
   * stream.expected_pruned: number of expected flows pruned (sum)
   * stream.expected_realized: number of expected flows realized (sum)
+  * stream.file_eof_prunes: number of FILE flows pruned due to EOF
+    (sum)
   * stream.file_memcap_prunes: number of FILE flows pruned due to
     memcap (sum)
   * stream.file_timeout_prunes: number of FILE flows pruned due to
@@ -12862,6 +12944,8 @@ libraries see the Getting Started section of the manual.
   * stream.flows: total sessions (sum)
   * stream.ha_prunes: sessions pruned by high availability sync (sum)
   * stream_icmp.created: icmp session trackers created (sum)
+  * stream.icmp_eof_prunes: number of ICMP flows pruned due to EOF
+    (sum)
   * stream_icmp.max: max icmp sessions (max)
   * stream.icmp_memcap_prunes: number of ICMP flows pruned due to
     memcap (sum)
@@ -12882,6 +12966,7 @@ libraries see the Getting Started section of the manual.
   * stream_ip.current_frags: current fragments (now)
   * stream_ip.discards: fragments discarded (sum)
   * stream_ip.drops: fragments dropped (sum)
+  * stream.ip_eof_prunes: number of IP flows pruned due to EOF (sum)
   * stream_ip.fragmented_bytes: total fragmented bytes (sum)
   * stream_ip.frag_timeouts: datagrams abandoned (sum)
   * stream_ip.max_frags: max fragments (max)
@@ -12907,6 +12992,8 @@ libraries see the Getting Started section of the manual.
   * stream_ip.trackers_completed: datagram trackers completed (sum)
   * stream_ip.trackers_freed: datagram trackers released (sum)
   * stream.memcap_prunes: sessions pruned due to memcap (sum)
+  * stream.pdu_eof_prunes: number of PDU flows pruned due to EOF
+    (sum)
   * stream.pdu_memcap_prunes: number of PDU flows pruned due to
     memcap (sum)
   * stream.pdu_timeout_prunes: number of PDU flows pruned due to
@@ -12942,6 +13029,8 @@ libraries see the Getting Started section of the manual.
   * stream_tcp.discards_skipped: tcp packet discards skipped due to
     normalization disabled (sum)
   * stream_tcp.discards: tcp packets discarded (sum)
+  * stream.tcp_eof_prunes: number of TCP flows pruned due to EOF
+    (sum)
   * stream_tcp.established: number of sessions currently established
     (now)
   * stream_tcp.events: events generated (sum)
@@ -13015,9 +13104,21 @@ libraries see the Getting Started section of the manual.
   * stream_tcp.rebuilt_bytes: total rebuilt bytes (sum)
   * stream_tcp.rebuilt_packets: total reassembled PDUs (sum)
   * stream_tcp.released: tcp session trackers released (sum)
-  * stream_tcp.resets: number of reset packets (sum)
   * stream_tcp.restarts: sessions restarted (sum)
   * stream_tcp.resyns: SYN received on established session (sum)
+  * stream_tcp.rsts_ack_bad: number of invalid rst packets bad ack
+    (RST in syn sent) (sum)
+  * stream_tcp.rsts_ack_ok: number of valid rst packets good ack (RST
+    in syn sent) (sum)
+  * stream_tcp.rsts_bad_seq: number of invalid rst packets, seq out
+    of window (sum)
+  * stream_tcp.rsts_in_window: number of rst packets in window per
+    RFC 5961 (sum)
+  * stream_tcp.rsts: number of rst packets (sum)
+  * stream_tcp.rsts_ok_rfc5961: number of valid rst packets per RFC
+    5961 (sum)
+  * stream_tcp.rsts_ok_rfc793: number of valid rst packets per RFC
+    793 (sum)
   * stream_tcp.segs_queued: total segments queued (sum)
   * stream_tcp.segs_released: total segments released (sum)
   * stream_tcp.segs_split: tcp segments split when reassembling PDUs
@@ -13049,6 +13150,8 @@ libraries see the Getting Started section of the manual.
     (sum)
   * stream.total_prunes: total sessions pruned (sum)
   * stream_udp.created: udp session trackers created (sum)
+  * stream.udp_eof_prunes: number of UDP flows pruned due to EOF
+    (sum)
   * stream_udp.ignored: udp packets ignored (sum)
   * stream_udp.max: max udp sessions (max)
   * stream.udp_memcap_prunes: number of UDP flows pruned due to
@@ -13064,6 +13167,8 @@ libraries see the Getting Started section of the manual.
   * stream.uni_flows: number of uni flows in cache (now)
   * stream.uni_ip_flows: number of uni ip flows in cache (now)
   * stream.uni_prunes: uni sessions pruned (sum)
+  * stream.user_eof_prunes: number of USER flows pruned due to EOF
+    (sum)
   * stream.user_memcap_prunes: number of USER flows pruned due to
     memcap (sum)
   * stream.user_timeout_prunes: number of USER flows pruned due to

@@ -1,3 +1,45 @@
+2025-11-05: 3.9.7.0
+
+* appid: add multi-stream support for DNS
+* appid: fix high inspected packets count
+* appid: fix printf args
+* appid: fix ssh service detection with dropped packets
+* appid, http_inspect, dns: add support for DNS over HTTPS and DNS over QUIC
+* appid: ignore arcserve so dcerpc protocol is used when syncing to flow service
+* appid: more restrictive checks for DNS client detection
+* appid: SNI and CNAME patterns matching fix
+* appid: solve coverity warnings
+* appid: suppress false positive coverity warning
+* build: only enable libml for supported versions
+* codec: fix byte math, codec coverity issues
+* dce_rpc: checking out of bounds
+* detection_engine: use const where possible
+* filters: resolve lock issues, 2k38 issues in rate_filter and sfthd
+* flow: new pegs and packet tracer log for flow prune
+* ha: guard against negative shift
+* hash: add FNV-1a hash
+* http_inspect: add waf buffers
+* http_inspect: partial inpection on start line
+* imap: parse_command OOB fix
+* js_norm: prevent memory leak when temp buffer was processing
+* log: increase max length of LogMessage output.
+* memory: resolve race condition on global stats
+* mp_data_bus: fixing coverity issues
+* perf_monitor: don't decrement index if already zero
+* perf_monitor: fix minor issue with int overflow
+* pop: fixing OOB in pop_paf search_for_command
+* rna: use std::move on RnaTracker to move instead of copying
+* s7commplus: out of bounds check during decode
+* sfthd: fix issues with printf type specifier, cppcheck issues
+* snort2lua: use std::move where possible
+* snort_ml: add mpse and lru cache
+* ssl: SSL extractor event
+* stream: add additional lock/unlock when we do extra_data_log
+* stream, loggers: use std::move where possible
+* stream: remove lock on extra_data_log as it is only changed at Analyzer startup
+* stream_tcp: copy all layers from original packet during pseudo packet creation
+* stream_tcp: enhance rst validation to follow RFC 5961 recommendations
+
 2025-10-06: 3.9.6.0
 
 * actions: fix integer underflow in ips_actions pegcount aggregation

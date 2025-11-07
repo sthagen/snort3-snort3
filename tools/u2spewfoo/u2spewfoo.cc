@@ -351,10 +351,10 @@ static void event3_dump(u2record* record)
 
     if (event.http_method[0])
         printf("\tHTTP Method: %s\n", event.http_method);
-    if (event.request_size)
-        printf("\tRequest Size: %u\n", htonl(event.request_size));
-    if (event.response_size)
-        printf("\tResponse Size: %u\n", htonl(event.response_size));
+    if (event.http_request_size)
+        printf("\tHTTP Request Size: %u\n", htonl(event.http_request_size));
+    if (event.http_response_size)
+        printf("\tHTTP Response Size: %u\n", htonl(event.http_response_size));
     if (event.http_version[0])
         printf("\tHTTP Version: %s\n", event.http_version);
     if (event.http_user_agent[0])

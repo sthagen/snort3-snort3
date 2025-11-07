@@ -146,8 +146,8 @@ protected:
 private:
     const Field& get_tmp_buffer(const HttpBufferInfo& buf);
     Field* compute_http_method_str(const HttpBufferInfo& buf);
-    Field* compute_request_size(const HttpBufferInfo& buf);
-    Field* compute_response_size(const HttpBufferInfo& buf);
+    Field* compute_http_request_size(const HttpBufferInfo& buf);
+    Field* compute_http_response_size(const HttpBufferInfo& buf);
     Field* compute_http_version_str(const HttpBufferInfo& buf);
     Field* compute_http_user_agent_str(const HttpBufferInfo& buf);
     Field* compute_http_referer_str(const HttpBufferInfo& buf);

@@ -96,8 +96,8 @@ struct Unified2Event
 
     char app_name[MAX_EVENT_APPNAME_LEN];
 
-    uint32_t request_size;
-    uint32_t response_size;
+    uint32_t http_request_size;
+    uint32_t http_response_size;
 
     char http_method[MAX_HTTP_METHOD_LEN];
     char http_version[MAX_HTTP_VERSION_LEN];

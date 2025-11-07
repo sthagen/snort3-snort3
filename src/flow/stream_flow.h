@@ -40,7 +40,7 @@ public:
     virtual void* get_hi_msg_section(const Flow*)
     { return nullptr; }
     virtual void set_hi_msg_section(Flow*, void*) { }
-    virtual AppId get_appid_from_stream(const Flow*) { return APP_ID_NONE; }
+    virtual AppId get_appid_from_stream(const Flow*) = 0;
     // Stream based flows should override this interface to return parent flow
     // when child flow is passed as input
     virtual Flow* get_stream_parent_flow(Flow* cflow) { return cflow; }

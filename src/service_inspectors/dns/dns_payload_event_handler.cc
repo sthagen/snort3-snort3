@@ -57,7 +57,7 @@ void DnsPayloadEventHandler::handle(DataEvent& event, Flow* flow)
     }
 
     if (is_udp)
-        static_cast<Dns&>(inspector).snort_dns(p, true);
+        static_cast<Dns&>(inspector).snort_dns(p, true, true);
 
     p->data = old_data;
     p->dsize = old_dsize;

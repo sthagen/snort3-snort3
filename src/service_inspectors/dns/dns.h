@@ -312,7 +312,7 @@ public:
     bool supports_no_ips() const override
     { return true; }
 
-    void snort_dns(snort::Packet* p, bool udp);
+    void snort_dns(snort::Packet* p, bool udp, bool is_payload = false);
 
     const DnsConfig* get_config() const
     { return config; }

@@ -68,7 +68,7 @@ void PacketTracer::log(const char* format, ...)
 
     va_list args;
     va_start(args, format);
-    vsnprintf(&log_buffer[len], BUFFER_SIZE, format, args);
+    vsnprintf(&log_buffer[len], (BUFFER_SIZE - len), format, args);
     va_end(args);
 }
 

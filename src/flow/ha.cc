@@ -222,6 +222,11 @@ FlowHAClient::FlowHAClient(uint8_t length, bool session_client) : max_length(len
         }
 
         index = ha->handle_counter;
+        
+        // Guard against null index which could cause a shift by a negative amount
+        if (!index)
+            return;
+
         handle = (1 << (index - 1));
         ha->client_map[index] = this;
         ha->handle_counter++;
@@ -247,7 +252,7 @@ static uint8_t write_flow_key(const Flow& flow, HAMessage& msg)
     msg.advance_cursor(sizeof(key->ip_l[3]));
     memcpy(msg.cursor, &key->ip_h[3], sizeof(key->ip_h[3]));
     msg.advance_cursor(sizeof(key->ip_h[3]));
-    memcpy(msg.cursor, ((const uint8_t*) key) + 32, KEY_SIZE_IP4 - 8);
+    memcpy(msg.cursor, (reinterpret_cast<const uint8_t*>(key)) + 32, KEY_SIZE_IP4 - 8);
     msg.advance_cursor(KEY_SIZE_IP4 - 8);
 
     return KEY_TYPE_IP4;
@@ -288,7 +293,7 @@ static uint8_t read_flow_key(HAMessage& msg, const HAMessageHeader* hdr, FlowKey
         key.ip_h[2] = htonl(0xFFFF);
         msg.advance_cursor(sizeof(key.ip_h[3]));
         /* The remainder of the key */
-        memcpy(((uint8_t*) &key) + 32, msg.cursor, KEY_SIZE_IP4 - 8);
+        memcpy((reinterpret_cast<uint8_t*>(&key)) + 32, msg.cursor, KEY_SIZE_IP4 - 8);
         msg.advance_cursor(KEY_SIZE_IP4 - 8);
 
         return KEY_SIZE_IP4;
@@ -334,7 +339,7 @@ static uint16_t calculate_update_msg_content_length(Flow& flow, bool full)
 // at the beginning of the content section.
 static void write_msg_header(const Flow& flow, HAEvent event, uint16_t content_length, HAMessage& msg)
 {
-    HAMessageHeader* hdr = (HAMessageHeader*) msg.cursor;
+    HAMessageHeader* hdr = reinterpret_cast<HAMessageHeader*>(msg.cursor);
     hdr->event = (uint8_t) event;
     hdr->version = HA_MESSAGE_VERSION;
     hdr->total_length = content_length;
@@ -344,7 +349,7 @@ static void write_msg_header(const Flow& flow, HAEvent event, uint16_t content_l
 
 static uint16_t update_msg_header_length(const HAMessage& msg)
 {
-    HAMessageHeader* hdr = (HAMessageHeader*) msg.buffer;
+    HAMessageHeader* hdr = reinterpret_cast<HAMessageHeader*>(msg.buffer);
     hdr->total_length = msg.cursor_position();
     return hdr->total_length;
 }
@@ -359,7 +364,7 @@ static void write_update_msg_client(FlowHAClient* client, Flow& flow, HAMessage&
     // Preemptively insert the client header.  If production fails, roll back the message cursor
     // to its original position.
     uint8_t* original_cursor = msg.cursor;
-    HAClientHeader* header = (HAClientHeader*) original_cursor;
+    HAClientHeader* header = reinterpret_cast<HAClientHeader*>(original_cursor);
     header->client = client->index;
     msg.advance_cursor(sizeof(HAClientHeader));
     if (!client->produce(flow, msg))
@@ -410,7 +415,7 @@ static Flow* consume_ha_update_message(HAMessage& msg, const FlowKey& key, Packe
             break;
         }
 
-        HAClientHeader* header = (HAClientHeader*) msg.cursor;
+        HAClientHeader* header = reinterpret_cast<HAClientHeader*>(msg.cursor);
         if ((header->client >= ha->handle_counter) || (ha->client_map[header->client] == nullptr))
         {
             ErrorMessage("Consuming HA Update message - invalid client index\n");
@@ -479,7 +484,7 @@ static Flow* consume_ha_message(HAMessage& msg,
         return nullptr;
     }
 
-    const HAMessageHeader* hdr = (HAMessageHeader*) msg.cursor;
+    const HAMessageHeader* hdr = reinterpret_cast<HAMessageHeader*>(msg.cursor);
 
     if (hdr->version != HA_MESSAGE_VERSION)
     {

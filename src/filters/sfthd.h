@@ -137,7 +137,7 @@ struct THD_NODE
     int type = 0;
     int priority = 0;
     int count = 0;
-    unsigned seconds = 0;
+    uint64_t seconds = 0;
     sfip_var_t* ip_address = nullptr;
 };
 

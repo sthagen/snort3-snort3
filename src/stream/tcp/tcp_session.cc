@@ -417,7 +417,6 @@ bool TcpSession::handle_syn_on_reset_session(TcpSegmentDescriptor& tsd)
         }
         else if ( tcph->is_syn_only() )
         {
-            flow->ssn_state.direction = FROM_CLIENT;
             flow->set_ttl(tsd.get_pkt(), true);
             init_session_on_syn(tsd);
             tcpStats.resyns++;
@@ -426,7 +425,6 @@ bool TcpSession::handle_syn_on_reset_session(TcpSegmentDescriptor& tsd)
         }
         else if ( tcph->is_syn_ack() )
         {
-            flow->ssn_state.direction = FROM_SERVER;
             flow->set_ttl(tsd.get_pkt(), false);
             init_session_on_synack(tsd);
             tcpStats.resyns++;
@@ -483,22 +481,34 @@ void TcpSession::handle_data_on_syn(TcpSegmentDescriptor& tsd)
     }
 }
 
-void TcpSession::update_session_on_rst(const TcpSegmentDescriptor& tsd, bool flush)
+void TcpSession::update_session_on_rst(
+    TcpSegmentDescriptor& tsd, bool flush, TcpStreamTracker::TcpState next_state)
 {
-    Packet* p = tsd.get_pkt();
-
     if ( flush )
     {
+        Packet* p = tsd.get_pkt();
+
         flush_listener(p, true);
         flush_talker(p, true);
         set_splitter(true, nullptr);
         set_splitter(false, nullptr);
     }
+    
+    TcpStreamTracker* listener = tsd.get_listener();
+    listener->normalizer.trim_rst_payload(tsd);
 
+    if ( listener->normalizer.is_tcp_ips_enabled() )
+        listener->set_tcp_state(next_state);
+
+    update_perf_base_state(TcpStreamTracker::TCP_CLOSING);
+    set_pkt_action_flag(ACTION_RST);
+    flow->set_session_flags(SSNFLAG_RESET);
+
+    // RST is valid, update the talker's TCP state 
     tsd.get_talker()->update_on_rst_sent();
 }
 
-void TcpSession::update_paws_timestamps(TcpSegmentDescriptor& tsd)
+void TcpSession::update_paws_timestamps(const TcpSegmentDescriptor& tsd)
 {
     TcpStreamTracker* listener = tsd.get_listener();
     TcpStreamTracker* talker = tsd.get_talker();
@@ -519,12 +529,12 @@ void TcpSession::update_paws_timestamps(TcpSegmentDescriptor& tsd)
     }
 }
 
-void TcpSession::check_for_session_hijack(TcpSegmentDescriptor& tsd)
+void TcpSession::check_for_session_hijack(const TcpSegmentDescriptor& tsd)
 {
     TcpStreamTracker* listener = tsd.get_listener();
     TcpStreamTracker* talker = tsd.get_talker();
 
-    Packet* p = tsd.get_pkt();
+    const Packet* p = tsd.get_pkt();
     if ( !(p->pkth->flags & DAQ_PKT_FLAG_PRE_ROUTING) )
     {
         if ( p->is_eth() )
@@ -725,7 +735,7 @@ void TcpSession::check_small_segment_threshold(const TcpSegmentDescriptor &tsd, 
 void TcpSession::handle_data_segment(TcpSegmentDescriptor& tsd, bool flush)
 {
     TcpStreamTracker* listener = tsd.get_listener();
-    TcpStreamTracker* talker = tsd.get_talker();
+    const TcpStreamTracker* talker = tsd.get_talker();
 
     if ( TcpStreamTracker::TCP_CLOSED != talker->get_tcp_state() )
     {
@@ -793,7 +803,7 @@ TcpStreamTracker::TcpState TcpSession::get_listener_state(const TcpSegmentDescri
 void TcpSession::check_for_repeated_syn(TcpSegmentDescriptor& tsd)
 {
     TcpStreamTracker* listener = tsd.get_listener();
-    TcpStreamTracker* talker = tsd.get_talker();
+    const TcpStreamTracker* talker = tsd.get_talker();
     uint32_t action = ACTION_NOTHING;
 
     if ( !SEQ_EQ(tsd.get_seq(), talker->get_iss()) and
@@ -1077,7 +1087,7 @@ int TcpSession::process(Packet* p)
 
     // check for and process meta-ack info first if present, the current listener is the
     // talker for the meta-ack...
-    DAQ_PktTcpAckData_t* tcp_mack = (DAQ_PktTcpAckData_t*)p->daq_msg->meta[DAQ_PKT_META_TCP_ACK_DATA];
+    const DAQ_PktTcpAckData_t* tcp_mack = (DAQ_PktTcpAckData_t*)p->daq_msg->meta[DAQ_PKT_META_TCP_ACK_DATA];
     if ( tcp_mack )
     {
         TcpSegmentDescriptor ma_tsd(flow, p, tcp_mack->tcp_ack_seq_num, tcp_mack->tcp_window_size);
@@ -1099,9 +1109,9 @@ int TcpSession::process(Packet* p)
     return process_tcp_packet(tsd, p);
 }
 
-void TcpSession::init_new_tcp_session(TcpSegmentDescriptor& tsd)
+void TcpSession::init_new_tcp_session(const TcpSegmentDescriptor& tsd)
 {
-    Packet* p = tsd.get_pkt();
+    const Packet* p = tsd.get_pkt();
 
     flow->pkt_type = p->type();
     flow->ip_proto = (uint8_t)p->get_ip_proto_next();
@@ -1402,7 +1412,7 @@ void TcpSession::set_pseudo_established(Packet* p)
 
 bool TcpSession::check_for_one_sided_session(Packet* p)
 {
-    Flow& flow = *p->flow;
+    const Flow& flow = *p->flow;
     if ( 0 == ( (SSNFLAG_ESTABLISHED | SSNFLAG_TCP_PSEUDO_EST) & flow.ssn_state.session_flags )
         && p->is_from_client_originally() )
     {
@@ -1438,7 +1448,7 @@ bool TcpSession::check_for_one_sided_session(Packet* p)
 
 void TcpSession::check_for_pseudo_established(Packet* p)
 {
-    Flow& flow = *p->flow;
+    const Flow& flow = *p->flow;
     if ( 0 == ( (SSNFLAG_ESTABLISHED | SSNFLAG_TCP_PSEUDO_EST) & flow.ssn_state.session_flags ) )
     {
         if ( check_for_one_sided_session(p) )

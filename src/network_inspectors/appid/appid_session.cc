@@ -28,6 +28,7 @@
 #include <cstring>
 
 #include "flow/flow_stash.h"
+#include "flow/stream_flow.h"
 #include "main/snort_config.h"
 #include "managers/inspector_manager.h"
 #include "profiler/profiler.h"
@@ -360,6 +361,8 @@ void AppIdSession::sync_with_snort_protocol_id(AppId newAppId, Packet* p, AppidC
     {
     case APP_ID_FTPS:
     case APP_ID_FTPSDATA:
+
+    case APP_ID_ARCSERVE:
 
     // These all are variants of HTTPS
     case APP_ID_DDM_SSL:
@@ -1193,15 +1196,45 @@ void AppIdSession::delete_all_http_sessions()
 
 AppIdDnsSession* AppIdSession::create_dns_session()
 {
-    if (api.dsession)
-        delete api.dsession;
-    api.dsession = new AppIdDnsSession();
-    return api.dsession;
+    if (flow->stream_intf)
+    {
+        int64_t stream_id;
+        flow->stream_intf->get_stream_id(flow, stream_id);
+        api.dsessions.emplace(stream_id, new AppIdDnsSession());
+        return api.dsessions[stream_id];
+    }
+    else
+    {
+        if (api.dsession)
+            delete api.dsession;
+        api.dsession = new AppIdDnsSession();
+        return api.dsession;
+    }
 }
 
 AppIdDnsSession* AppIdSession::get_dns_session() const
 {
-    return api.dsession;
+    if (flow->stream_intf)
+    {
+        int64_t stream_id;
+        flow->stream_intf->get_stream_id(flow, stream_id);
+        if (stream_id == 0xFFFFFFFF) // no stream id is processing now, pick the last processed
+        {
+            if (!api.dsessions.empty())
+                return std::prev(api.dsessions.end())->second;
+            else
+                return nullptr;
+        }
+        auto it = api.dsessions.find(stream_id);
+        if (it != api.dsessions.end())
+            return it->second;
+
+        return nullptr;
+    }
+    else if (!api.dsessions.empty()) // flow data of inspector who handles stream_intf got deleted, take the last one
+        return std::prev(api.dsessions.end())->second;
+    else
+        return api.dsession;
 }
 
 bool AppIdSession::is_tp_appid_done() const

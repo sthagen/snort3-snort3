@@ -46,10 +46,7 @@ bool TcpStateSynRecv::syn_sent(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
         flow->set_session_flags(SSNFLAG_ECN_SERVER_REPLY);
 
     if ( tsd.is_packet_from_server() )
-    {
-        flow->set_session_flags(SSNFLAG_SEEN_SERVER);
         trk.session->tel.set_tcp_event(EVENT_4WHS);
-    }
 
     return true;
 }
@@ -172,22 +169,13 @@ bool TcpStateSynRecv::fin_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 
 bool TcpStateSynRecv::rst_recv(TcpSegmentDescriptor& tsd, TcpStreamTracker& trk)
 {
-    trk.normalizer.trim_rst_payload(tsd);
-    if ( trk.normalizer.validate_rst(tsd) )
-    {
-        Flow* flow = tsd.get_flow();
-        flow->set_session_flags(SSNFLAG_RESET);
-    }
-    else
-    {
-        trk.session->tel.set_tcp_event(EVENT_BAD_RST);
-        trk.normalizer.packet_dropper(tsd, NORM_TCP_BLOCK);
-        trk.session->set_pkt_action_flag(ACTION_BAD_PKT);
-    }
-
-    // FIXIT-L might be good to create alert specific to RST with data
+    TcpStreamTracker::TcpState next_state = trk.is_client_tracker() ? 
+        TcpStreamTracker::TCP_CLOSED : TcpStreamTracker::TCP_LISTEN;
+        
     if ( tsd.is_data_segment() )
         trk.session->tel.set_tcp_event(EVENT_DATA_AFTER_RST_RCVD);
+
+    trk.handle_rst_packet(tsd, false, next_state);
 
     return true;
 }

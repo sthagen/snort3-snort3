@@ -22,6 +22,8 @@
 #ifndef SSL_H
 #define SSL_H
 
+#include <string>
+
 #include "main/snort_types.h"
 
 #define SSL_NO_FLAG             0x00000000
@@ -81,6 +83,8 @@
     SSL_CUR_SERVER_KEYX_FLAG | SSL_CUR_CLIENT_KEYX_FLAG | \
     SSL_UNKNOWN_FLAG)
 
+#define SSL_TLS_METADATA_FINISH_PACKET (SSL_SERVER_KEYX_FLAG | SSL_CLIENT_KEYX_FLAG | SSL_CHANGE_CIPHER_FLAG)
+
 // Flag set when a client uses SSLv3/TLS backward compatibility and sends a
 // SSLv2 Hello specifying an SSLv3/TLS version.
 #define SSL_V3_BACK_COMPAT_V2   0x04000000
@@ -102,6 +106,7 @@
 
 /* Flags for additional info */
 #define SSL_ALERT_LVL_FATAL_FLAG    0x00000001
+#define SSL_TLS_METADATA_PUBLISHED  0x00000002
 
 /* The constants used below are from RFC 2246 */
 
@@ -168,12 +173,20 @@ struct SSL_handshake_t
     uint8_t length[3];
 };
 
+struct SSL_random_t
+{
+    uint32_t gmt_unix_time;
+    uint8_t random_bytes[28];
+};
+
 struct SSL_handshake_hello_t
 {
     uint8_t type;
     uint8_t length[3];
     uint8_t major;
     uint8_t minor;
+    SSL_random_t random;
+    uint8_t session_id_length;
 };
 
 // http://www.mozilla.org/projects/security/pki/nss/ssl/draft02.html
@@ -201,6 +214,13 @@ struct SSLv2_shello_t
     uint8_t minor;
 };
 
+struct SSLv2_client_master_key_t
+{
+    uint16_t length;
+    uint8_t type;
+    uint8_t cipher_spec[3];
+};
+
 struct SO_PUBLIC SSLV3ClientHelloData
 {
     ~SSLV3ClientHelloData();
@@ -213,13 +233,35 @@ struct SO_PUBLIC SSLV3ServerCertData
     ~SSLV3ServerCertData();
     void clear();
     /* While collecting certificates: */
-    unsigned certs_len;   // (Total) length of certificate(s).
+    unsigned certs_len = 0;         // (Total) length of certificate(s).
     uint8_t* certs_data = nullptr;  // Certificate(s) data (each proceeded by length (3 bytes)).
     /* Data collected from certificates afterwards: */
     char* common_name = nullptr;
-    int common_name_strlen;
+    int common_name_strlen = 0;
     char* org_unit = nullptr;
-    int org_unit_strlen;
+    int org_unit_strlen = 0;
+    char* issuer_info = nullptr;
+    int issuer_info_strlen = 0;
+    char* subject_info = nullptr;
+    int subject_info_strlen = 0;
+};
+
+struct SO_PUBLIC TLSConnectionParams
+{
+    uint16_t curve = 0;
+    uint16_t cipher = 0;
+    uint16_t selected_tls_version = 0;
+};
+
+struct SO_PUBLIC TLSConnectionData
+{
+    void process(const SSLV3ServerCertData& cert_data);
+    void process(const SSLV3ClientHelloData& client_hello_data);
+    
+    std::string server_name_identifier;
+    std::string subject_info;
+    std::string issuer_info;
+    TLSConnectionParams tls_params;
 };
 
 enum class SSLV3RecordType : uint8_t
@@ -270,8 +312,16 @@ struct ServiceSSLV3ExtensionServerName
     /* String follows. */
 };
 
+struct ServiceSSLV3ExtensionSupportedVersion
+{
+    uint16_t type;
+    uint16_t length;
+    uint16_t supported_version;
+};
+
 /* Extension types. */
 #define SSL_EXT_SERVER_NAME 0
+#define SSL_EXT_SUPPORTED_VERSION 43
 
 #define SSL_V2_MIN_LEN 5
 
@@ -307,20 +357,22 @@ struct ServiceSSLV3ExtensionServerName
 namespace snort
 {
 
-enum class ParseCHResult
+enum ParseHelloResult : uint8_t
 {
     SUCCESS = 0,
     FRAGMENTED_PACKET = 1,
-    FAILED = 2
+    FAILURE = 2
 };
 
 SO_PUBLIC uint32_t SSL_decode(
     const uint8_t* pkt, int size, uint32_t pktflags, uint32_t prevflags,
     uint8_t* alert_flags, uint16_t* partial_rec_len, int hblen, uint32_t* info_flags = nullptr,
-    SSLV3ClientHelloData* data = nullptr, SSLV3ServerCertData* server_cert_data = nullptr);
+    SSLV3ClientHelloData* data = nullptr, SSLV3ServerCertData* server_cert_data = nullptr, TLSConnectionParams* tls_connection_params = nullptr);
 
-    ParseCHResult parse_client_hello_data(const uint8_t* pkt, uint16_t size, SSLV3ClientHelloData*);
+    ParseHelloResult parse_client_hello_data(const uint8_t* pkt, uint16_t size, SSLV3ClientHelloData*);
+    ParseHelloResult parse_server_hello_data(const uint8_t* pkt, uint16_t size, TLSConnectionParams*);
     bool parse_server_certificates(SSLV3ServerCertData* server_cert_data);
+    bool parse_server_key_exchange(const uint8_t* pkt, uint16_t size, TLSConnectionParams*);
 
 SO_PUBLIC bool IsTlsClientHello(const uint8_t* ptr, const uint8_t* end);
 SO_PUBLIC bool IsTlsServerHello(const uint8_t* ptr, const uint8_t* end);

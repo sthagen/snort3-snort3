@@ -25,13 +25,11 @@
 #include "snort_ml_engine.h"
 
 #include <cassert>
+#include <cstring>
 #include <fstream>
 
-#ifdef HAVE_LIBML
-#include <libml.h>
-#endif
-
 #include "framework/decode_data.h"
+#include "hash/fnv.h"
 #include "helpers/directory.h"
 #include "log/messages.h"
 #include "main/reload_tuner.h"
@@ -43,35 +41,109 @@
 using namespace snort;
 using namespace std;
 
-static THREAD_LOCAL libml::BinaryClassifierSet* classifiers = nullptr;
+static THREAD_LOCAL SnortMLEngineStats snort_ml_engine_stats;
+static THREAD_LOCAL SnortMLContext* snort_ml_ctx = nullptr;
 
-static bool build_classifiers(const vector<string>& models,
-    libml::BinaryClassifierSet*& set)
+static SnortMLContext* create_context(const SnortMLEngineConfig& conf)
 {
-    set = new libml::BinaryClassifierSet();
+    SnortMLContext* ctx = new SnortMLContext();
 
-    return set->build(models);
+    if (!ctx->classifiers.build(conf.http_param_models))
+    {
+        ErrorMessage("Could not build classifiers.\n");
+        return ctx;
+    }
+
+    if (conf.cache_memcap > 0)
+    {
+        ctx->cache = make_unique<SnortMLCache>(conf.cache_memcap,
+            snort_ml_engine_stats);
+    }
+
+    return ctx;
 }
 
 //--------------------------------------------------------------------------
 // module
 //--------------------------------------------------------------------------
 
-static const Parameter snort_ml_engine_params[] =
+static const Parameter filter_param[] =
 {
-    { "http_param_model", Parameter::PT_STRING, nullptr, nullptr, "path to model file(s)" },
+    { "filter_pattern", Parameter::PT_STRING, nullptr, nullptr,
+      "pattern that triggers ML classification" },
     { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
 };
 
-SnortMLEngineModule::SnortMLEngineModule() : Module(SNORT_ML_ENGINE_NAME, SNORT_ML_ENGINE_HELP, snort_ml_engine_params) {}
+static const Parameter ignore_param[] =
+{
+    { "ignore_pattern", Parameter::PT_STRING, nullptr, nullptr,
+      "pattern that skips ML classification" },
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+static const Parameter snort_ml_engine_params[] =
+{
+    { "http_param_model", Parameter::PT_STRING, nullptr, nullptr,
+      "path to model file(s)" },
+
+    { "http_param_filter", Parameter::PT_LIST, filter_param, nullptr,
+      "list of patterns that trigger ML classification" },
+
+    { "http_param_ignore", Parameter::PT_LIST, ignore_param, nullptr,
+      "list of patterns that skip ML classification" },
+
+    { "cache_memcap", Parameter::PT_INT, "0:maxSZ", "0",
+      "maximum memory for verdict cache in bytes, 0 = disabled" },
+
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+static const PegInfo peg_names[] =
+{
+    LRU_CACHE_LOCAL_PEGS("snort_ml_engine"),
+    { CountType::SUM, "filter_searches", "total filter searches" },
+    { CountType::SUM, "filter_matches", "total filter matches" },
+    { CountType::SUM, "filter_allows", "total filter allows" },
+    { CountType::SUM, "libml_calls", "total libml calls" },
+    { CountType::END, nullptr, nullptr }
+};
+
+SnortMLEngineModule::SnortMLEngineModule()
+    : Module(SNORT_ML_ENGINE_NAME, SNORT_ML_ENGINE_HELP, snort_ml_engine_params) {}
+
+bool SnortMLEngineModule::begin(const char* fqn, int, SnortConfig*)
+{
+    if (!strcmp(SNORT_ML_ENGINE_NAME, fqn))
+        conf = {};
+
+    return true;
+}
 
 bool SnortMLEngineModule::set(const char*, Value& v, SnortConfig*)
 {
     if (v.is("http_param_model"))
         conf.http_param_model_path = v.get_string();
 
+    else if (v.is("filter_pattern"))
+        conf.http_param_filters[v.get_string()] = true;
+
+    else if (v.is("ignore_pattern"))
+    {
+        conf.http_param_filters[v.get_string()] = false;
+        conf.has_allow = true;
+    }
+
+    else if (v.is("cache_memcap"))
+        conf.cache_memcap = v.get_size();
+
     return true;
 }
+
+const PegInfo* SnortMLEngineModule::get_pegs() const
+{ return peg_names; }
+
+PegCount* SnortMLEngineModule::get_counts() const
+{ return reinterpret_cast<PegCount*>(&snort_ml_engine_stats); }
 
 //--------------------------------------------------------------------------
 // reload tuner
@@ -80,9 +152,7 @@ bool SnortMLEngineModule::set(const char*, Value& v, SnortConfig*)
 class SnortMLReloadTuner : public snort::ReloadResourceTuner
 {
 public:
-    explicit SnortMLReloadTuner(const vector<string>& models)
-        : http_param_models(models) {}
-
+    explicit SnortMLReloadTuner(const SnortMLEngineConfig& c) : conf(c) {}
     ~SnortMLReloadTuner() override = default;
 
     const char* name() const override
@@ -90,11 +160,8 @@ public:
 
     bool tinit() override
     {
-        delete classifiers;
-
-        if (!build_classifiers(http_param_models, classifiers))
-            ErrorMessage("Could not build classifiers.\n");
-
+        delete snort_ml_ctx;
+        snort_ml_ctx = create_context(conf);
         return false;
     }
 
@@ -105,25 +172,48 @@ public:
     { return true; }
 
 private:
-    const vector<string>& http_param_models;
+    const SnortMLEngineConfig& conf;
 };
 
 //--------------------------------------------------------------------------
 // inspector
 //--------------------------------------------------------------------------
 
-SnortMLEngine::SnortMLEngine(const SnortMLEngineConfig& c) : config(c)
+bool SnortMLEngine::configure(SnortConfig*)
 {
-    if (!read_models() || !validate_models())
+    if (!read_models())
+        return false;
+
+    libml::BinaryClassifierSet classifiers;
+
+    if (!classifiers.build(conf.http_param_models))
+    {
         ParseError("Could not build classifiers.");
+        return false;
+    }
+
+    if (!conf.http_param_filters.empty())
+    {
+        mpse = new SearchTool;
+
+        for (auto& f : conf.http_param_filters)
+            mpse->add(f.first.c_str(), f.first.size(), (void*)&f);
+
+        mpse->prep();
+    }
+
+    return true;
 }
 
 void SnortMLEngine::show(const SnortConfig*) const
-{ ConfigLogger::log_value("http_param_model", config.http_param_model_path.c_str()); }
+{
+    ConfigLogger::log_value("http_param_model", conf.http_param_model_path.c_str());
+    ConfigLogger::log_value("cache_memcap", conf.cache_memcap);
+}
 
 bool SnortMLEngine::read_models()
 {
-    const char* hint = config.http_param_model_path.c_str();
+    const char* hint = conf.http_param_model_path.c_str();
     string path;
 
     if (!get_config_file(hint, path))
@@ -160,7 +250,13 @@ bool SnortMLEngine::read_models()
         }
     }
 
-    return !http_param_models.empty();
+    if (conf.http_param_models.empty())
+    {
+        ParseError("snort_ml_engine: no models found");
+        return false;
+    }
+
+    return true;
 }
 
 bool SnortMLEngine::read_model(const string& path)
@@ -178,33 +274,80 @@ bool SnortMLEngine::read_model(const string& path)
     string buffer(size, '\0');
     file.read(&buffer[0], streamsize(size));
 
-    http_param_models.push_back(move(buffer));
+    conf.http_param_models.push_back(std::move(buffer));
     return true;
 }
 
-bool SnortMLEngine::validate_models()
-{
-    libml::BinaryClassifierSet* set = nullptr;
-    bool res = build_classifiers(http_param_models, set);
-    delete set;
-
-    return res;
-}
-
 void SnortMLEngine::tinit()
-{ build_classifiers(http_param_models, classifiers); }
+{ snort_ml_ctx = create_context(conf); }
 
 void SnortMLEngine::tterm()
 {
-    delete classifiers;
-    classifiers = nullptr;
+    delete snort_ml_ctx;
+    snort_ml_ctx = nullptr;
 }
 
 void SnortMLEngine::install_reload_handler(SnortConfig* sc)
-{ sc->register_reload_handler(new SnortMLReloadTuner(http_param_models)); }
+{ sc->register_reload_handler(new SnortMLReloadTuner(conf)); }
 
-libml::BinaryClassifierSet* SnortMLEngine::get_classifiers()
-{ return classifiers; }
+static int filter_match_callback(void* f, void*, int, void* s, void*)
+{
+    auto filter = reinterpret_cast<const pair<string, bool>*>(f);
+    auto search = reinterpret_cast<SnortMLSearch*>(s);
+
+    search->match = true;
+    search->allow |= !filter->second;
+
+    if (search->has_allow && !search->allow)
+        return 0;
+
+    return 1;
+}
+
+bool SnortMLEngine::scan(const char* buf, const size_t len, float& out) const
+{
+    if (!snort_ml_ctx)
+        return false;
+
+    if (mpse)
+    {
+        snort_ml_engine_stats.filter_searches++;
+
+        SnortMLSearch search;
+        search.has_allow = conf.has_allow;
+
+        mpse->find_all(buf, len, filter_match_callback,
+            false, (void*)&search);
+
+        if (!search.match)
+            return false;
+
+        snort_ml_engine_stats.filter_matches++;
+
+        if (search.allow)
+        {
+            snort_ml_engine_stats.filter_allows++;
+            return false;
+        }
+    }
+
+    float res = 0;
+    bool is_new = true;
+
+    float& result = (snort_ml_ctx->cache) ?
+        snort_ml_ctx->cache->find_else_create(fnv1a(buf, len), &is_new) : res;
+
+    if (is_new)
+    {
+        snort_ml_engine_stats.libml_calls++;
+
+        if (!snort_ml_ctx->classifiers.run(buf, len, result))
+            return false;
+    }
+
+    out = result;
+    return true;
+}
 
 //--------------------------------------------------------------------------
 // api stuff
@@ -218,7 +361,7 @@ static void mod_dtor(Module* m)
 
 static Inspector* snort_ml_engine_ctor(Module* m)
 {
-    SnortMLEngineModule* mod = (SnortMLEngineModule*)m;
+    SnortMLEngineModule* mod = reinterpret_cast<SnortMLEngineModule*>(m);
     return new SnortMLEngine(mod->get_config());
 }
 
@@ -274,8 +417,9 @@ const BaseApi* nin_snort_ml_engine[] =
 
 TEST_CASE("SnortML tuner name", "[snort_ml_module]")
 {
-    const vector<string> models = { "model" };
-    SnortMLReloadTuner tuner(models);
+    SnortMLEngineConfig conf;
+    conf.http_param_models = { "model" };
+    SnortMLReloadTuner tuner(conf);
 
     REQUIRE(strcmp(tuner.name(), "SnortMLReloadTuner") == 0);
 }

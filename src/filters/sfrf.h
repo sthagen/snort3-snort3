@@ -22,6 +22,7 @@
 #ifndef SFRF_H
 #define SFRF_H
 
+#include <atomic>
 #include <ctime>
 #include <mutex>
 
@@ -64,15 +65,18 @@ typedef enum
     FS_NEW = 0, FS_OFF, FS_ON, FS_MAX
 } FilterState;
 
-struct tSFRFConfigNode
+class tSFRFConfigNode
 {
+public:
     int tid = 0;
     unsigned gid = 0;
     unsigned sid = 0;
     PolicyId policyId = 0;
     SFRF_TRACK tracking = SFRF_TRACK_BY_NONE;
-    unsigned count = 0;
-    unsigned seconds = 0;
+    time_t seconds = 0;
+
+    // The count variable can be updated by multiple threads simultaneously, so it must be atomic
+    std::atomic<unsigned> count{0};
 
     // Action that replaces original rule action on reaching threshold
     snort::IpsAction::Type newAction = 0;
@@ -80,6 +84,54 @@ struct tSFRFConfigNode
     // Threshold action duration in seconds before reverting to original rule action
     unsigned timeout = 0;
     sfip_var_t* applyTo = nullptr;
+
+    tSFRFConfigNode() = default;
+
+    tSFRFConfigNode(const tSFRFConfigNode& other)
+        : tid(other.tid)
+        , gid(other.gid)
+        , sid(other.sid)
+        , policyId(other.policyId)
+        , tracking(other.tracking)
+        , seconds(other.seconds)
+        , count(other.count.load())
+        , newAction(other.newAction)
+        , timeout(other.timeout)
+        , applyTo(other.applyTo)
+    { }
+
+    tSFRFConfigNode(tSFRFConfigNode&& other) noexcept
+        : tid(other.tid)
+        , gid(other.gid)
+        , sid(other.sid)
+        , policyId(other.policyId)
+        , tracking(other.tracking)
+        , seconds(other.seconds)
+        , count(other.count.load())
+        , newAction(other.newAction)
+        , timeout(other.timeout)
+        , applyTo(other.applyTo)
+    { }
+
+    ~tSFRFConfigNode() = default;
+
+    tSFRFConfigNode& operator=(const tSFRFConfigNode& other)
+    {
+        if (this != &other)
+        {
+            tid = other.tid;
+            gid = other.gid;
+            sid = other.sid;
+            policyId = other.policyId;
+            tracking = other.tracking;
+            seconds = other.seconds;
+            count.store(other.count.load());
+            newAction = other.newAction;
+            timeout = other.timeout;
+            applyTo = other.applyTo;
+        }
+        return *this;
+    }
 
     void init()
     {

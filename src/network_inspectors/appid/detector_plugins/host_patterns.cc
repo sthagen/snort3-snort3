@@ -127,11 +127,10 @@ inline bool host_pattern_validate_url_match(const MatchedHostPatterns * const mp
                 data[mp->match_start_pos-1] == '.';
 }
 
-inline bool is_perfect_literal_match(const MatchedHostPatterns * const mp, const size_t& data_size)
-{
-    return mp->mpattern->is_literal and  mp->match_start_pos == 0 and
-            (mp->match_start_pos + mp->mpattern->pattern_size == data_size);
-
+inline bool is_perfect_literal_match(const MatchedHostPatterns * const mp, const size_t& data_size, const HostPatternType& type)
+{    
+    return mp->mpattern->is_literal and mp->match_start_pos == 0 and
+            mp->mpattern->pattern_size == data_size and mp->mpattern->pattern_type == type;
 }
 
 template<HostPatternType T>
@@ -158,7 +157,7 @@ bool scan_patterns(SearchTool& matcher, const uint8_t* data, size_t size,
         {
             if ( T != HostPatternType::HOST_PATTERN_TYPE_URL)
             {
-                if ( is_perfect_literal_match(tmp, size) )
+                if ( is_perfect_literal_match(tmp, size, T) )
                 {
                     best_match = match;
                     break;

@@ -90,7 +90,7 @@ public:
     int handle_paws(TcpSegmentDescriptor& tsd)
     { return norm->handle_paws(tns, tsd); }
 
-    bool validate_rst(TcpSegmentDescriptor& tsd)
+    TcpNormalizer::RstStatus validate_rst(TcpSegmentDescriptor& tsd)
     { return norm->validate_rst(tns, tsd); }
 
     int handle_repeated_syn(TcpSegmentDescriptor& tsd)

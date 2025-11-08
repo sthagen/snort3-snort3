@@ -124,6 +124,7 @@ bool Dcerpc::parse_int_and_add_to_all(const std::string& opt_name, std::istrings
 
     if (stream >> val)
     {
+        // coverity[tainted_scalar]
         return add_option_to_all(opt_name, val, co_only);
     }
 

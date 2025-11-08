@@ -254,12 +254,11 @@ Packet* TcpReassemblerBase::initialize_pdu(Packet* p, uint32_t pkt_flags, struct
     pdu->dsize = 0;
     pdu->data = nullptr;
     pdu->ip_proto_next = (IpProtocol)p->flow->ip_proto;
-
+    memcpy( pdu->layers, p->layers, p->num_layers * sizeof(Layer));
+    pdu->num_layers = p->num_layers;
 
     if ( p->proto_bits & PROTO_BIT__VLAN )
     {
-        memcpy( pdu->layers, p->layers, p->num_layers * sizeof(Layer));
-        pdu->num_layers = p->num_layers;
         pdu->proto_bits |= PROTO_BIT__VLAN;
         pdu->vlan_idx = p->vlan_idx;
     }

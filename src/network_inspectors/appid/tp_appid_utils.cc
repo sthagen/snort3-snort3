@@ -613,7 +613,7 @@ bool do_tp_discovery(ThirdPartyAppIdContext& tp_appid_ctxt, AppIdSession& asd, I
         assert(hsession);
     }
 
-    if (tp_app_id == APP_ID_SSH)
+    if (tp_app_id == APP_ID_SSH and !(p->flow->get_session_flags() & SSNFLAG_MIDSTREAM))
     {
         APPID_LOG(p, TRACE_DEBUG_LEVEL, "Setting the ignore and early detection flag\n");
          asd.get_odp_ctxt().get_app_info_mgr().set_app_info_flags(tp_app_id, APPINFO_FLAG_IGNORE);

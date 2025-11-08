@@ -489,7 +489,7 @@ const std::string ExpandVars(const std::string& input_str)
         {
         case '-':
             if (var_contents.empty())
-                var_contents = var_aux;
+                var_contents = std::move(var_aux);
             break;
 
         case '?':

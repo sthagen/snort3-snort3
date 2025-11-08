@@ -180,7 +180,8 @@ public:
     bool move_to_allowlist(snort::Flow* f);
 
     virtual bool filter_flows(const snort::Flow&, const FilterFlowCriteria&) const;
-    virtual void output_flow(std::fstream&, const snort::Flow&, const struct timeval&) const;
+    template<typename StreamType>
+    void output_flow(StreamType&, const snort::Flow&, const struct timeval&) const;
 
     unsigned get_flows_allocated() const;
 
@@ -228,6 +229,8 @@ private:
         checked_lrus_mask |= lru_mask;
         empty_lru_masks |= lru_mask;
     }
+
+    inline void log_flow_release(const snort::Flow* flow, PruneReason reason) const;
 
 private:
     uint8_t timeout_idx;

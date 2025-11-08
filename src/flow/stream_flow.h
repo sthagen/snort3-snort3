@@ -33,11 +33,13 @@ class FlowData;
 class SO_PUBLIC StreamFlowIntf
 {
 public:
-    virtual FlowData* get_stream_flow_data(const Flow*) = 0;
-    virtual void set_stream_flow_data(Flow*, FlowData*) = 0;
+    virtual FlowData* get_stream_flow_data(const Flow*)
+    { return nullptr; }
+    virtual void set_stream_flow_data(Flow*, FlowData*) { }
     virtual void get_stream_id(const Flow*, int64_t& stream_id) = 0;
-    virtual void* get_hi_msg_section(const Flow*) = 0;
-    virtual void set_hi_msg_section(Flow*, void* section) = 0;
+    virtual void* get_hi_msg_section(const Flow*)
+    { return nullptr; }
+    virtual void set_hi_msg_section(Flow*, void*) { }
     virtual AppId get_appid_from_stream(const Flow*) { return APP_ID_NONE; }
     // Stream based flows should override this interface to return parent flow
     // when child flow is passed as input

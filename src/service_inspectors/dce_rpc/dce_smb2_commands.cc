@@ -277,10 +277,25 @@ void DCE2_Smb2TreeDisconnect(DCE2_Smb2SsnData*, const uint8_t* smb_data,
 
 bool DCE2_IsSmb2DurableReconnect(const Smb2CreateRequestHdr* smb_create_hdr, const uint8_t* end, uint64_t& file_id)
 {
-    const uint8_t* data = (const uint8_t*)smb_create_hdr + alignedNtohl(&smb_create_hdr->create_contexts_offset) -
-        SMB2_HEADER_LENGTH;
+    if (!smb_create_hdr || !end)
+        return false;
+    const uint8_t* start = (const uint8_t*)smb_create_hdr - SMB2_HEADER_LENGTH;
+
+    if (end <= start)
+        return false;
+
+    const size_t total_len = static_cast<size_t>(end - start);
+    const uint32_t ctx_offset = alignedNtohl(&smb_create_hdr->create_contexts_offset);
     uint32_t remaining = alignedNtohl(&smb_create_hdr->create_contexts_length);
 
+    if ((size_t)ctx_offset > total_len)          // bounds
+        return false;
+    
+    if ((size_t)remaining > (total_len - (size_t)ctx_offset))
+        return false;
+    
+    const uint8_t* data = start + (size_t)ctx_offset;
+    
     while (remaining > sizeof(Smb2CreateRequestHdr) && data < end)
     {
         const Smb2CreateContextHdr* context = (const Smb2CreateContextHdr*)data;
@@ -299,7 +314,7 @@ bool DCE2_IsSmb2DurableReconnect(const Smb2CreateRequestHdr* smb_create_hdr, con
             (data_offset & 0x7) != 0 or
             (data_offset and (data_offset < name_offset + name_length)) or
             (data_offset > remaining) or
-            (data_offset + data_length > remaining) or (data_offset + data_length < data_length))
+            (data_length > remaining - data_offset) or (size_t)(end - data) < (size_t)next)
         {
             return false;
         }

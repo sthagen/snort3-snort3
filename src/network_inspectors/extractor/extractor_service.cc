@@ -31,6 +31,7 @@
 #include "extractor_dns.h"
 #include "extractor_ftp.h"
 #include "extractor_http.h"
+#include "extractor_ssl.h"
 
 using namespace snort;
 
@@ -120,6 +121,10 @@ ExtractorService* ExtractorService::make_service(Extractor& ins, const ServiceCo
 
     case ServiceType::FTP:
         srv = new FtpExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
+        break;
+
+    case ServiceType::SSL:
+        srv = new SslExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
         break;
 
     case ServiceType::CONN:
@@ -223,6 +228,11 @@ void ExtractorService::validate(const ServiceConfig& cfg)
     case ServiceType::FTP:
         validate_events(FtpExtractorService::blueprint, cfg.on_events);
         validate_fields(FtpExtractorService::blueprint, cfg.fields);
+        break;
+
+    case ServiceType::SSL:
+        validate_events(SslExtractorService::blueprint, cfg.on_events);
+        validate_fields(SslExtractorService::blueprint, cfg.fields);
         break;
 
     case ServiceType::CONN:
@@ -352,6 +362,48 @@ const snort::Connector::ID& FtpExtractorService::internal_tinit()
 { return log_id = logger->get_id(type.c_str()); }
 
 const snort::Connector::ID& FtpExtractorService::get_log_id()
+{ return log_id; }
+
+//-------------------------------------------------------------------------
+//  SslExtractorService
+//-------------------------------------------------------------------------
+
+const ServiceBlueprint SslExtractorService::blueprint =
+{
+    // events
+    {
+        "tls_metadata_event",
+    },
+    // fields
+    {
+        "version",
+        "server_name_identifier",
+        "curve",
+        "cipher",
+        "subject",
+        "issuer",
+        "validation_status",
+        "module_identifier"
+    },
+};
+
+THREAD_LOCAL Connector::ID SslExtractorService::log_id;
+
+SslExtractorService::SslExtractorService(uint32_t tenant, const std::vector<std::string>& srv_fields,
+    const std::vector<std::string>& srv_events, ServiceType s_type, Extractor& ins)
+    : ExtractorService(tenant, srv_fields, srv_events, blueprint, s_type, ins)
+{
+    for (const auto& event : get_events())
+    {
+        if (!strcmp("tls_metadata_event", event.c_str()))
+            handlers.push_back(new SslExtractor(ins, tenant_id, get_fields()));
+    }
+}
+
+const snort::Connector::ID& SslExtractorService::internal_tinit()
+{ return log_id = logger->get_id(type.c_str()); }
+
+const snort::Connector::ID& SslExtractorService::get_log_id()
 { return log_id; }
 
 //-------------------------------------------------------------------------
@@ -549,6 +601,7 @@ TEST_CASE("Service Type", "[extractor]")
     {
         ServiceType http = ServiceType::HTTP;
         ServiceType ftp = ServiceType::FTP;
+        ServiceType ssl = ServiceType::SSL;
         ServiceType conn = ServiceType::CONN;
         ServiceType dns = ServiceType::DNS;
         ServiceType weird = ServiceType::IPS_BUILTIN;
@@ -558,6 +611,7 @@ TEST_CASE("Service Type", "[extractor]")
 
         CHECK_FALSE(strcmp("http", http.c_str()));
         CHECK_FALSE(strcmp("ftp", ftp.c_str()));
+        CHECK_FALSE(strcmp("ssl", ssl.c_str()));
         CHECK_FALSE(strcmp("conn", conn.c_str()));
         CHECK_FALSE(strcmp("dns", dns.c_str()));
         CHECK_FALSE(strcmp("weird", weird.c_str()));

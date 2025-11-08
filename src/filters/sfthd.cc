@@ -457,16 +457,16 @@ static inline int sfthd_test_non_suppress(
     THD_IP_NODE* sfthd_ip_node,
     time_t curtime)
 {
-    unsigned dt;
+    uint64_t dt;
 
     if ( sfthd_node->type == THD_TYPE_DETECT )
     {
-        dt = (unsigned)(curtime - sfthd_ip_node->tstart);
+        dt = curtime - sfthd_ip_node->tstart;
 
         if ( dt >= sfthd_node->seconds )
         {   /* reset */
             sfthd_ip_node->tstart = curtime;
-            if ( (unsigned)(curtime - sfthd_ip_node->tlast) > sfthd_node->seconds )
+            if ( static_cast<uint64_t>(curtime - sfthd_ip_node->tlast) > sfthd_node->seconds )
                 sfthd_ip_node->prev = 0;
             else
                 sfthd_ip_node->prev = sfthd_ip_node->count - 1;
@@ -486,7 +486,7 @@ static inline int sfthd_test_non_suppress(
     }
     if ( sfthd_node->type == THD_TYPE_LIMIT )
     {
-        dt = (unsigned)(curtime - sfthd_ip_node->tstart);
+        dt = curtime - sfthd_ip_node->tstart;
 
         if ( dt >= sfthd_node->seconds )
         {   /* reset */
@@ -505,7 +505,7 @@ static inline int sfthd_test_non_suppress(
     }
     else if ( sfthd_node->type == THD_TYPE_THRESHOLD )
     {
-        dt = (unsigned)(curtime - sfthd_ip_node->tstart);
+        dt = curtime - sfthd_ip_node->tstart;
         if ( dt >= sfthd_node->seconds )
         {
             sfthd_ip_node->tstart = curtime;
@@ -522,7 +522,7 @@ static inline int sfthd_test_non_suppress(
     }
     else if ( sfthd_node->type == THD_TYPE_BOTH )
     {
-        dt = (unsigned)(curtime - sfthd_ip_node->tstart);
+        dt = curtime - sfthd_ip_node->tstart;
         if ( dt >= sfthd_node->seconds )
         {
             sfthd_ip_node->tstart = curtime;
@@ -875,7 +875,7 @@ int sfthd_show_objects(ThresholdObjects* thd_objs)
                 else
                 {
                     printf(".........count   =%d\n",sfthd_node->count);
-                    printf(".........seconds =%u\n",sfthd_node->seconds);
+                    printf(".........seconds =%lu\n",sfthd_node->seconds);
                 }
             }
         }

@@ -23,6 +23,7 @@
 #define APPID_DNS_SESSION_H
 
 #include <string>
+
 #include "pub_sub/appid_events.h"
 
 #define DNS_GOT_QUERY    0x01
@@ -44,6 +45,7 @@ public:
         record_type = 0;
         ttl = 0;
         options_offset = 0;
+        doh = false;
     }
 
     uint8_t get_state() const
@@ -109,6 +111,12 @@ public:
     void set_options_offset(uint16_t optionsOffset)
     { options_offset = optionsOffset; }
 
+    void set_doh(bool Doh)
+    { doh = Doh; }
+
+    bool is_doh() const
+    { return doh; }
+
 protected:
     uint8_t state = 0;
     uint8_t response_type = 0;
@@ -118,5 +126,6 @@ protected:
     std::string host;
     uint16_t host_offset = 0;
     uint16_t options_offset = 0;
+    bool doh = false;
 };
 #endif

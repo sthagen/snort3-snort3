@@ -47,7 +47,15 @@
     "http_uri",                   \
     "http_version",               \
     "js_data",                    \
-    "vba_data"
+    "vba_data",                   \
+    "http_method_str",            \
+    "request_size",               \
+    "response_size",              \
+    "http_version_str",           \
+    "http_user_agent_str",        \
+    "http_referer_str",           \
+    "detail_119_20",              \
+    "detail_119_287"
 
 class HttpApi
 {

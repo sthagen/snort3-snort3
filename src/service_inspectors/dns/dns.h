@@ -25,9 +25,10 @@
 #include <set>
 
 #include "flow/flow.h"
-
 #include "protocols/packet.h"
 #include "pub_sub/dns_events.h"
+
+#include "dns_module.h"
 
 // Implementation header with definitions, datatypes and flowdata class for
 // DNS service inspector.
@@ -183,8 +184,11 @@ struct DNSNameState
 #define DNS_RESP_STATE_AUTH_RR          0x50
 #define DNS_RESP_STATE_ADD_RR           0x60
 
+
 class DnsConfig;
 struct DNSData;
+
+DNSData* get_dns_session_data(snort::Packet* p, bool from_server, DNSData& udpSessionData, bool udp);
 
 class DnsResponseFqdn
 {
@@ -246,8 +250,6 @@ struct DNSData
     static const std::string& qtype_name(uint16_t query_type, bool* is_unknown = nullptr);
 };
 
-DNSData* get_dns_session_data(snort::Packet* p, bool from_server, DNSData& udpSessionData);
-
 class DnsResponseIp
 {
 public:
@@ -292,6 +294,32 @@ public:
 public:
     static unsigned inspector_id;
     std::set<uint16_t> trans_ids;
+};
+
+class Dns : public snort::Inspector
+{
+public:
+    Dns(DnsModule*);
+    ~Dns() override;
+
+    void eval(snort::Packet*) override;
+    snort::StreamSplitter* get_splitter(bool) override;
+    bool configure(snort::SnortConfig*) override;
+    void show(const snort::SnortConfig*) const override;
+    static unsigned get_pub_id()
+    { return pub_id; }
+
+    bool supports_no_ips() const override
+    { return true; }
+
+    void snort_dns(snort::Packet* p, bool udp);
+
+    const DnsConfig* get_config() const
+    { return config; }
+
+private:
+    const DnsConfig* config = nullptr;
+    static unsigned pub_id;
 };
 
 #endif

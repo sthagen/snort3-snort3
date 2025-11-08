@@ -29,6 +29,7 @@
 #include <daq_common.h>
 
 #include "flow/flow.h"
+#include "flow/prune_stats.h"
 #include "main/policy.h"
 #include "protocols/packet.h"
 #include "time/packet_time.h"
@@ -113,6 +114,7 @@ public:
     // the resources allocated to that flow to the free list.
     static void delete_flow(const FlowKey*);
     static void delete_flow(Flow*);
+    static void delete_flow(Flow*, PruneReason reason = PruneReason::NONE);
 
     // Examines the source and destination ip addresses and ports to determine if the
     // packet is from the client or server side of the flow and sets bits in the

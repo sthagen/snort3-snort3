@@ -151,7 +151,9 @@ static inline void CopyVersionString(ServiceFTPData& fd, const uint8_t* version,
     {
         copyLen--;
     }
-    memcpy(fd.version, version, copyLen);
+    // coverity[integer_overflow]
+    if (copyLen > 0)
+        memcpy(fd.version, version, copyLen);
     fd.version[copyLen] = '\0';
 }
 

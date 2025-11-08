@@ -438,6 +438,9 @@ bool FlowCache::release(Flow* flow, PruneReason reason, bool do_cleanup)
         }
     }
 
+    if ( UNLIKELY(PacketTracer::is_active()) )
+        log_flow_release(flow, reason);
+
     uint8_t in_allowlist = flow->flags.in_allowlist;
     flow->reset(do_cleanup);
     prune_stats.update(reason, ( in_allowlist ? static_cast<PktType>(allowlist_lru_index) : flow->key->pkt_type ));
@@ -1017,7 +1020,8 @@ bool FlowCache::filter_flows(const Flow& flow, const FilterFlowCriteria& ffc) co
     return true;
 }
 
-void FlowCache::output_flow(std::fstream& stream, const Flow& flow, const struct timeval& now) const
+template<typename StreamType>
+void FlowCache::output_flow(StreamType& stream, const Flow& flow, const struct timeval& now) const
 {
     char src_ip[INET6_ADDRSTRLEN];
     src_ip[0] = 0;
@@ -1226,4 +1230,16 @@ size_t FlowCache::count_flows_in_lru(uint8_t lru_index) const
 }
 #endif
 
+inline void FlowCache::log_flow_release(const snort::Flow* flow, PruneReason reason) const
+{
+    PacketTracerUnsuspend pt_unsusp;
 
+    std::stringstream temp_stream;
+    struct timeval now;
+
+    packet_gettimeofday(&now);
+    output_flow(temp_stream, *flow, now);
+    std::string flow_info = temp_stream.str();
+
+    PacketTracer::log("Flow: Releasing flow due to %s: %s", prune_reason_to_string(reason), flow_info.c_str());
+}

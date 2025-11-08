@@ -149,8 +149,7 @@ AppidCpuTableDisplayStatus AppidCPUProfilingManager::display_appid_cpu_profiler_
 
     while (!sorted_appid_cpu_profiler_table.empty() and rows_displayed < display_rows_limit)
     {
-        auto entry = sorted_appid_cpu_profiler_table.top();
-        sorted_appid_cpu_profiler_table.pop();
+        const auto& entry = sorted_appid_cpu_profiler_table.top();
         if (!entry.second.processed_packets or !entry.second.per_appid_sessions)
             continue;
 
@@ -161,6 +160,7 @@ AppidCpuTableDisplayStatus AppidCPUProfilingManager::display_appid_cpu_profiler_
                 FormatWithCommas(entry.second.max_processing_time_per_session).c_str(), static_cast<double>(entry.second.processing_time) / total_processing_time * 100.0);
 
         rows_displayed += 1;
+        sorted_appid_cpu_profiler_table.pop();
     }
 
     print_log(ctrlcon, output_type, TRACE_INFO_LEVEL, partition);

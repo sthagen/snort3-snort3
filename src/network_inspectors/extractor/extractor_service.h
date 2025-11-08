@@ -122,6 +122,21 @@ private:
     static THREAD_LOCAL snort::Connector::ID log_id;
 };
 
+class SslExtractorService : public ExtractorService
+{
+public:
+    static const ServiceBlueprint blueprint;
+
+    SslExtractorService(uint32_t tenant, const std::vector<std::string>& fields,
+        const std::vector<std::string>& events, ServiceType, Extractor&);
+
+private:
+    const snort::Connector::ID& internal_tinit() override;
+    const snort::Connector::ID& get_log_id() override;
+
+    static THREAD_LOCAL snort::Connector::ID log_id;
+};
+
 class ConnExtractorService : public ExtractorService
 {
 public:

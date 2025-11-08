@@ -218,7 +218,7 @@ static bool register_plugin(
             return false;  // keep the old one
     }
 
-    p.key = key;
+    p.key = std::move(key);
     p.api = api;
     p.handle = std::move(handle);
     p.source = file;

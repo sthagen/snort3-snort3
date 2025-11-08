@@ -125,6 +125,8 @@ HttpFlowData::~HttpFlowData()
         discard_list = discard_list->next;
         delete tmp;
     }
+
+    HttpMsgSection::clear_tmp_buffers();
 }
 
 void HttpFlowData::half_reset(SourceId source_id)

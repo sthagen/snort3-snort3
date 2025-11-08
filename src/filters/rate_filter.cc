@@ -80,7 +80,7 @@ int RateFilter_Create(
 #ifdef RF_DBG
     printf(
         "THRESHOLD: gid=%u, sid=%u, tracking=%d, count=%u, seconds=%u \n",
-        thdx->gid, thdx->sid, thdx->tracking, thdx->count, thdx->seconds);
+        thdx->gid, thdx->sid, thdx->tracking, unsigned(thdx->count), thdx->seconds);
 #endif
 
     /* Add the object to the table - */

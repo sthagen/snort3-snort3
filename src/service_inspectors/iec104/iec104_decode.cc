@@ -45,7 +45,7 @@ using namespace snort;
 // Function to determine the APCI type of the current message based on the
 // major and (where needed) minor codes
 // returns an ApciType enum value corresponding to the determined APCI
-static uint32_t getApciType(Packet* p)
+static uint32_t getApciType(const Packet* p)
 {
     // overlay a generic apci struct over the first three bytes of the stream
     const Iec104GenericApci* apci = (const Iec104GenericApci*) p->data;
@@ -148,7 +148,7 @@ bool Iec104Decode(Packet* p, Iec104FlowData* iec104fd)
 
             // print out the APCI
             print_debug_information(p, "Information Transfer Format APCI\n");
-            parseIec104ApciI(apci);
+            parseIec104ApciI(apci, p->dsize);
 
             break;
         }

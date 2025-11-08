@@ -36,6 +36,7 @@ struct HttpEventIds
     RESPONSE_HEADER,
     REQUEST_BODY,
     BODY,
+    DOH_BODY,
     END_OF_TRANSACTION,
     HTTP_PUBLISH_LENGTH,
 

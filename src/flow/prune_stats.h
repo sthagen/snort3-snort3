@@ -23,6 +23,7 @@
 
 #include <cstdint>
 #include <type_traits>
+#include <array>
 
 #include "framework/counts.h"
 
@@ -33,11 +34,25 @@ enum class PruneReason : uint8_t
     MEMCAP,
     HA,
     STALE,
-	IDLE_MAX_FLOWS,
-	IDLE_PROTOCOL_TIMEOUT,
+    IDLE_MAX_FLOWS,
+    IDLE_PROTOCOL_TIMEOUT,
+    STREAM_CLOSED,
+    END_OF_FLOW,
     NONE,
     MAX
 };
+
+inline const char* prune_reason_to_string(PruneReason reason)
+{
+    static constexpr const char* names[] = {
+        "EXCESS", "UNI", "MEMCAP", "HA", "STALE",
+        "IDLE_MAX_FLOWS", "IDLE_PROTOCOL_TIMEOUT", 
+        "STREAM_CLOSED", "EOF", "NONE"
+    };
+    
+    auto idx = static_cast<uint8_t>(reason);
+    return (idx < static_cast<uint8_t>(PruneReason::MAX)) ? names[idx] : "UNKNOWN";
+}
 
 struct LRUPruneStats
 {

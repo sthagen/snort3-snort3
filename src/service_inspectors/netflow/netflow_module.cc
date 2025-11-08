@@ -30,6 +30,7 @@
 #include "netflow_cache.h"
 #include "netflow_module.h"
 
+#include "log/messages.h"
 #include "utils/util.h"
 
 using namespace snort;
@@ -242,6 +243,14 @@ void NetFlowModule::parse_service_id_file(const std::string& serv_id_file_path)
             while( std::getline(ss, tmp_str, '\t') )
                 tokens.push_back(tmp_str);
 
+            if ( tokens.size() != 3 )
+            {
+                ParseWarning(WARN_CONF,
+                    "netflow: malformed service id line (expected 3 tab-separated tokens, got %u): %s",
+                    static_cast<unsigned>(tokens.size()), serv_line.c_str());
+                continue;
+            }
+
             // Format is <port> <tcp/udp> <internal ID>
             uint16_t srv_port = std::stoi(tokens[0]);
             std::string proto_str = tokens[1];
@@ -267,7 +276,7 @@ PegCount* NetFlowModule::get_counts() const
         netflow_stats.netflow_cache_bytes_in_use = 0;
         netflow_stats.template_cache_bytes_in_use = 0;
     }
-    return (PegCount*)&netflow_stats;
+    return reinterpret_cast<PegCount*>(&netflow_stats);
 }
 
 const PegInfo* NetFlowModule::get_pegs() const

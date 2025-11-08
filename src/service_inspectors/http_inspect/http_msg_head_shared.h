@@ -45,6 +45,9 @@ public:
     const Field& get_all_header_values_raw(HttpEnums::HeaderId header_id);
     const Field& get_header_value_norm(HttpEnums::HeaderId header_id);
     int get_header_count(HttpEnums::HeaderId header_id) const;
+    uint32_t get_length() const override
+    // +4 to account for \r\n\r\n at the end of the section that was removed by the splitter
+    { auto len = HttpMsgSection::get_length(); return (len > 0) ? len + 4 : 0; }
 
     // Tables of header field names and header value names
     static const StrCode header_list[];

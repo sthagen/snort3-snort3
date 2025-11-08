@@ -245,6 +245,8 @@ int ByteMathOption::calc(uint32_t& value, const uint32_t rvalue)
         }
     case BM_DIVIDE:
         assert(rvalue != 0);
+        if (!rvalue)
+             return NO_MATCH;
         value /= rvalue;
         break;
 
@@ -495,7 +497,7 @@ static void mod_dtor(Module* m)
 
 static IpsOption* byte_math_ctor(Module* p, IpsInfo&)
 {
-    ByteMathModule* m = (ByteMathModule*)p;
+    ByteMathModule* m = reinterpret_cast<ByteMathModule*>(p);
     ByteMathData& data = m->data;
 
     data.result_var = AddVarNameToList(data.result_name);

@@ -199,7 +199,10 @@ bool StreamGlobal::convert(std::istringstream& data_stream)
         }
     }
     if ( emit_max_flows )
+    {
+        // coverity[tainted_scalar]
         table_api.add_option("max_flows", tcp_max + udp_max + icmp_max + ip_max);
+    }
 
     if ( emit_pruning_timeout )
         table_api.add_option("pruning_timeout", INT_MAX == pruning_timeout ? 30 : pruning_timeout);

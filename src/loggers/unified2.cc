@@ -232,6 +232,39 @@ static void alert_event(Packet* p, const char*, Unified2Config* config, const Ev
 
         u2_event.snort_status = p->active->get_status();
         u2_event.snort_action = p->active->get_action();
+
+        if ( p->flow && p->flow->gadget )
+        {
+            Inspector* gadget = p->flow->gadget;
+            InspectionBuffer buf;
+
+            if ( gadget->get_buf("http_method_str", p, buf) )
+                strncpy(u2_event.http_method,
+                    reinterpret_cast<const char*>(buf.data), MAX_HTTP_METHOD_LEN - 1);
+
+            if ( gadget->get_buf("request_size", p, buf) )
+                u2_event.request_size = htonl(*reinterpret_cast<const uint32_t*>(buf.data));
+
+            if ( gadget->get_buf("response_size", p, buf) )
+                u2_event.response_size = htonl(*reinterpret_cast<const uint32_t*>(buf.data));
+
+            if ( gadget->get_buf("http_version_str", p, buf) )
+                strncpy(u2_event.http_version,
+                    reinterpret_cast<const char*>(buf.data), MAX_HTTP_VERSION_LEN - 1);
+
+            if ( gadget->get_buf("http_user_agent_str", p, buf) )
+                strncpy(u2_event.http_user_agent,
+                    reinterpret_cast<const char*>(buf.data), MAX_HTTP_USER_AGENT_LEN - 1);
+
+            if ( gadget->get_buf("http_referer_str", p, buf) )
+                strncpy(u2_event.http_referer,
+                    reinterpret_cast<const char*>(buf.data), MAX_HTTP_REFERER_LEN - 1);
+
+            std::string message_detail = "detail_" + std::to_string(gid) + "_" + std::to_string(sid);
+            if ( gadget->get_buf(message_detail.c_str(), p, buf) )
+                strncpy(u2_event.message_detail,
+                    reinterpret_cast<const char*>(buf.data), MAX_MESSAGE_DETAIL_LEN - 1);
+        }
     }
 
     Serial_Unified2_Header hdr;

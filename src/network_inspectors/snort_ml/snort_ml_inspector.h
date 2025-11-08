@@ -30,16 +30,17 @@
 class SnortML : public snort::Inspector
 {
 public:
-    SnortML(const SnortMLConfig& c) : config(c) { }
+    SnortML(const SnortMLConfig& c) : conf(c) {}
 
     void show(const snort::SnortConfig*) const override;
     void eval(snort::Packet*) override {}
     bool configure(snort::SnortConfig*) override;
 
-    const SnortMLConfig& get_config()
-    { return config; }
+    const SnortMLConfig& get_config() const
+    { return conf; }
+
 private:
-    SnortMLConfig config;
+    SnortMLConfig conf;
 };
 
 #endif

@@ -86,7 +86,7 @@ bool Smtp::parse_alt_max_cmd(std::istringstream& stream)
             Command c;
             c.name = std::string(elem);
             c.length = len;
-            commands.push_back(c);
+            commands.push_back(std::move(c));
         }
         else
         {

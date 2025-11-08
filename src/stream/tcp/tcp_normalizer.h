@@ -65,6 +65,8 @@ class TcpNormalizer
 public:
     using State = TcpNormalizerState;
     enum NormStatus { NORM_BAD_SEQ = -1, NORM_TRIMMED = 0, NORM_OK = 1 };
+    enum RstStatus {  RST_BAD_ACK = -2, RST_BAD_SEQ = -1, 
+        RST_OK = 1, RST_IN_WINDOW = 2 };
 
     virtual ~TcpNormalizer() = default;
 
@@ -86,7 +88,7 @@ public:
     virtual uint32_t data_inside_window(State&, TcpSegmentDescriptor&);
     virtual uint32_t get_tcp_timestamp(State&, TcpSegmentDescriptor&, bool strip);
     virtual int handle_paws(State&, TcpSegmentDescriptor&);
-    virtual bool validate_rst(State&, TcpSegmentDescriptor&);
+    virtual RstStatus validate_rst(State&, TcpSegmentDescriptor&);
     virtual int handle_repeated_syn(State&, TcpSegmentDescriptor&) = 0;
     virtual uint16_t set_urg_offset(State&, const snort::tcp::TCPHdr* tcph, uint16_t dsize);
     virtual void set_zwp_seq(State&, uint32_t seq);
@@ -102,13 +104,13 @@ public:
 protected:
     TcpNormalizer() = default;
 
-    virtual bool trim_payload(State&, TcpSegmentDescriptor&, uint32_t, NormMode, PegCounts,
-        bool force = false);
-    virtual bool strip_tcp_timestamp(
-        State&, TcpSegmentDescriptor&, const snort::tcp::TcpOption*, NormMode);
-    virtual bool validate_rst_seq_geq(State&, TcpSegmentDescriptor&);
-    virtual bool validate_rst_end_seq_geq(State&, TcpSegmentDescriptor&);
-    virtual bool validate_rst_seq_eq(State&, TcpSegmentDescriptor&);
+    virtual bool trim_payload(State&, TcpSegmentDescriptor&, uint32_t, NormMode,
+        PegCounts, bool force = false);
+    virtual bool strip_tcp_timestamp(State&, TcpSegmentDescriptor&, 
+        const snort::tcp::TcpOption*, NormMode);
+    virtual RstStatus validate_rst_seq_os_hpux11(State&, TcpSegmentDescriptor&);
+    virtual RstStatus is_rst_seq_valid_rfc793(State&, TcpSegmentDescriptor&);
+    virtual RstStatus is_rst_seq_valid_rfc5961(State&, TcpSegmentDescriptor&);
 
     virtual int validate_paws_timestamp(State&, TcpSegmentDescriptor&);
     virtual bool is_paws_ts_checked_required(State&, TcpSegmentDescriptor&);

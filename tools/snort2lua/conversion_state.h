@@ -133,6 +133,7 @@ protected:
             if (append)
                 table_api.append_option(opt_name, val);
             else
+                // coverity[tainted_scalar]
                 table_api.add_option(opt_name, val);
             return true;
         }
@@ -175,6 +176,7 @@ protected:
         if (stream >> val)
         {
             val = !val ? -1 : ( val == -1 ? 0 : val );
+            // coverity[tainted_scalar]
             table_api.add_option(opt_name, val);
             return true;
         }

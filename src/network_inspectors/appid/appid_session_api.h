@@ -22,6 +22,8 @@
 #ifndef APPID_SESSION_API_H
 #define APPID_SESSION_API_H
 
+#include <map>
+
 #include "flow/flow.h"
 #include "main/snort_types.h"
 #include "pub_sub/appid_events.h"
@@ -175,7 +177,8 @@ private:
         bool user_logged_in : 1;
     } flags = {};
     std::vector<std::unique_ptr<AppIdHttpSession>> hsessions;
-    AppIdDnsSession* dsession = nullptr;
+    std::map<int64_t, AppIdDnsSession*> dsessions; // for multi stream DNS like DoH2/DoH3/DoQ
+    AppIdDnsSession* dsession = nullptr; // for DNS over TCP/UDP
     snort::SfIp initiator_ip;
     ServiceAppDescriptor service;
     char* tls_host = nullptr;
@@ -212,6 +215,9 @@ private:
         netbios_domain = nullptr;
         snort_free(tls_sni);
         tls_sni = nullptr;
+        for (auto& pair : dsessions)
+            delete pair.second;
+        dsessions.clear();
         delete dsession;
         dsession = nullptr;
     }

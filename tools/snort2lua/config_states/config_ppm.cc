@@ -114,6 +114,7 @@ bool Ppm::convert(std::istringstream& data_stream)
             {
                 table_api.add_diff_option_comment("suspend-timeout", "max_suspend_time");
                 table_api.add_comment("seconds changed to milliseconds");
+                // coverity[tainted_scalar]
                 tmpval = table_api.add_option("max_suspend_time", opt * 1000);
             }
 

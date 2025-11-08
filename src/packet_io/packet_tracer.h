@@ -135,5 +135,25 @@ struct PacketTracerSuspend
     { PacketTracer::unpause(); }
 };
 
+struct PacketTracerUnsuspend
+{
+    unsigned saved_pause_count = 0;
+
+    PacketTracerUnsuspend()
+    {
+        while (PacketTracer::is_paused())
+        {
+            PacketTracer::unpause();
+            saved_pause_count++;
+        }
+    }
+
+    ~PacketTracerUnsuspend() noexcept
+    {
+        for (unsigned i = 0; i < saved_pause_count; i++)
+            PacketTracer::pause();
+    }
+};
+
 }
 #endif

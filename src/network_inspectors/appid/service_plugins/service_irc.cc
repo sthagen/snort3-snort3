@@ -23,6 +23,7 @@
 #include "config.h"
 #endif
 
+#include <cstring>
 #include "service_irc.h"
 
 #define IRC_COUNT_THRESHOLD 10
@@ -169,9 +170,9 @@ int IrcServiceDetector::validate(AppIdDiscoveryArgs& args)
             *state = IRC_STATE_MID_COMMAND;
             break;
         case IRC_STATE_MID_COMMAND:
-            if (*data != (*command)[*pos])
+            if (*command != nullptr && *data != (*command)[*pos])
             {
-                if (*command == IRC_PONG && *pos == 1 && *data == IRC_PING[1])
+                if ((std::strcmp(*command, IRC_PONG) == 0) && *pos == 1 && *data == IRC_PING[1])
                 {
                     *command = IRC_PING;
                 }
@@ -179,7 +180,7 @@ int IrcServiceDetector::validate(AppIdDiscoveryArgs& args)
                     goto fail;
             }
             (*pos)++;
-            if (!(*command)[*pos])
+            if (*command != nullptr && !(*command)[*pos])
             {
                 if (args.dir == APP_ID_FROM_RESPONDER)
                 {

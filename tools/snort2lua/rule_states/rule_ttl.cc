@@ -49,7 +49,7 @@ bool Ttl::convert(std::istringstream& stream)
         std::string new_val;
 
         if ( arg.find('-') == std::string::npos )
-            new_val = arg;
+            new_val = std::move(arg);
         else
         {
             if ( arg.find('-') != arg.rfind('-') )
@@ -79,6 +79,7 @@ bool Ttl::convert(std::istringstream& stream)
                     arg_stream >> low;
                     arg_stream.ignore(1);
                     arg_stream >> high;
+                    // coverity[tainted_scalar]
                     new_val = std::to_string(low) + "<=>" + std::to_string(high);
                 }
             }

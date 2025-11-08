@@ -190,6 +190,7 @@ void MPUnixDomainTransport::register_event_helpers(const unsigned& pub_id, const
     
     this->event_helpers[pub_id] = SerializeFunctionHandle();
     this->event_helpers[pub_id].serialize_functions.insert({event_id, std::move(helper)});
+    // coverity[return_with_moved_parameter:SUPPRESS]
 }
 
 void MPUnixDomainTransport::register_receive_handler(const TransportReceiveEventHandler& handler)
@@ -382,12 +383,20 @@ void MPUnixDomainTransport::init_side_channels()
 
     this->is_running = true;
 
-    struct stat st;
-    if (::stat(config->unix_domain_socket_path.c_str(), &st) != 0 || !S_ISDIR(st.st_mode))
+    if (mkdir(config->unix_domain_socket_path.c_str(), 0755) != 0)
     {
-        if (mkdir(config->unix_domain_socket_path.c_str(), 0755) != 0)
+        if (errno == EEXIST)
         {
-            MPTransportLog("Failed to create directory %s\n", config->unix_domain_socket_path.c_str());
+            struct stat st;
+            if (::stat(config->unix_domain_socket_path.c_str(), &st) == 0 && !S_ISDIR(st.st_mode))
+            {
+                MPTransportLog("Path %s exists but is not a directory: %s\n", config->unix_domain_socket_path.c_str(), strerror(errno));
+                return;
+            }
+        }
+        else
+        {
+            MPTransportLog("Failed to create directory %s: %s\n", config->unix_domain_socket_path.c_str(), strerror(errno));
             return;
         }
     }
@@ -415,7 +424,7 @@ void MPUnixDomainTransport::init_side_channels()
             unix_config->max_retries = 0;
             unix_config->connect_timeout_seconds = 0;
         }
-        unix_config->paths.push_back(listen_path);
+        unix_config->paths.push_back(std::move(listen_path));
 
         unix_listener->start_accepting_connections( std::bind(&MPUnixDomainTransport::handle_new_connection, this, std::placeholders::_1, std::placeholders::_2, instance_id+1), unix_config);
 

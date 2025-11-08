@@ -81,8 +81,8 @@ Flow* Stream::new_flow(const FlowKey* key)
 void Stream::delete_flow(const FlowKey* key)
 { flow_con->release_flow(key); }
 
-void Stream::delete_flow(Flow* flow)
-{ flow_con->release_flow(flow, PruneReason::NONE); }
+void Stream::delete_flow(Flow* flow, PruneReason reason)
+{ flow_con->release_flow(flow, reason); }
 
 //-------------------------------------------------------------------------
 // key foo
@@ -194,7 +194,7 @@ void Stream::check_flow_closed(Packet* p)
         // eventually all onloads will occur and delete will be called
         if ( not flow->is_suspended() )
         {
-            flow_con->release_flow(flow, PruneReason::NONE);
+            flow_con->release_flow(flow, PruneReason::STREAM_CLOSED);
             return;
         }
     }
@@ -499,6 +499,7 @@ StreamSplitter* Stream::get_splitter(Flow* flow, bool to_server)
 void Stream::log_extra_data(
     Flow* flow, uint32_t mask, const AlertInfo& alert_info)
 {
+    // coverity[missing_lock]
     if ( mask && stream.extra_data_log )
     {
         stream.extra_data_log(
@@ -777,7 +778,7 @@ uint16_t Stream::get_mss(Flow* flow, bool to_server)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
     return tcp_session->get_mss(to_server);
 }
 
@@ -785,7 +786,7 @@ uint8_t Stream::get_tcp_options_len(Flow* flow, bool to_server)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
     return tcp_session->get_tcp_options_len(to_server);
 }
 
@@ -801,7 +802,7 @@ bool Stream::can_set_no_ack_mode(Flow* flow)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
     return tcp_session->can_set_no_ack();
 }
 
@@ -809,7 +810,7 @@ bool Stream::set_no_ack_mode(Flow* flow, bool on_off)
 {
     assert(flow and flow->session and flow->pkt_type == PktType::TCP);
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
     return tcp_session->set_no_ack(on_off);
 }
 
@@ -818,9 +819,9 @@ void Stream::partial_flush(Flow* flow, bool to_server)
     if ( flow->pkt_type == PktType::TCP )
     {
         if ( to_server )
-            ((TcpSession*)flow->session)->server.perform_partial_flush();
+            reinterpret_cast<TcpSession*>(flow->session)->server.perform_partial_flush();
         else
-            ((TcpSession*)flow->session)->client.perform_partial_flush();
+            reinterpret_cast<TcpSession*>(flow->session)->client.perform_partial_flush();
     }
 }
 
@@ -829,7 +830,7 @@ bool Stream::get_held_pkt_seq(Flow* flow, uint32_t& seq)
     if (!flow or !flow->session or !(flow->pkt_type == PktType::TCP))
         return false;
 
-    TcpSession* tcp_session = (TcpSession*)flow->session;
+    TcpSession* tcp_session = reinterpret_cast<TcpSession*>(flow->session);
 
     if (tcp_session->held_packet_dir == SSN_DIR_NONE)
         return false;

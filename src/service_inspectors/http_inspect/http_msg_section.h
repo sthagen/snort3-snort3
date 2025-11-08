@@ -82,6 +82,7 @@ public:
 
     int32_t get_status_code_num() const { return status_code_num; }
 
+    static void clear_tmp_buffers();
     virtual void clear();
     bool is_clear() { return cleared; }
 
@@ -90,6 +91,11 @@ public:
     int32_t get_max_header_line(const HttpBufferInfo& buf) const;
     int32_t get_num_cookies(const HttpBufferInfo& buf) const;
     HttpEnums::VersionId get_version_id(const HttpBufferInfo& buf) const;
+
+    static uint32_t get_section_len(const HttpMsgSection* sec)
+    { return (sec != nullptr) ? sec->get_length() : 0; }
+    virtual uint32_t get_length() const
+    { return (msg_text.length() > 0) ? msg_text.length() : 0; }
 
     HttpMsgSection* next = nullptr;
 
@@ -136,6 +142,17 @@ protected:
     void print_section_wrapup(FILE* output) const;
     void print_peg_counts(FILE* output) const;
 #endif
+
+private:
+    const Field& get_tmp_buffer(const HttpBufferInfo& buf);
+    Field* compute_http_method_str(const HttpBufferInfo& buf);
+    Field* compute_request_size(const HttpBufferInfo& buf);
+    Field* compute_response_size(const HttpBufferInfo& buf);
+    Field* compute_http_version_str(const HttpBufferInfo& buf);
+    Field* compute_http_user_agent_str(const HttpBufferInfo& buf);
+    Field* compute_http_referer_str(const HttpBufferInfo& buf);
+    Field* compute_detail_119_20(const HttpBufferInfo& buf);
+    Field* compute_detail_119_287(const HttpBufferInfo& buf);
 };
 
 #endif

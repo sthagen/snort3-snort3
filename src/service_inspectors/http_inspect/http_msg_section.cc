@@ -44,6 +44,193 @@ using namespace HttpCommon;
 using namespace HttpEnums;
 using namespace snort;
 
+static constexpr uint TMP_BUFFER_CNT = HTTP__TMP_BUFFER_MAX - HTTP__BUFFER_MAX;
+THREAD_LOCAL Field* tmp_buffers[TMP_BUFFER_CNT] = { nullptr };
+
+void HttpMsgSection::clear_tmp_buffers()
+{
+    for (unsigned i = 0; i < TMP_BUFFER_CNT; i++)
+    {
+        delete tmp_buffers[i];
+        tmp_buffers[i] = nullptr;
+    }
+}
+
+static Field* tmp_field_from_data(const uint8_t* data, uint32_t len)
+{
+    uint8_t* val_buf = new uint8_t[len + 1];
+    memcpy(val_buf, data, len);
+    val_buf[len] = '\0';
+    return new Field(len + 1, val_buf, true);
+}
+
+static Field* tmp_field(uint32_t val)
+{
+    uint32_t* val_buf = new uint32_t[1];
+    *val_buf = val;
+    return new Field(sizeof(uint32_t), reinterpret_cast<uint8_t*>(val_buf), true);
+}
+
+static Field* tmp_field(const std::string& str)
+{
+    return tmp_field_from_data(reinterpret_cast<const uint8_t*>(str.c_str()), str.length());
+}
+
+static Field* tmp_field(const Field& f)
+{
+    int32_t len = f.length();
+    if (len <= 0)
+        return new Field(STAT_NOT_PRESENT);
+
+    const uint8_t* data = f.start();
+    const uint8_t* end = data + len;
+    const uint8_t* p = data;
+    for (; p < end; ++p)
+    {
+        uint8_t c = *p;
+        if (c < 0x20 || c > 0x7E || c == '\\')
+            break;
+    }
+
+    if (p == end)
+        return tmp_field_from_data(data, len);  // No escaping needed
+
+    static constexpr char hex_chars[16] = {
+        '0', '1', '2', '3', '4', '5', '6', '7',
+        '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+    };
+
+    std::string escaped;
+    escaped.reserve(len * 2);  // Will grow if needed
+    escaped.append(reinterpret_cast<const char*>(data), p - data);
+
+    for (; p < end; ++p)
+    {
+        uint8_t c = *p;
+
+        if (c == '\\')
+            escaped.append("\\x5c");
+        else if (c < 0x20 || c > 0x7E)
+        {
+            escaped.append("\\x");
+            escaped.push_back(hex_chars[(c >> 4) & 0x0F]);
+            escaped.push_back(hex_chars[c & 0x0F]);
+        }
+        else
+            escaped.push_back(c);
+    }
+
+    return tmp_field_from_data(reinterpret_cast<const uint8_t*>(escaped.c_str()), escaped.length());
+}
+
+Field* HttpMsgSection::compute_http_method_str(const HttpBufferInfo&)
+{
+    return tmp_field(get_classic_buffer(HTTP_BUFFER_METHOD, 0, 0));
+}
+
+Field* HttpMsgSection::compute_request_size(const HttpBufferInfo&)
+{
+    uint32_t val = 0;
+    val += get_section_len(request);
+    val += get_section_len(header[SRC_CLIENT]);
+    val += transaction->get_body_len(HttpCommon::SRC_CLIENT);
+    val += get_section_len(trailer[SRC_CLIENT]);
+    return tmp_field(val);
+}
+
+Field* HttpMsgSection::compute_response_size(const HttpBufferInfo&)
+{
+    uint32_t val = 0;
+    val += get_section_len(status);
+    val += get_section_len(header[SRC_SERVER]);
+    val += transaction->get_body_len(HttpCommon::SRC_SERVER);
+    val += get_section_len(trailer[SRC_SERVER]);
+    return tmp_field(val);
+}
+
+Field* HttpMsgSection::compute_http_version_str(const HttpBufferInfo& buf)
+{
+    VersionId version = get_version_id(buf);
+    const auto& iter = VersionEnumToStr.find(version);
+    if (iter == VersionEnumToStr.end())
+        return new Field(STAT_NOT_PRESENT);
+
+    std::string val = "HTTP/";
+    val.append(iter->second);
+    return tmp_field(val);
+}
+
+Field* HttpMsgSection::compute_http_user_agent_str(const HttpBufferInfo&)
+{
+    return tmp_field(get_classic_buffer(HTTP_BUFFER_HEADER, HEAD_USER_AGENT, 0));
+}
+
+Field* HttpMsgSection::compute_http_referer_str(const HttpBufferInfo&)
+{
+    return tmp_field(get_classic_buffer(HTTP_BUFFER_HEADER, HEAD_REFERER, 0));
+}
+
+Field* HttpMsgSection::compute_detail_119_20(const HttpBufferInfo& buf)
+{
+    // EVENT_MAX_HEADERS
+    // Header Count: XXX
+    std::string val = "Header Count: ";
+    auto cnt = get_num_headers(buf);
+    if (cnt >= 0)
+        val.append(std::to_string(cnt));
+    else
+    {
+        val.append("<no header ");
+        val.append(std::to_string(cnt));
+        val.append(">");
+    }
+
+    return tmp_field(val);
+}
+
+Field* HttpMsgSection::compute_detail_119_287(const HttpBufferInfo&)
+{
+    // EVENT_DISALLOWED_METHOD
+    // HTTP Method: XXX
+    std::string val = "HTTP Method: ";
+    const Field& method = get_classic_buffer(HTTP_BUFFER_METHOD, 0, 0);
+    if (method.length() > 0)
+        val.append(reinterpret_cast<const char*>(method.start()), method.length());
+    else
+    {
+        val.append("<no method ");
+        val.append(std::to_string(method.length()));
+        val.append(">");
+    }
+
+    return tmp_field(val);
+}
+
+const Field& HttpMsgSection::get_tmp_buffer(const HttpBufferInfo& buf)
+{
+    typedef Field* (HttpMsgSection::*ComputeFunction)(const HttpBufferInfo&);
+
+    static const ComputeFunction compute_functions[TMP_BUFFER_CNT] = {
+        &HttpMsgSection::compute_http_method_str,       // HTTP_BUFFER_METHOD_STR
+        &HttpMsgSection::compute_request_size,          // BUFFER_REQUEST_SIZE
+        &HttpMsgSection::compute_response_size,         // BUFFER_RESPONSE_SIZE
+        &HttpMsgSection::compute_http_version_str,      // HTTP_BUFFER_VERSION_STR
+        &HttpMsgSection::compute_http_user_agent_str,   // HTTP_BUFFER_USER_AGENT_STR
+        &HttpMsgSection::compute_http_referer_str,      // HTTP_BUFFER_REFERER_STR
+        &HttpMsgSection::compute_detail_119_20,         // DETAIL_119_20, EVENT_MAX_HEADERS
+        &HttpMsgSection::compute_detail_119_287         // DETAIL_119_287, EVENT_DISALLOWED_METHOD
+    };
+
+    const unsigned index = buf.type - (HTTP__BUFFER_MAX + 1);
+    assert(index < TMP_BUFFER_CNT);
+
+    if (tmp_buffers[index] == nullptr)
+        tmp_buffers[index] = (this->*compute_functions[index])(buf);
+
+    assert(tmp_buffers[index] != nullptr);
+    return *tmp_buffers[index];
+}
+
 HttpMsgSection::HttpMsgSection(const uint8_t* buffer, const uint16_t buf_size,
        HttpFlowData* session_data_, SourceId source_id_, bool buf_owner, Flow* flow_,
        const HttpParaList* params_) :
@@ -281,7 +468,11 @@ const Field& HttpMsgSection::get_classic_buffer(const HttpBufferInfo& buf)
             return Field::FIELD_NULL;
     }
     default:
-        assert(buf.type <= HTTP__BUFFER_MAX);
+        if (buf.type <= HTTP__BUFFER_MAX)
+            return Field::FIELD_NULL;
+        else if (buf.type <= HTTP__TMP_BUFFER_MAX)
+            return get_tmp_buffer(buf);
+        assert(false);
         return Field::FIELD_NULL;
     }
 }
@@ -464,6 +655,7 @@ void HttpMsgSection::get_related_sections()
 
 void HttpMsgSection::clear()
 {
+    clear_tmp_buffers();
     transaction->clear_section();
     cleared = true;
 }

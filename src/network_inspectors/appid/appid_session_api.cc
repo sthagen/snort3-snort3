@@ -26,12 +26,15 @@
 #include "appid_session_api.h"
 
 #include "flow/ha.h"
+#include "flow/stream_flow.h"
+
 #include "appid_inspector.h"
 #include "appid_peg_counts.h"
 #include "appid_session.h"
 #include "appid_types.h"
 #include "service_plugins/service_bootp.h"
 #include "service_plugins/service_netbios.h"
+#include "network_inspectors/appid/service_plugins/service_ssl.h"
 
 #define SSL_ALLOWLIST_PKT_LIMIT 20
 
@@ -250,6 +253,15 @@ bool AppIdSessionApi::is_appid_inspecting_session() const
             return false;
     }
 
+    // service is a TLS-wrapped service or SNI has been observed
+    if ( (is_service_over_ssl(get_service_app_id()) or (get_tls_host() != nullptr)) and
+         !asd->get_session_flags(APPID_SESSION_DECRYPTED) and
+         !asd->get_odp_ctxt().check_host_port_app_cache and
+         (asd->session_packet_count >= SSL_ALLOWLIST_PKT_LIMIT) )
+    {
+        return false;
+    }
+
     if ( (get_service_app_id() == APP_ID_QUIC or  get_service_app_id() == APP_ID_HTTP3) and
          !asd->get_session_flags(APPID_SESSION_DECRYPTED) )
         return false;
@@ -364,7 +376,28 @@ uint16_t AppIdSessionApi::get_service_port() const
 
 const AppIdDnsSession* AppIdSessionApi::get_dns_session() const
 {
-    return dsession;
+    if (asd && asd->flow->stream_intf)
+    {
+        int64_t stream_id;
+        asd->flow->stream_intf->get_stream_id(asd->flow, stream_id);
+        if (stream_id == 0xFFFFFFFF || stream_id == -1) // no stream id is processing now, pick the last processed
+        {
+            if (!dsessions.empty())
+                return std::prev(dsessions.end())->second;
+            else
+                return nullptr;
+        }
+        auto it = dsessions.find(stream_id);
+        if (it != dsessions.end())
+        {
+            return it->second;
+        }
+        return nullptr;
+    }
+    else if (!dsessions.empty()) // flow data of inspector who handles stream_intf got deleted, take the last one
+        return std::prev(dsessions.end())->second;
+    else
+        return dsession;
 }
 
 bool AppIdSessionApi::is_http_inspection_done() const

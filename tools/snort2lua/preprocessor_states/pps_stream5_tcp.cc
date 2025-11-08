@@ -87,7 +87,9 @@ bool StreamTcp::parse_small_segments(std::istringstream& stream)
         return false;
 
     table_api.open_table("small_segments");
+    // coverity[tainted_scalar]
     table_api.add_option("count", consec_segs);
+    // coverity[tainted_scalar]
     table_api.add_option("maximum_size", min_bytes);
     table_api.close_table();
 
@@ -96,7 +98,10 @@ bool StreamTcp::parse_small_segments(std::istringstream& stream)
         uint16_t port;
 
         while (stream >> port)
+        {
+            // coverity[tainted_scalar]
             ignore_ports += " " + std::to_string(port);
+        }
         table_api.add_deleted_comment(ignore_ports);
     }
 
@@ -346,7 +351,10 @@ bool StreamTcp::convert(std::istringstream& data_stream)
             int val;
 
             if ( arg_stream >> val )
+            {
+                // coverity[tainted_scalar]
                 table_api.add_option("require_3whs", val);
+            }
             else
                 table_api.add_option("require_3whs", 0);
         }
@@ -361,7 +369,7 @@ bool StreamTcp::convert(std::istringstream& data_stream)
                 while (arg_stream >> tmp)
                     addr += " " + tmp;
 
-                add_to_bindings(&Binder::add_when_net, addr);
+                add_to_bindings(&Binder::add_when_net, std::move(addr));
             }
             else
             {

@@ -106,9 +106,11 @@ bool HttpInspect::convert(std::istringstream& data_stream)
             std::string codemap;
             int code_page;
 
+            // coverity[tainted_scalar]
             if ( (data_stream >> codemap) &&
                 (data_stream >> code_page))
             {
+                // coverity[tainted_scalar]
                 tmpval = table_api.add_option("iis_unicode_map_file", codemap);
                 tmpval = table_api.add_option("iis_unicode_code_page", code_page) && tmpval;
             }

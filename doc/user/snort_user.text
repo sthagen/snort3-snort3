@@ -8,7 +8,7 @@ Snort 3 User Manual
 The Snort Team
 
 Revision History
-Revision 3.9.6.0 2025-10-06 12:42:57 EDT TST
+Revision 3.9.7.0 2025-11-05 22:24:16 EST TST
 
 ---------------------------------------------------------------------
 
@@ -4100,7 +4100,7 @@ Partial depth detection enables faster threat detection by
 immediately forwarding partial message data to the detection engine
 before the complete message arrives. This feature can be configured
 independently for HTTP request bodies (partial_depth_body) and
-headers (partial_depth_header).
+headers and request line (partial_depth_header).
 
 Configuration options:
 0 (default):    Feature disabled
@@ -4110,6 +4110,11 @@ Positive value: Enable only when received bytes are below the specified threshol
 For HTTP request bodies only, the maximum configurable value is
 16,384 bytes. Use partial_depth_body = -1 when early detection is
 needed beyond this limit. HTTP headers have no such limitation.
+
+Partially inspected request lines are not parsed, the raw content is
+available in the http_raw_request buffer. Incomplete lines in
+partially inspected headers are not parsed. The raw content of the
+partial header is available in the http_raw_header buffer.
 
 This feature is turned off by default by setting partial_depth_body =
 0 and partial_depth_header = 0. To activate it, set the corresponding
@@ -5919,6 +5924,9 @@ Services and their events:
       + response
       + eot (a session defined by the following commands: APPE, DELE,
         RETR, STOR, STOU, ACCT, PORT, PASV, EPRT, EPSV)
+  * SSL
+
+      + tls_metadata_event
   * DNS
 
       + response
@@ -5986,6 +5994,18 @@ Fields supported for FTP:
   * data_channel.orig_h - IP address of data channel originator
   * data_channel.resp_h - IP address of data channel receiving point
   * data_channel.resp_p - TCP port of data channel receiving point
+
+Fields supported for SSL:
+
+  * version - SSL/TLS version that the server chose
+  * server_name_identifier - Server Name Identifier ( SNI ) extracted
+    from Client Hello
+  * validation_status - result of certificate validation
+  * subject - RFC2253 formatted certificate subject information
+  * issuer - RFC2253 formatted certificate issuer information
+  * module_identifier - name of snort module that populated the event
+  * cipher - SSL/TLS cipher suite that the server chose
+  * curve - named elliptic curve the server chose
 
 Fields supported for DNS:
 

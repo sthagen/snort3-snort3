@@ -25,7 +25,7 @@
 
 void parseIec104ApciU(const struct Iec104ApciU* apci);
 void parseIec104ApciS(const struct Iec104ApciS* apci);
-void parseIec104ApciI(const struct Iec104ApciI* apci);
+void parseIec104ApciI(const struct Iec104ApciI* apci, const uint16_t& data_size);
 
 
 #define IEC104_ERROR -1

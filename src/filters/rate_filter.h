@@ -29,7 +29,7 @@ struct Packet;
 struct SnortConfig;
 }
 struct RateFilterConfig;
-struct tSFRFConfigNode;
+class tSFRFConfigNode;
 struct OptTreeNode;
 
 RateFilterConfig* RateFilter_ConfigNew();

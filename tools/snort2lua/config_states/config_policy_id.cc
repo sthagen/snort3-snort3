@@ -42,6 +42,7 @@ bool PolicyId::convert(std::istringstream& data_stream)
     if (data_stream >> policy_id)
     {
         cv.get_table_api().open_table("ips");
+        // coverity[tainted_scalar]
         cv.get_table_api().add_option("id", policy_id);
         cv.get_table_api().close_table();
 
@@ -57,6 +58,7 @@ bool PolicyId::convert(std::istringstream& data_stream)
 
     if (data_stream >> policy_id)
     {
+        // coverity[tainted_scalar]
         data_api.failed_conversion(data_stream, std::to_string(policy_id));
         rc = false;
     }

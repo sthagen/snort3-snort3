@@ -35,6 +35,10 @@
 #include "s7comm.h"
 #include "s7comm_module.h"
 
+#ifdef REG_TEST
+#include "log/messages.h"
+#endif
+
 #pragma pack(1)
 /* TPKT header */
 struct TpktHeader
@@ -95,6 +99,15 @@ static bool S7commPlusProtocolDecode(S7commplusSessionData* session, Packet* p)
     }
     else
     {
+        if ( p->dsize < (sizeof(TpktHeader) + sizeof(CotpHeader) + \
+            sizeof(S7commplusHeader) + sizeof(S7commplusDataHeader) + \
+            INTEGRITY_PART_LEN) )
+        {
+#ifdef REG_TEST
+            LogMessage("s7commplus packet dsize is less than headers for version 3 protocol");
+#endif
+            return false;
+        }
         /* 33 byte Integrity part for V3 header packets */
         offset += sizeof(S7commplusHeader) + INTEGRITY_PART_LEN ;
     }

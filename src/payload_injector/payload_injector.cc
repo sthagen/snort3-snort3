@@ -163,5 +163,8 @@ const char* PayloadInjector::get_err_string(InjectionReturnStatus status)
 {
     auto iter = InjectionErrorToString.find(status);
     assert (iter != InjectionErrorToString.end());
-    return iter->second;
+    if (iter != InjectionErrorToString.end())
+        return iter->second;
+    else
+        return nullptr;
 }

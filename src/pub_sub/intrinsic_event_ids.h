@@ -61,6 +61,8 @@ struct IntrinsicEventIds
     AUXILIARY_IP,
     FILE_VERDICT,
 
+    DNS_PAYLOAD,
+
     num_ids
 }; };
 

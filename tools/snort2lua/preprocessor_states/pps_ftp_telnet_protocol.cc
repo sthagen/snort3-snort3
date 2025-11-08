@@ -145,7 +145,7 @@ bool FtpServer::parse_alt_max_cmd(std::istringstream& stream)
             Command c;
             c.name = std::string(elem);
             c.length = len;
-            commands.push_back(c);
+            commands.push_back(std::move(c));
             updated = true;
         }
         else
@@ -203,26 +203,26 @@ bool FtpServer::parse_cmd_validity_cmd(std::istringstream& data_stream)
     if (it == commands.end())
     {
         Command c;
-        c.name = std::string(command);
-        c.format = std::string(format);
+        c.name = std::string(std::move(command));
+        c.format = std::string(std::move(format));
         c.length = command_default_len;
-        commands.push_back(c);
+        commands.push_back(std::move(c));
         updated = true;
     }
     // command exists, but format unspecified (length likely specified)
     else if (it->format.empty())
     {
-        it->format = std::string(format);
+        it->format = std::string(std::move(format));
         updated = true;
     }
     // command && format exists, but format is different. create new command
     else if (format != it->format)
     {
         Command c;
-        c.name = std::string(command);
-        c.format = std::string(format);
+        c.name = std::string(std::move(command));
+        c.format = std::string(std::move(format));
         c.length = it->length;
-        commands.push_back(c);
+        commands.push_back(std::move(c));
         updated = true;
     }
     else
@@ -742,7 +742,10 @@ bool Telnet::convert(std::istringstream& data_stream)
             int i_val;
 
             if (data_stream >> i_val)
+            {
+                 // coverity[tainted_scalar]
                 tmpval = table_api.add_option("ayt_attack_thresh", i_val);
+            }
             else
                 tmpval = false;
         }

@@ -52,8 +52,18 @@ HttpMsgRequest::~HttpMsgRequest()
     delete body_params;
 }
 
+bool HttpMsgRequest::detection_required() const
+{
+    if (params->partial_depth_header != 0)
+        return true;
+    return version_id == HttpEnums::VERS_0_9;
+}
+
 void HttpMsgRequest::parse_start_line()
 {
+    if (session_data->partial_flush[source_id])
+        return;
+
     // Version field
     if ((start_line.length() < 10) || !is_sp_tab[start_line.start()[start_line.length()-9]] ||
         memcmp(start_line.start() + start_line.length() - 8, "HTTP/", 5))
@@ -219,6 +229,9 @@ void HttpMsgRequest::clear_body_params()
 
 void HttpMsgRequest::gen_events()
 {
+    if (session_data->partial_flush[source_id])
+        return;
+
     if (*transaction->get_infractions(source_id) & INF_BAD_REQ_LINE)
         return;
 
@@ -351,6 +364,9 @@ void HttpMsgRequest::update_flow()
 
 void HttpMsgRequest::publish(unsigned)
 {
+    if (session_data->partial_flush[source_id])
+        return;
+
     if (!session_data->ssl_search_abandoned && trans_num > 1 &&
         !flow->flags.data_decrypted && get_method_id() != METH_CONNECT)
     {

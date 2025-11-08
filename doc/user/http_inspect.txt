@@ -153,7 +153,7 @@ This feature is off by default. script_detection = true will activate it.
 Partial depth detection enables faster threat detection by immediately forwarding
 partial message data to the detection engine before the complete message arrives.
 This feature can be configured independently for HTTP request bodies
-(partial_depth_body) and headers (partial_depth_header).
+(partial_depth_body) and headers and request line (partial_depth_header).
 
     Configuration options:
     0 (default):    Feature disabled
@@ -163,6 +163,10 @@ This feature can be configured independently for HTTP request bodies
 For HTTP request bodies only, the maximum configurable value is 16,384 bytes. Use
 partial_depth_body = -1 when early detection is needed beyond this limit. HTTP
 headers have no such limitation.
+
+Partially inspected request lines are not parsed, the raw content is available in the
+http_raw_request buffer. Incomplete lines in partially inspected headers are not parsed.
+The raw content of the partial header is available in the http_raw_header buffer.
 
 This feature is turned off by default by setting partial_depth_body = 0
 and partial_depth_header = 0. To activate it, set the corresponding parameter to

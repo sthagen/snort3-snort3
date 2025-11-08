@@ -44,6 +44,11 @@
 #define UNIFIED2_EVENT3              114
 
 #define MAX_EVENT_APPNAME_LEN         64
+#define MAX_HTTP_METHOD_LEN           80
+#define MAX_HTTP_VERSION_LEN          16
+#define MAX_HTTP_USER_AGENT_LEN      256
+#define MAX_HTTP_REFERER_LEN         256
+#define MAX_MESSAGE_DETAIL_LEN       256
 
 /* Data structure used for serialization of Unified2 Records */
 struct Serial_Unified2_Header
@@ -90,6 +95,15 @@ struct Unified2Event
     uint8_t snort_action;  // pass=0, drop, block, reset
 
     char app_name[MAX_EVENT_APPNAME_LEN];
+
+    uint32_t request_size;
+    uint32_t response_size;
+
+    char http_method[MAX_HTTP_METHOD_LEN];
+    char http_version[MAX_HTTP_VERSION_LEN];
+    char http_user_agent[MAX_HTTP_USER_AGENT_LEN];
+    char http_referer[MAX_HTTP_REFERER_LEN];
+    char message_detail[MAX_MESSAGE_DETAIL_LEN];
 };
 
 // UNIFIED2_IDS_EVENT_VLAN = type 104

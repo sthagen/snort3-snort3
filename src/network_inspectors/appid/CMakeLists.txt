@@ -213,7 +213,9 @@ set ( APPID_SOURCES
     appid_cpu_profile_table.cc 
     appid_cpu_profile_table.h
     user_data_map.h
-    user_data_map.cc 
+    user_data_map.cc
+    appid_dns_payload_event_handler.cc
+    appid_dns_payload_event_handler.h
 )
 
 #if (STATIC_INSPECTORS)

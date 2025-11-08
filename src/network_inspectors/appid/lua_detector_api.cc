@@ -746,7 +746,7 @@ static int detector_get_pcre_groups(lua_State* L)
     if (re == nullptr)
     {
         pcre2_get_error_message(errorcode, error, 128);
-        APPID_LOG(lsd->ldp.pkt, TRACE_ERROR_LEVEL, "PCRE compilation failed at offset %d: %s\n", erroffset, error);
+        APPID_LOG(lsd->ldp.pkt, TRACE_ERROR_LEVEL, "PCRE compilation failed at offset %zu: %s\n", erroffset, error);
         return 0;
     }
 

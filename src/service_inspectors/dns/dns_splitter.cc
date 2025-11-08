@@ -39,11 +39,9 @@ StreamSplitter::Status DnsSplitter::scan(
 {
     assert(len > 0);
 
-    DNSData udp_session_data;
-    bool from_server = p->is_from_server();
-    DNSData* dnsSessionData = get_dns_session_data(p, from_server, udp_session_data);
-
-    if ( dnsSessionData and ( dnsSessionData->flags & DNS_FLAG_NOT_DNS ) )
+    DnsFlowData* fd;
+    fd = (DnsFlowData*)((p->flow)->get_flow_data(DnsFlowData::inspector_id));
+    if (fd && (fd->session.flags & DNS_FLAG_NOT_DNS))
     {
         dnsstats.aborted_sessions++;
         return ABORT;

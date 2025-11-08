@@ -192,7 +192,7 @@ TcpStreamTracker::TcpEvent TcpStreamTracker::set_tcp_event(const TcpSegmentDescr
         else if ( tcph->is_rst() )
         {
             tcp_event = TCP_RST_RECV_EVENT;
-            tcpStats.resets++;
+            tcpStats.rsts++;
         }
         else if ( tcph->is_fin( ) )
         {
@@ -480,7 +480,6 @@ void TcpStreamTracker::disable_reassembly(Flow* f)
 
 void TcpStreamTracker::init_on_syn_sent(TcpSegmentDescriptor& tsd)
 {
-    tsd.get_flow()->set_session_flags(SSNFLAG_SEEN_CLIENT);
     if ( tsd.get_tcph()->are_flags_set(TH_CWR | TH_ECE) )
         tsd.get_flow()->set_session_flags(SSNFLAG_ECN_CLIENT_QUERY);
 
@@ -516,7 +515,6 @@ void TcpStreamTracker::init_on_syn_recv(const TcpSegmentDescriptor& tsd)
 
 void TcpStreamTracker::init_on_synack_sent(TcpSegmentDescriptor& tsd)
 {
-    tsd.get_flow()->set_session_flags(SSNFLAG_SEEN_SERVER);
     if (tsd.get_tcph()->are_flags_set(TH_CWR | TH_ECE))
         tsd.get_flow()->set_session_flags(SSNFLAG_ECN_SERVER_REPLY);
 
@@ -563,13 +561,6 @@ void TcpStreamTracker::init_on_synack_recv(const TcpSegmentDescriptor& tsd)
 
 void TcpStreamTracker::init_on_data_seg_sent(TcpSegmentDescriptor& tsd)
 {
-    Flow* flow = tsd.get_flow();
-
-    if ( flow->ssn_state.direction == FROM_CLIENT )
-        flow->set_session_flags(SSNFLAG_SEEN_CLIENT);
-    else
-        flow->set_session_flags(SSNFLAG_SEEN_SERVER);
-
     iss = tsd.get_seq() - 1;
     irs = tsd.get_ack() - 1;
     snd_una = tsd.get_seq();
@@ -728,26 +719,64 @@ bool TcpStreamTracker::update_on_3whs_ack(TcpSegmentDescriptor& tsd)
     return good_ack;
 }
 
-bool TcpStreamTracker::update_on_rst_recv(TcpSegmentDescriptor& tsd)
+void TcpStreamTracker::update_on_bad_rst(TcpSegmentDescriptor& tsd)
 {
-    normalizer.trim_rst_payload(tsd);
-    bool good_rst = normalizer.validate_rst(tsd);
-    if ( good_rst )
-    {
-        Flow* flow = tsd.get_flow();
+    session->tel.set_tcp_event(EVENT_BAD_RST);
+    normalizer.packet_dropper(tsd, NORM_TCP_BLOCK);
+    session->set_pkt_action_flag(ACTION_BAD_PKT);
+}
 
-        flow->set_session_flags(SSNFLAG_RESET);
-        if ( normalizer.is_tcp_ips_enabled() )
-            tcp_state = TcpStreamTracker::TCP_CLOSED;
+TcpNormalizer::RstStatus TcpStreamTracker::is_rst_valid_syn_sent(TcpSegmentDescriptor& tsd)
+{
+    // ack number must ack syn seq
+   TcpNormalizer::RstStatus rst_status = SEQ_EQ(tsd.get_ack(), snd_nxt) ?
+        TcpNormalizer::RST_OK : TcpNormalizer::RST_BAD_ACK;
+    if ( rst_status == TcpNormalizer::RST_OK )
+    {
+        if ( PacketTracer::is_active() )
+            PacketTracer::log("stream_tcp: RST is valid in SYN-SENT state, ack %u == snd_nxt %u.\n",
+                tsd.get_ack(), snd_nxt);
+                
+         tcpStats.rsts_ack_ok++;
     }
     else
     {
-        session->tel.set_tcp_event(EVENT_BAD_RST);
-        normalizer.packet_dropper(tsd, NORM_TCP_BLOCK);
-        session->set_pkt_action_flag(ACTION_BAD_PKT);
+        if ( PacketTracer::is_active() )
+            PacketTracer::log("stream_tcp: RST is NOT valid in SYN-SENT state, ack %u != snd_nxt %u.\n",
+                tsd.get_ack(), snd_nxt);
+        tcpStats.rsts_ack_bad++;
+        update_on_bad_rst(tsd);
+    }
+    
+    return rst_status;
+}
+
+TcpNormalizer::RstStatus TcpStreamTracker::handle_rst_packet(TcpSegmentDescriptor& tsd, bool flush,
+     TcpStreamTracker::TcpState next_state)
+{
+    // seq number of RST must be in receiver's window
+    TcpNormalizer::RstStatus rst_status = normalizer.validate_rst(tsd);
+    switch ( rst_status )
+    {
+    case TcpNormalizer::RST_OK:
+        session->update_session_on_rst(tsd, flush, next_state);
+        break;
+
+    case TcpNormalizer::RST_IN_WINDOW:
+        // per RFC 5961, RSTs in window but not exact match do not cause the
+        // connection to be closed immediately.  Trim the payload but otherwise
+        // ignore the RST and let the packet be sent.
+        normalizer.trim_rst_payload(tsd);
+        break;
+            
+    case TcpNormalizer::RST_BAD_ACK:
+    case TcpNormalizer::RST_BAD_SEQ:
+    default:
+        update_on_bad_rst(tsd);
+        break;
     }
 
-    return good_rst;
+    return rst_status;
 }
 
 void TcpStreamTracker::update_on_rst_sent()

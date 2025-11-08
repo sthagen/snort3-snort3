@@ -210,6 +210,8 @@ void PerfMonitor::show(const SnortConfig*) const
 
 void PerfMonitor::disable_tracker(size_t i)
 {
+    assert (i < trackers->size() && i > 0);
+
     WarningMessage("Disabling %s\n", (*trackers)[i]->get_name().c_str());
     auto tracker = trackers->at(i);
 
@@ -253,10 +255,16 @@ void PerfMonitor::tinit()
     if (config->perf_flags & PERF_CPU )
         trackers->emplace_back(new CPUTracker(config));
 
-    for (unsigned i = 0; i < trackers->size(); i++)
+    // Second condition is to prevent overflow, shouldn't happen in practice
+    for (unsigned i = 0; i < trackers->size() && i < std::numeric_limits<unsigned>::max(); i++)
     {
         if (!(*trackers)[i]->open(true))
-            disable_tracker(i--);
+        {
+            disable_tracker(i);
+
+            if (i > 0)
+                i--;
+        }
     }
 
     for (auto& tracker : *trackers)
@@ -265,7 +273,7 @@ void PerfMonitor::tinit()
 
 bool PerfMonReloadTuner::tinit()
 {
-    PerfMonitor* pm = (PerfMonitor*)PigPen::get_inspector(PERF_NAME, true);
+    PerfMonitor* pm = reinterpret_cast<PerfMonitor*>(PigPen::get_inspector(PERF_NAME, true));
     auto* new_constraints = pm->get_constraints();
 
     if (new_constraints->flow_ip_enabled)
@@ -317,9 +325,16 @@ void PerfMonitor::tterm()
 
 void PerfMonitor::rotate()
 {
-    for ( unsigned i = 0; i < trackers->size(); i++ )
-        if ( !(*trackers)[i]->rotate() )
-            disable_tracker(i--);
+    for (auto& tracker : *trackers)
+        {
+            if (!tracker->rotate())
+            {
+                auto found_trk = std::find(trackers->begin(), trackers->end(), tracker);
+                size_t pos = found_trk - trackers->begin();
+                if (found_trk != trackers->end() && pos > 0 && pos < trackers->size())
+                    disable_tracker(pos - 1);
+            }
+        }
 }
 
 void PerfMonitor::swap_constraints(PerfConstraints* constraints)
@@ -452,7 +467,7 @@ static void mod_dtor(Module* m)
 { delete m; }
 
 static Inspector* pm_ctor(Module* m)
-{ return new PerfMonitor(((PerfMonModule*)m)->get_config()); }
+{ return new PerfMonitor((reinterpret_cast<PerfMonModule*>(m))->get_config()); }
 
 static void pm_dtor(Inspector* p)
 { delete p; }

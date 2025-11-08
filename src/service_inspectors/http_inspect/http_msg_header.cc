@@ -46,6 +46,11 @@
 #include "http_msg_body.h"
 #include "http_normalizers.h"
 
+#include "mime/decode_b64.h"
+#include "pub_sub/dns_payload_event.h"
+#include "pub_sub/intrinsic_event_ids.h"
+
+
 using namespace snort;
 using namespace HttpCommon;
 using namespace HttpEnums;
@@ -72,6 +77,74 @@ void HttpMsgHeader::publish(unsigned pub_id)
         HttpEventIds::REQUEST_HEADER : HttpEventIds::RESPONSE_HEADER;
 
     DataBus::publish(pub_id, evid, http_header_event, flow);
+
+    // Look for DNS over HTTPS (DOH) and if found publish a DNS payload event
+    int32_t uri_length = 0;
+    const uint8_t* uri = http_header_event.get_uri_query(uri_length);
+    if (uri_length == 0)
+        return;
+    constexpr char doh_pattern[] = "dns=";
+    constexpr int8_t doh_pattern_len = sizeof(doh_pattern) - 1;
+    // For DOH, get request will look like GET /dns-query?dns=BASE64_ENCODED_DNS_QUERY
+    if (uri_length >= doh_pattern_len && memcmp(uri, doh_pattern, doh_pattern_len) == 0 && get_method_id() == METH_GET)
+    {
+        size_t b64_start = doh_pattern_len;
+        if (b64_start < (size_t)uri_length)
+        {
+            const uint8_t* b64_data_start = uri + b64_start;
+            const uint8_t* b64_data_end = uri + uri_length;
+            size_t b64_len = b64_data_end - b64_data_start;
+
+            // Copy base64 data to a vector for padding and conversion from base64url to base64
+            std::vector<uint8_t> b64_data(b64_data_start, b64_data_end);
+
+            for (auto& c : b64_data)
+            {
+                if (c == '-')
+                    c = '+';
+                else if (c == '_')
+                    c = '/';
+            }
+            // DOH RFC requires base64url encoding which omits padding(rfc8484:4.1.1). Add it back if needed.
+            // Base64 length must be a multiple of 4
+            size_t remainder = b64_len % 4;
+            if (remainder == 1)
+            {
+                // Invalid base64 length, do not decode
+                return;
+            }
+            else if (remainder == 2)
+            {
+                b64_data.push_back('=');
+                b64_data.push_back('=');
+            }
+            else if (remainder == 3)
+                b64_data.push_back('=');
+
+            std::vector<uint8_t> decode_buf(1024);
+            B64Decode decoder = B64Decode(1024, 1024);
+            DecodeResult decode_result = decoder.decode_data(b64_data.data(), b64_data.data() + b64_data.size(),
+                decode_buf.data());
+            if (decode_result == DECODE_SUCCESS)
+            {
+                const uint8_t* decoded_data = nullptr;
+                uint32_t decode_buf_size = 0;
+                decoder.get_decoded_data(&decoded_data, &decode_buf_size);
+                DnsPayloadEvent dns_payload_event(decoded_data, decode_buf_size, (source_id == SRC_CLIENT), true, true);
+                DnsDataStash* stash = new DnsDataStash(decoded_data, decode_buf_size);
+                flow->set_attr(STASH_DNS_DATA, stash);
+                DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::DNS_PAYLOAD, dns_payload_event, flow);
+                #ifdef REG_TEST
+                if (HttpTestManager::use_test_output(HttpTestManager::IN_HTTP))
+                {
+                    fprintf(HttpTestManager::get_output_file(),
+                        "Published %" PRId32 " bytes of DOH payload from base64 decoded query.\n", decode_buf_size);
+                    fflush(HttpTestManager::get_output_file());
+                }
+                #endif
+            }
+        }
+    }
 }
 
 bool HttpMsgHeader::has_supported_encoding() const
@@ -515,11 +588,11 @@ void HttpMsgHeader::prepare_body()
         session_data->detect_depth_remaining[source_id] = INT64_MAX;
     }
 
-    // Set the default depth if we're publishing the request body.
-    if (params->publish_request_body and is_request)
+    // Set the default depth if we're publishing the request body or DOH body.
+    if ( (params->publish_request_body and is_request) || (get_content_type() == CT_APPLICATION_DNS) )
     {
         session_data->publish_octets[source_id] = 0;
-        session_data->publish_depth_remaining[source_id] = REQUEST_PUBLISH_DEPTH;
+        session_data->publish_depth_remaining[source_id] = BODY_PUBLISH_DEPTH;
     }
 
     // Dynamically update the publish depth.

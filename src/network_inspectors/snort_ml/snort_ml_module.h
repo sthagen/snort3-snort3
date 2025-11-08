@@ -39,7 +39,6 @@ struct SnortMLStats
     PegCount client_body_alerts;
     PegCount uri_bytes;
     PegCount client_body_bytes;
-    PegCount libml_calls;
 };
 
 extern THREAD_LOCAL SnortMLStats snort_ml_stats;
@@ -48,7 +47,6 @@ extern THREAD_LOCAL const snort::Trace* snort_ml_trace;
 
 struct SnortMLConfig
 {
-    std::string http_param_model_path;
     double http_param_threshold;
     int32_t uri_depth;
     int32_t client_body_depth;
@@ -62,7 +60,7 @@ public:
     bool set(const char*, snort::Value&, snort::SnortConfig*) override;
     bool end(const char*, int, snort::SnortConfig*) override;
 
-    const SnortMLConfig& get_conf() const
+    const SnortMLConfig& get_config() const
     { return conf; }
 
     unsigned get_gid() const override
@@ -79,7 +77,10 @@ public:
     snort::ProfileStats* get_profile() const override;
 
     void set_trace(const snort::Trace*) const override;
+
+#ifdef DEBUG_MSGS
     const snort::TraceOption* get_trace_options() const override;
+#endif
 
 private:
     SnortMLConfig conf = {};

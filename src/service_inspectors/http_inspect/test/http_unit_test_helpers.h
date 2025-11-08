@@ -31,6 +31,8 @@ public:
         { assert(flow_data!=nullptr); return flow_data->section_type; }
     static HttpCommon::SectionType* get_type_expected(HttpFlowData* flow_data)
         { assert(flow_data!=nullptr); return flow_data->type_expected; }
+    static void half_reset(HttpFlowData* flow_data, HttpCommon::SourceId source_id)
+        { assert(flow_data!=nullptr); flow_data->half_reset(source_id); }
 };
 
 #endif

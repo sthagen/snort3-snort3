@@ -63,8 +63,8 @@ TcpNormalizer::NormStatus TcpNormalizer::apply_normalizations(
             break;
         }
         if (PacketTracer::is_active())
-            PacketTracer::log("Current TCP window : [ %u - %u ]\n"
-            , tns.tracker->r_win_base, tns.tracker->r_win_base + tns.tracker->get_snd_wnd());
+            PacketTracer::log("Current TCP window : [ %u - %u ]\n",
+                tns.tracker->r_win_base, tns.tracker->r_win_base + tns.tracker->get_snd_wnd());
         tns.tracker->seglist.print_stream_state(tsd.get_talker());
         trim_win_payload(tns, tsd, 0, inline_mode);
         return NORM_BAD_SEQ;
@@ -354,52 +354,123 @@ uint32_t TcpNormalizer::get_tcp_timestamp(
     return TF_NONE;
 }
 
-bool TcpNormalizer::validate_rst_seq_geq(
+TcpNormalizer::RstStatus TcpNormalizer::validate_rst_seq_os_hpux11(
     TcpNormalizerState& tns, TcpSegmentDescriptor& tsd)
 {
     // FIXIT-M check for rcv_nxt == 0 is hack for uninitialized rcv_nxt
     if ( ( tns.tracker->rcv_nxt == 0 ) || SEQ_GEQ(tsd.get_seq(), tns.tracker->rcv_nxt) )
-        return true;
-
-    return false;
-}
-
-bool TcpNormalizer::validate_rst_end_seq_geq(
-    TcpNormalizerState& tns, TcpSegmentDescriptor& tsd)
-{
-    // FIXIT-M check for r_win_base == 0 is hack for uninitialized r_win_base
-    if ( tns.tracker->r_win_base == 0 )
-        return true;
-
-    if ( SEQ_GEQ(tsd.get_end_seq(), tns.tracker->r_win_base))
     {
-        // reset must be admitted when window closed
-        if (SEQ_LEQ(tsd.get_seq(), tns.tracker->r_win_base + get_stream_window(tns, tsd)))
-            return true;
+        if ( PacketTracer::is_active() )
+            PacketTracer::log("stream_tcp: RST is valid for OS HPUX 11, seq %u >= rcv_nxt %u.\n",
+                tsd.get_seq(), tns.tracker->rcv_nxt);
+
+        tcpStats.rsts_ok_rfc793++;
+        return RST_OK;
     }
 
-    return false;
+    if ( PacketTracer::is_active() )
+        PacketTracer::log("stream_tcp: RST is NOT valid for OS HPUX 11, seq %u <rcv_nxt %u.\n",
+            tsd.get_seq(), tns.tracker->rcv_nxt);
+
+    tcpStats.rsts_bad_seq++;
+    return RST_BAD_SEQ;
 }
 
-bool TcpNormalizer::validate_rst_seq_eq(
+TcpNormalizer::RstStatus TcpNormalizer::is_rst_seq_valid_rfc793(
     TcpNormalizerState& tns, TcpSegmentDescriptor& tsd)
 {
-    uint32_t expected_seq = tns.tracker->r_win_base + tns.tracker->get_fin_seq_adjust();
+    uint32_t rst_seq = tsd.get_seq();
+    uint32_t window = get_stream_window(tns, tsd);
 
-    if ( SEQ_EQ(tsd.get_seq(), expected_seq) )
-        return true;
+    if ( SEQ_GEQ(rst_seq, tns.tracker->r_win_base) )
+    {
+        if ( SEQ_LEQ(rst_seq, tns.tracker->r_win_base + window) )
+        {
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("stream_tcp: RST is valid, seq %u is in window. Current TCP window : [ %u - %u ]\n",
+                    rst_seq, tns.tracker->r_win_base, 
+                    tns.tracker->r_win_base + tns.tracker->get_snd_wnd());
+        
+            tcpStats.rsts_ok_rfc793++;
+            return RST_OK;
+        }
+        else if ( window == 0 )
+        {
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("stream_tcp: RST is valid, the window is closed, seq %u is >= base of window: %u\n",
+                    rst_seq, tns.tracker->r_win_base);
+        
+            tcpStats.rsts_ok_rfc793++;
+            return RST_OK;
+        }
+    }
+    
+    if ( PacketTracer::is_active() )
+        PacketTracer::log("stream_tcp: RST is invalid, seq %u not in window. Current TCP window : [ %u - %u ]\n",
+            rst_seq, tns.tracker->r_win_base, 
+            tns.tracker->r_win_base + tns.tracker->get_snd_wnd());
+        
+    tcpStats.rsts_bad_seq++;
+    return RST_BAD_SEQ;
 
-    return false;
 }
 
-// per rfc 793 a rst is valid if the seq number is in window
-// for all states but syn-sent (handled above).  however, we
-// validate here based on how various implementations actually
-// handle a rst.
-bool TcpNormalizer::validate_rst(
+TcpNormalizer::RstStatus TcpNormalizer::is_rst_seq_valid_rfc5961(
     TcpNormalizerState& tns, TcpSegmentDescriptor& tsd)
 {
-    return validate_rst_seq_eq(tns, tsd);
+    uint32_t rst_seq = tsd.get_seq();
+    uint32_t window = get_stream_window(tns, tsd);
+    uint32_t my_rcv_nxt = tns.tracker->rcv_nxt + tns.tracker->get_fin_seq_adjust();
+
+    if ( SEQ_EQ(rst_seq, my_rcv_nxt) )
+    {
+        if ( PacketTracer::is_active() )
+            PacketTracer::log("stream_tcp: RST is valid, seq %u matches rcv_nxt %u.\n",
+                rst_seq, my_rcv_nxt);
+
+        tcpStats.rsts_ok_rfc5961++;
+        return RST_OK;
+    }
+    else if ( SEQ_GEQ(rst_seq, tns.tracker->r_win_base) )
+    {
+        if ( SEQ_LEQ(rst_seq, tns.tracker->r_win_base + window) )
+        {
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("stream_tcp: RST is valid, seq %u is in window. Current TCP window : [ %u - %u ]\n",
+                    rst_seq, tns.tracker->r_win_base, 
+                    tns.tracker->r_win_base + tns.tracker->get_snd_wnd());
+        
+            tcpStats.rsts_in_window++;
+            return RST_IN_WINDOW;
+        }
+        else if ( window == 0 )
+        {
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("stream_tcp: RST is valid, the window is closed, seq %u is >= base of window: %u\n",
+                    rst_seq, tns.tracker->r_win_base);
+        
+            tcpStats.rsts_ok_rfc5961++;
+            return RST_OK;
+        }
+    }
+
+    if ( PacketTracer::is_active() )
+        PacketTracer::log("stream_tcp: RST is invalid, seq %u is left of window base. Current TCP window : [ %u - %u ]\n",
+            rst_seq, tns.tracker->r_win_base, 
+            tns.tracker->r_win_base + tns.tracker->get_snd_wnd());
+
+    tcpStats.rsts_bad_seq++;
+    return RST_BAD_SEQ;
+}
+
+// The default validation is to check if the rst seq is in the window as 
+// specified in RFC 9293 and RFC 5961.  The default method is used for
+// all the modern OSes and for IPS mode (FIRST) when no specific OS policy
+// is specified.
+TcpNormalizer::RstStatus TcpNormalizer::validate_rst(
+    TcpNormalizerState& tns, TcpSegmentDescriptor& tsd)
+{
+    return is_rst_seq_valid_rfc5961(tns, tsd);
 }
 
 int TcpNormalizer::validate_paws_timestamp(

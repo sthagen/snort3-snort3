@@ -715,7 +715,7 @@ void RnaPnd::discover_network_ethernet(const Packet* p)
 
             if ( !etherType or etherType > static_cast<uint16_t>(ProtocolId::ETHERTYPE_MINIMUM) )
             {
-                generate_new_host_mac(p, rt);
+                generate_new_host_mac(p, std::move(rt));
                 return;
             }
 
@@ -723,7 +723,7 @@ void RnaPnd::discover_network_ethernet(const Packet* p)
 
             if ( llc->s.s.DSAP != llc->s.s.SSAP )
             {
-                generate_new_host_mac(p, rt);
+                generate_new_host_mac(p, std::move(rt));
                 return;
             }
 
@@ -745,7 +745,7 @@ void RnaPnd::discover_network_ethernet(const Packet* p)
     }
 
     if ( retval )
-        generate_new_host_mac(p, rt, true);
+        generate_new_host_mac(p, std::move(rt), true);
 
     return;
 }

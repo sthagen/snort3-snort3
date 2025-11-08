@@ -30,8 +30,10 @@
 #include "helpers/buffer_data.h"
 #include "http_module.h"
 #include "js_norm/js_enum.h"
+#include "pub_sub/dns_payload_event.h"
 #include "pub_sub/http_request_body_event.h"
 #include "pub_sub/http_body_event.h"
+#include "pub_sub/intrinsic_event_ids.h"
 
 #include "http_api.h"
 #include "http_common.h"
@@ -112,20 +114,20 @@ void HttpMsgBody::publish(unsigned pub_id)
     }
 
     // Publish request body limited statically
-    if (params->publish_request_body and is_request and (publish_octets < REQUEST_PUBLISH_DEPTH))
+    if (params->publish_request_body and is_request and (publish_octets < BODY_PUBLISH_DEPTH))
     {
         // Exclude already published octets (publish_octets):
-        const auto request_publish_depth_remaining = REQUEST_PUBLISH_DEPTH - publish_octets;
+        const auto request_publish_depth_remaining = BODY_PUBLISH_DEPTH - publish_octets;
 
         // We should not publish more than the remaining publish depth:
         auto request_publish_length = (publish_length > request_publish_depth_remaining) ?
             request_publish_depth_remaining : publish_length;
 
-        // If it is not the last piece of the request, it should be marked as such because of REQUEST_PUBLISH_DEPTH limit:
+        // If it is not the last piece of the request, it should be marked as such because of BODY_PUBLISH_DEPTH limit:
         // if sum of already published octets (publish_octets) and current publishing length (request_publish_length)
         // is greater than the request publish depth.
         auto request_last_piece = last_piece ?
-            true : (publish_octets + request_publish_length >= REQUEST_PUBLISH_DEPTH);
+            true : (publish_octets + request_publish_length >= BODY_PUBLISH_DEPTH);
 
         HttpRequestBodyEvent http_request_body_event(this, request_publish_length, publish_octets, request_last_piece, session_data);
         DataBus::publish(pub_id, HttpEventIds::REQUEST_BODY, http_request_body_event, flow);
@@ -135,6 +137,30 @@ void HttpMsgBody::publish(unsigned pub_id)
             fprintf(HttpTestManager::get_output_file(),
                 "Published %" PRId32 " bytes of request body. last: %s\n", request_publish_length,
                 (request_last_piece ? "true" : "false"));
+            fflush(HttpTestManager::get_output_file());
+        }
+    #endif
+    }
+
+    // publish DOH body if applicable
+    if (get_header(source_id) and (get_header(source_id)->get_content_type() == CT_APPLICATION_DNS) 
+        and (publish_octets < BODY_PUBLISH_DEPTH))
+    {
+        const auto doh_publish_depth_remaining = BODY_PUBLISH_DEPTH - publish_octets;        
+        auto doh_publish_length = (publish_length > doh_publish_depth_remaining) ?
+            doh_publish_depth_remaining : publish_length;
+        auto doh_last_piece = last_piece ? true : (publish_octets + doh_publish_length >= BODY_PUBLISH_DEPTH);
+        DnsPayloadEvent dns_payload_event(msg_text_new.start(), publish_length, is_request,
+            true, doh_last_piece);
+        DnsDataStash* stash = new DnsDataStash(msg_text_new.start(), publish_length);
+        flow->set_attr(STASH_DNS_DATA, stash);
+        DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::DNS_PAYLOAD, dns_payload_event, flow);
+    #ifdef REG_TEST
+        if (HttpTestManager::use_test_output(HttpTestManager::IN_HTTP))
+        {
+            fprintf(HttpTestManager::get_output_file(),
+                "Published %" PRId32 " bytes of DOH body. last: %s\n", doh_publish_length,
+                (doh_last_piece ? "true" : "false"));
             fflush(HttpTestManager::get_output_file());
         }
     #endif

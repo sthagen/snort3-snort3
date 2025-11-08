@@ -127,7 +127,7 @@ void TalosLogger::open()
     if ( sep_pos != string::npos )
         ifname = ifname.substr(sep_pos+1);
 
-    talos_log->name = ifname;
+    talos_log->name = std::move(ifname);
 }
 
 void TalosLogger::close()
@@ -185,14 +185,14 @@ void TalosLogger::alert(Packet*, const char* msg, const Event& event)
     message.pop_back();
 
     rule.key = key.str();
-    rule.msg = message;
+    rule.msg = std::move(message);
     rule.gid = gid;
     rule.sid = sid;
     rule.rev = rev;
     rule.count = 1;
 
     // rule not in map, add it
-    alerts[key.str()] = rule;
+    alerts[key.str()] = std::move(rule);
 }
 
 //-------------------------------------------------------------------------

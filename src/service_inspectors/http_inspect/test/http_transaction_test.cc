@@ -29,6 +29,7 @@
 #include "service_inspectors/http_inspect/http_flow_data.h"
 #include "service_inspectors/http_inspect/http_inspect.h"
 #include "service_inspectors/http_inspect/http_module.h"
+#include "service_inspectors/http_inspect/http_msg_section.h"
 #include "service_inspectors/http_inspect/http_transaction.h"
 #include "service_inspectors/http2_inspect/http2_flow_data.h"
 
@@ -112,6 +113,7 @@ const snort::StreamBuffer HttpStreamSplitter::reassemble(snort::Flow*, unsigned,
 }
 bool HttpStreamSplitter::finish(snort::Flow*) { return false; }
 void HttpStreamSplitter::prep_partial_flush(snort::Flow*, uint32_t, uint32_t, uint32_t) { }
+void HttpMsgSection::clear_tmp_buffers() { }
 
 THREAD_LOCAL PegCount HttpModule::peg_counts[PEG_COUNT_MAX] = { };
 const Field Field::FIELD_NULL { STAT_NO_SOURCE };
@@ -204,6 +206,7 @@ TEST(http_transaction_test, simple_pipeline)
         type_expected[SRC_CLIENT] = SEC_HEADER;
         section_type[SRC_CLIENT] = SEC_HEADER;
         CHECK(trans[k] == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+        HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
         for (unsigned j=0; j < k; j++)
         {
             CHECK(trans[k] != trans[j]);
@@ -268,6 +271,7 @@ TEST(http_transaction_test, pipeline_underflow)
     type_expected[SRC_CLIENT] = SEC_HEADER;
     section_type[SRC_CLIENT] = SEC_HEADER;
     CHECK(trans == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+    HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
     type_expected[SRC_CLIENT] = SEC_REQUEST;
 
     section_type[SRC_SERVER] = SEC_STATUS;
@@ -287,6 +291,7 @@ TEST(http_transaction_test, pipeline_underflow)
     type_expected[SRC_CLIENT] = SEC_HEADER;
     section_type[SRC_CLIENT] = SEC_HEADER;
     CHECK(trans2 == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+    HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
     type_expected[SRC_CLIENT] = SEC_REQUEST;
 
     section_type[SRC_SERVER] = SEC_STATUS;
@@ -482,6 +487,7 @@ TEST(http_transaction_test, pipeline_continue_pipeline)
         type_expected[SRC_CLIENT] = SEC_HEADER;
         section_type[SRC_CLIENT] = SEC_HEADER;
         CHECK(trans[k] == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+        HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
         for (unsigned j=0; j < k; j++)
         {
             CHECK(trans[k] != trans[j]);
@@ -521,6 +527,7 @@ TEST(http_transaction_test, pipeline_continue_pipeline)
         type_expected[SRC_CLIENT] = SEC_HEADER;
         section_type[SRC_CLIENT] = SEC_HEADER;
         CHECK(trans[k] == HttpTransaction::attach_my_transaction(flow_data, SRC_CLIENT, flow));
+        HttpUnitTestSetup::half_reset(flow_data, SRC_CLIENT);
         for (unsigned j=5; j < k; j++)
         {
             CHECK(trans[k] != trans[j]);

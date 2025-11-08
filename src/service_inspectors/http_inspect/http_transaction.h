@@ -42,7 +42,7 @@ public:
     static void delete_transaction(HttpTransaction*, HttpFlowData*);
 
     HttpMsgRequest* get_request() const { return request; }
-    void set_request(HttpMsgRequest* request_) { request = request_; }
+    void set_request(HttpMsgRequest* request);
 
     HttpMsgStatus* get_status() const { return status; }
     void set_status(HttpMsgStatus* status_) { status = status_; }

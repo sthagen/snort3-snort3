@@ -124,7 +124,7 @@ bool Pcre::convert(std::istringstream& data_stream)
 
         if (!sticky_buffer.empty())
         {
-            buffer = sticky_buffer;
+            buffer = std::move(sticky_buffer);
 
             if (sticky_buffer_set)
                 rule_api.bad_rule(data_stream,

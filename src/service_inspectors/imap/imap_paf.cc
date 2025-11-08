@@ -426,7 +426,7 @@ static inline void parse_command(const uint8_t ch, ImapPafData* pfdata)
                 : IMAP_PAF_VAL_STATE;
         }
     }
-    else if (toupper(ch) == toupper(val))
+    else if (toupper(ch) == toupper(val) && val != '\0')
         pfdata->imap_data_info.next_letter++;
 
     else

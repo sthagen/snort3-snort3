@@ -163,7 +163,7 @@ bool Profilers<table_name>::convert(std::istringstream& data_stream)
                 add_or_append("sort", "no_matches");
             }
             else
-                add_or_append("sort", val);
+                add_or_append("sort", std::move(val));
         }
         else
         {

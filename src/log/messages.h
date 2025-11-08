@@ -35,7 +35,7 @@
 #define __attribute__(x)  /*NOTHING*/
 #endif
 
-#define STD_BUF 1024
+#define STD_BUF 2048
 
 enum WarningGroup
 {

@@ -39,8 +39,7 @@ public:
         HttpCommon::SourceId source_id_, bool buf_owner, snort::Flow* flow_,
         const HttpParaList* params_);
     ~HttpMsgRequest() override;
-    bool detection_required() const override
-        { return version_id == HttpEnums::VERS_0_9; }
+    bool detection_required() const override;
     snort::PduSection get_inspection_section() const override
         { return snort::PS_HEADER; }
     void gen_events() override;

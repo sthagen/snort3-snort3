@@ -59,6 +59,8 @@ Services and their events:
   ** `request`
   ** `response`
   ** `eot` (a session defined by the following commands: APPE, DELE, RETR, STOR, STOU, ACCT, PORT, PASV, EPRT, EPSV)
+* SSL
+  ** `tls_metadata_event`
 * DNS
   ** `response`
 * connection (conn)
@@ -114,6 +116,17 @@ Fields supported for FTP:
 * `data_channel.orig_h` - IP address of data channel originator
 * `data_channel.resp_h` - IP address of data channel receiving point
 * `data_channel.resp_p` - TCP port of data channel receiving point
+
+Fields supported for SSL:
+
+* `version` - SSL/TLS version that the server chose
+* `server_name_identifier` - Server Name Identifier ( SNI ) extracted from Client Hello
+* `validation_status` - result of certificate validation
+* `subject` - RFC2253 formatted certificate subject information
+* `issuer` - RFC2253 formatted certificate issuer information
+* `module_identifier` - name of snort module that populated the event
+* `cipher` - SSL/TLS cipher suite that the server chose
+* `curve` - named elliptic curve the server chose
 
 Fields supported for DNS:
 

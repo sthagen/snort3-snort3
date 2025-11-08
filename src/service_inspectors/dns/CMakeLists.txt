@@ -9,6 +9,8 @@ set( FILE_LIST
     dns_rr_decoder.cc
     dns_splitter.cc
     dns_splitter.h
+    dns_payload_event_handler.cc
+    dns_payload_event_handler.h
 )
 
 # if (STATIC_INSPECTORS)

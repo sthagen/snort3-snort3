@@ -72,7 +72,7 @@ private:
     snort::FileContext* get_file(snort::Flow*, uint64_t file_id, bool to_create,
         int64_t timeout, bool using_cache_entry, bool &cache_full, int64_t& cache_expire);
     FileVerdict check_verdict(snort::Packet*, snort::FileInfo*, snort::FilePolicyBase*,const uint8_t* current_data, uint32_t current_data_len);
-    int store_verdict(snort::Flow*, snort::FileInfo*, int64_t timeout, bool &cache_full);
+    int store_verdict(snort::Flow*, snort::FileInfo*, int64_t timeout, bool &cache_full, bool is_cacheable);
     void publish_file_cache_event(snort::Flow* flow, snort::FileInfo* file, int64_t timeout);
 
     /* The hash table of expected files */

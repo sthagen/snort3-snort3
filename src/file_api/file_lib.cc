@@ -122,7 +122,8 @@ void FileInfo::copy(const FileInfo& other, bool clear_data)
 
     if (other.sha256)
     {
-        sha256 = new uint8_t[SHA256_HASH_SIZE];
+        if (!sha256)
+            sha256 = new uint8_t[SHA256_HASH_SIZE];
         memcpy( (char*)sha256, (const char*)other.sha256, SHA256_HASH_SIZE);
     }
 

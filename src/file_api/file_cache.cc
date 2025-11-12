@@ -351,7 +351,7 @@ void FileCache::publish_file_cache_event(Flow* flow, FileInfo* file, int64_t tim
     }
 }
 
-int FileCache::store_verdict(Flow* flow, FileInfo* file, int64_t timeout, bool &cache_full)
+int FileCache::store_verdict(Flow* flow, FileInfo* file, int64_t timeout, bool &cache_full, bool is_cacheable)
 {
     assert(file);
     uint64_t file_id = file->get_file_id();
@@ -369,6 +369,9 @@ int FileCache::store_verdict(Flow* flow, FileInfo* file, int64_t timeout, bool &
     {
         publish_file_cache_event(flow, file, cache_expire);
         *((FileInfo*)(file_got)) = *file;
+
+        if (file != file_got and not is_cacheable)
+            file_got->set_not_cacheable();
 
         if (FILE_VERDICT_PENDING == file->verdict and file != file_got)
         {
@@ -512,7 +515,7 @@ bool FileCache::apply_verdict(Packet* p, FileContext* file_ctx, FileVerdict verd
 
             if (resume)
                 policy->log_file_action(flow, file_ctx, FILE_RESUME_BLOCK);
-            else if (store_verdict(flow, file_ctx, lookup_timeout, cache_full) != 0)
+            else if (store_verdict(flow, file_ctx, lookup_timeout, cache_full, file_ctx->is_cacheable()) != 0)
             {
                 if (cache_full)
                 {
@@ -547,9 +550,9 @@ bool FileCache::apply_verdict(Packet* p, FileContext* file_ctx, FileVerdict verd
         file_ctx->log_file_event(flow, policy);
         policy->log_file_action(flow, file_ctx, FILE_RESUME_BLOCK);
     }
-    else if (file_ctx->is_cacheable())
+    else if (bool is_cacheable = file_ctx->is_cacheable())
     {
-        if (store_verdict(flow, file_ctx, block_timeout, cache_full) != 0)
+        if (store_verdict(flow, file_ctx, block_timeout, cache_full, is_cacheable) != 0)
         {
             if (PacketTracer::is_active())
             {

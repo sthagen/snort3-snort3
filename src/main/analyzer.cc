@@ -104,6 +104,7 @@ class RetryQueue
 public:
     RetryQueue(unsigned interval_ms)
     {
+        LogMessage("Retry queue interval is: %u ms\n", interval_ms);
         assert(interval_ms > 0);
         interval = { static_cast<time_t>(interval_ms / 1000), static_cast<suseconds_t>((interval_ms % 1000) * 1000) };
     }
@@ -746,12 +747,12 @@ void Analyzer::term()
     TraceApi::thread_term();
 }
 
-Analyzer::Analyzer(SFDAQInstance* instance, unsigned i, const char* s, uint64_t msg_cnt) :
+Analyzer::Analyzer(SFDAQInstance* instance, unsigned i, const char* s, uint64_t msg_cnt, const uint32_t retry_timeout) :
     id(i),
     exit_after_cnt(msg_cnt),
     source(s ? s : ""),
     daq_instance(instance),
-    retry_queue(new RetryQueue(200)),
+    retry_queue(new RetryQueue(retry_timeout)),
     oops_handler(new OopsHandler())
 {
     set_state(State::NEW);

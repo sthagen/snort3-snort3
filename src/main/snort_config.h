@@ -423,7 +423,7 @@ public:
     SoRules* so_rules = nullptr;
 
     DumpConfigType dump_config_type = DUMP_CONFIG_NONE;
-
+    uint32_t retry_timeout = 200;   // Milliseconds to hold packet on retry queue.
     std::string dump_config_file;
     std::thread* config_dumper = nullptr;
 private:

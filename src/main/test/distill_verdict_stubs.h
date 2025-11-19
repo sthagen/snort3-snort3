@@ -212,7 +212,6 @@ const uint8_t* PacketManager::encode_reject(UnreachResponse, EncodeFlags, const 
 void FileService::thread_init() { }
 void FileService::thread_term() { }
 void ErrorMessage(const char*,...) { }
-void LogMessage(const char*,...) { }
 [[noreturn]] void FatalError(const char*,...) { exit(-1); }
 void ParseWarning(WarningGroup, const char*, ...) { }
 void HighAvailabilityManager::thread_init() { }

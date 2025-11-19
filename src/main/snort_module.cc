@@ -573,6 +573,9 @@ static const Parameter s_params[] =
     { "--process-all-events", Parameter::PT_IMPLIED, nullptr, nullptr,
       "process all action groups" },
 
+    { "--retry-timeout", Parameter::PT_INT, "0:max32", "200",
+      "Number of milliseconds a packet stays in the retry queue before being reexamined" },
+
     { "--rule", Parameter::PT_STRING, nullptr, nullptr,
       "<rules> to be added to configuration; may be repeated" },
 
@@ -1149,6 +1152,9 @@ bool SnortModule::set(const char*, Value& v, SnortConfig* sc)
 
     else if ( is(v, "--process-all-events") )
         sc->set_process_all_events(true);
+
+    else if ( is(v, "--retry-timeout") )
+        sc->retry_timeout = v.get_uint32();
 
     else if ( is(v, "--rule") )
         parser_append_rules(v.get_string());

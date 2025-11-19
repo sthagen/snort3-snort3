@@ -38,7 +38,8 @@
 template <typename Ret, class... Context>
 struct DataField
 {
-    DataField(const char* name, Ret (*get)(Context...)) : name(name), get(get) { }
+    DataField(const char* name_in, Ret (*get_in)(Context...)) : name(name_in), get(get_in)
+    { }
 
     const char* name;
     Ret (*get)(Context...);

@@ -24,6 +24,7 @@
 #endif
 
 #include <cassert>
+#include <vector>
 
 #include "detection/ips_context.h"
 #include "framework/cursor.h"
@@ -35,6 +36,8 @@
 #include "log/log_stats.h"
 #include "log/messages.h"
 #include "main/snort_config.h"
+#include "main/thread.h"
+#include "main/thread_config.h"
 #include "managers/ips_manager.h"
 #include "managers/module_manager.h"
 #include "profiler/profiler.h"
@@ -59,14 +62,43 @@ void show_pcre_counts();
 
 struct PcreData
 {
-    pcre2_code* re;                       /* compiled regex */
-    pcre2_match_context* match_context;   /* match_context */
-    pcre2_match_data* match_data;         /* match data space for storing results */
-    int options;                          /* sp_pcre specific options (relative & inverse) */
+    PcreData();
+    ~PcreData();
+
+    pcre2_code* re;                                    /* compiled regex */
+    pcre2_match_context* match_context;                /* match_context */
+    std::vector<pcre2_match_data*> match_data_store;   /* match data space for storing results */
+    int options;                                       /* sp_pcre specific options (relative & inverse) */
     char* expression;
 };
 
 static THREAD_LOCAL ProfileStats pcrePerfStats;
+
+PcreData::PcreData() :
+    re(nullptr),
+    match_context(nullptr),
+    match_data_store(ThreadConfig::get_instance_max(), nullptr),
+    options(0),
+    expression(nullptr)
+{ }
+
+PcreData::~PcreData()
+{
+    if (expression)
+        snort_free(expression);
+
+    assert(match_context);
+    pcre2_match_context_free(match_context);
+
+    assert(re);
+    pcre2_code_free(re);
+
+    for (auto* match_data : match_data_store)
+    {
+        assert(match_data);
+        pcre2_match_data_free(match_data);
+    }
+}
 
 struct PcreCounts
 {
@@ -294,7 +326,8 @@ static void pcre_parse(const SnortConfig* sc, const char* data, PcreData* pcre_d
         return;
     }
 
-    pcre_data->match_data = pcre2_match_data_create_from_pattern(pcre_data->re, nullptr);
+    for (auto& match_data : pcre_data->match_data_store)
+        match_data = pcre2_match_data_create_from_pattern(pcre_data->re, nullptr);
 
      /* now study it... */
     if (USE_JIT)
@@ -347,13 +380,18 @@ static bool pcre_search(
 
     found_offset = -1;
 
+    assert(get_instance_id() < pcre_data->match_data_store.size());
+
+    auto match_data = pcre_data->match_data_store[get_instance_id()];
+    assert(match_data);
+
     int result = pcre2_match(
         pcre_data->re,              /* result of pcre_compile() */
         (PCRE2_SPTR)buf,            /* the subject string */
         (PCRE2_SIZE)len,            /* the length of the subject string */
         (PCRE2_SIZE)start_offset,   /* start at offset 0 in the subject */
         0,                          /* options (handled at compile time) */
-        pcre_data->match_data,      /* match data to store the match results */
+        match_data,                 /* match data to store the match results */
         pcre_data->match_context);  /* match context for limits */
 
     if (result >= 0)
@@ -379,7 +417,7 @@ static bool pcre_search(
          * and a single int for scratch space.
          */
 
-        ovector = pcre2_get_ovector_pointer(pcre_data->match_data);
+        ovector = pcre2_get_ovector_pointer(match_data);
         found_offset = ovector[1];
     }
     else if (result == PCRE2_ERROR_NOMATCH)
@@ -448,17 +486,7 @@ private:
 
 PcreOption::~PcreOption()
 {
-    if ( !config )
-        return;
-
-    if ( config->expression )
-        snort_free(config->expression);
-
-    pcre2_match_context_free(config->match_context);
-    pcre2_code_free(config->re);
-    pcre2_match_data_free(config->match_data);
-
-    snort_free(config);
+    delete config;
 }
 
 uint32_t PcreOption::hash() const
@@ -684,7 +712,7 @@ bool PcreModule::end(const char* name, int v, SnortConfig* sc)
 
     if ( !mod_regex )
     {
-        data = (PcreData*)snort_calloc(sizeof(*data));
+        data = new PcreData();
         pcre_parse(sc, re.c_str(), data);
     }
 

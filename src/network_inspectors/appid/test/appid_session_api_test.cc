@@ -393,6 +393,34 @@ TEST(appid_session_api, get_first_stream_appids_for_http2)
     delete &asd.get_api();
 }
 
+TEST(appid_session_api, get_first_stream_appids_for_http3)
+{
+    SfIp ip{};
+    AppIdSession asd(IpProtocol::TCP, &ip, 1492, dummy_appid_inspector, odpctxt, 0
+#ifndef DISABLE_TENANT_ID
+    ,0
+#endif
+    );
+    asd.flow = &flow;
+    AppidChangeBits change_bits;
+    asd.set_ss_application_ids(APP_ID_HTTP3,APP_ID_HTTP3,APP_ID_HTTP3,APP_ID_HTTP3,APP_ID_HTTP3, change_bits);
+
+    AppId service, client, payload, misc;
+    asd.get_api().get_first_stream_app_ids(service, client, payload, misc);
+    CHECK_EQUAL(service, APP_ID_HTTP3);
+    CHECK_EQUAL(client, APP_ID_HTTP3);
+    CHECK_EQUAL(payload, APP_ID_HTTP3);
+    CHECK_EQUAL(misc, APP_ID_HTTP3);
+
+    service = client = payload = APP_ID_NONE;
+    asd.get_api().get_first_stream_app_ids(service, client, payload);
+    CHECK_EQUAL(service, APP_ID_HTTP3);
+    CHECK_EQUAL(client, APP_ID_HTTP3);
+    CHECK_EQUAL(payload, APP_ID_HTTP3);
+
+    delete &asd.get_api();
+}
+
 TEST(appid_session_api, get_tls_host)
 {
     AppidChangeBits change_bits;

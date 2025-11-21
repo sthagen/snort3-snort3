@@ -376,6 +376,33 @@ TEST(appid_api, ssl_app_group_id_lookup_sni_mismatch)
     mock().checkExpectations();
 }
 
+TEST(appid_api, ssl_app_group_id_lookup_zero_len_data)
+{
+    mock().expectNCalls(1, "publish");
+    AppId service, client, payload = APP_ID_NONE;
+    bool val = false;
+
+    AppidChangeBits change_bits;
+
+    mock_session->set_ss_application_ids(0,0,0,0,0, change_bits);
+    mock_session->tsession->set_tls_sni(nullptr, 0);
+    mock_session->tsession->set_tls_cname(nullptr, 0);
+    mock_session->tsession->set_tls_first_alt_name(nullptr, 0);
+    mock_session->tsession->set_tls_org_unit(nullptr, 0);
+
+    const char* test_zero_tls_data = "";
+
+    val = appid_api.ssl_app_group_id_lookup(flow, test_zero_tls_data, test_zero_tls_data,
+        test_zero_tls_data, test_zero_tls_data, true, service, client, payload);
+
+    CHECK_TRUE(val);
+    CHECK_EQUAL(mock_session->tsession->get_tls_sni(), nullptr);
+    CHECK_EQUAL(mock_session->tsession->get_tls_first_alt_name(), nullptr);
+    CHECK_EQUAL(mock_session->tsession->get_tls_cname(), nullptr);
+    CHECK_EQUAL(mock_session->tsession->get_tls_org_unit(), nullptr);
+    mock().checkExpectations();
+}
+
 TEST(appid_api_no_session, ssl_app_group_id_lookup)
 {
     AppId service, client, payload = APP_ID_NONE;
@@ -429,6 +456,23 @@ TEST(appid_api, is_inspection_needed)
 
     inspector.set_service(dummy_http2_protocol_id + 1);
     CHECK_FALSE(appid_api.is_inspection_needed(inspector));
+}
+
+TEST(appid_api, is_inspection_needed_no_appid_inspector)
+{
+    mock_inspector_exist = false;
+    DummyInspector inspector;
+    bool res = appid_api.is_inspection_needed(inspector);
+    CHECK_FALSE(res);
+    mock_inspector_exist = true;
+}
+
+TEST(appid_api, update_shadow_traffic_status_no_appid_inspector)
+{
+    mock_inspector_exist = false;
+    appid_api.update_shadow_traffic_status(false);
+    CHECK_TRUE(true);// no crash
+    mock_inspector_exist = true;
 }
 
 TEST(appid_api, is_service_http_type)

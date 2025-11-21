@@ -149,28 +149,44 @@ bool AppIdApi::ssl_app_group_id_lookup(Flow* flow, const char* server_name,
 
         if (org_unit)
         {
-            asd->tsession->set_tls_org_unit(org_unit, strlen(org_unit));
-            asd->scan_flags |= SCAN_SSL_ORG_UNIT_FLAG;
+            auto org_unit_len = strlen(org_unit);
+            if (org_unit_len > 0)
+            {
+                asd->tsession->set_tls_org_unit(org_unit, org_unit_len);
+                asd->scan_flags |= SCAN_SSL_ORG_UNIT_FLAG;
+            }
         }
 
         if (server_name)
         {
-            asd->tsession->set_tls_sni(server_name, strlen(server_name));
-            if (!sni_mismatch)
-                asd->scan_flags |= SCAN_SSL_HOST_FLAG;
+            auto sni_len = strlen(server_name);
+            if (sni_len > 0)
+            {
+                asd->tsession->set_tls_sni(server_name, sni_len);
+                if (!sni_mismatch)
+                    asd->scan_flags |= SCAN_SSL_HOST_FLAG;
+            }
         }
 
         if (first_alt_name)
         {
-            asd->tsession->set_tls_first_alt_name(first_alt_name, strlen(first_alt_name));
-            asd->scan_flags |= SCAN_SSL_ALT_NAME;
+            auto first_alt_name_len = strlen(first_alt_name);
+            if (first_alt_name_len > 0)
+            {
+                asd->tsession->set_tls_first_alt_name(first_alt_name, first_alt_name_len);
+                asd->scan_flags |= SCAN_SSL_ALT_NAME;
+            }
         }
 
         if (common_name)
         {
-            asd->tsession->set_tls_cname(common_name, strlen(common_name));
-            asd->scan_flags |= SCAN_SSL_CERTIFICATE_FLAG;
-            asd->tsession->set_tls_handshake_done();
+            auto common_name_len = strlen(common_name);
+            if (common_name_len > 0)
+            {
+                asd->tsession->set_tls_cname(common_name, common_name_len);
+                asd->scan_flags |= SCAN_SSL_CERTIFICATE_FLAG;
+                asd->tsession->set_tls_handshake_done();
+            }
         }
 
         asd->scan_flags |= SCAN_CERTVIZ_ENABLED_FLAG;

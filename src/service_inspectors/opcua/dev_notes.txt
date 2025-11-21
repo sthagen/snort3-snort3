@@ -1,0 +1,72 @@
+*** OPC UA service inspector overview ***
+OPC Unified Architecture (OPC UA) is a protocol maintained by the OPC
+Foundation that aims to provide a platform-independent framework that
+improves upon the success of OPC Classic while adding new features.
+
+OPC UA does not define a specific TCP port for its use, but instead
+requires each application to choose its own.
+
+The `opcua` service inspector decodes the message header and provides
+rule options to access certain protocol fields and data content. This
+allows the user to write rules for OPC UA messages without manually
+decoding the protocol.
+
+
+*** OPC UA message chunking overview ***
+The OPC UA `Secure Conversation Message` header introduces a field named
+`IsFinal` with three defined values: Intermediate Chunk (C), Final Chunk
+(F), and Aborted Final Chunk (A). The value set in this field indicates
+whether or not the full message has been sent.
+
+When values `F` or `A` are set this tells the host on the other side of
+the conversation that all of the expected data has been sent. When the
+value `C` is set it indicates that the contained data makes up only a
+portion of the greater message. In this case to properly analyze the
+message the receiving host must wait a message with either the F or A
+values set and then rebuild the entire message.
+
+
+*** OPC UA curse ***
+In the OPC UA curse, current and prior state are tracked as the potential
+message is processed byte by byte. The current state indicates the part of
+an OPC UA message that the byte in that position would represent if it was
+found to contain a suitable message. The prior state is tracked so that the
+state machine knows where to pick up in the event of a message being split.
+Two special states exist which are used to assist in determining when to
+stop processing: OPCUA_STATE_FOUND and OPCUA_STATE_NOT_FOUND.
+
+During processing only states that are required to be specific values are
+enforced, leaving more specific enforcement to the service inspector itself.
+This choice was made to help avoid false negatives caused by states that
+would not affect the inspector's parsing. For example the `IsFinal` field has
+values that are expected, but a majority of valid requests are allowed to
+ignore this field so it is not enforced in the curse. By contrast, the value
+of the `MsgType` field is crucial to determining which message is being sent
+and must be enforced. If the message type checks pass, a few message specific
+pattern checks are made to make sure that the payload roughly fits the
+expected message.
+
+
+*** OPC UA message pipelining overview ***
+Multiple OPC UA messages can be sent within a single TCP stream through use of
+a variety of techniques beyond the message chunking described above. Splitting
+for known forms is handled as follows:
+
+Case 1 Combined:
+In this case multiple complete messages are concatenated together within one
+TCP packet. No special considerations were needed in the curse to handle
+this case as the flush point is already contained in the provided buffer.
+
+Case 2 Split:
+In this case a single message is split across multiple TCP packets within the
+same stream. To ensure that detection continues regardless of the split
+location, any checks spanning more than one byte must have state saved off.
+This is explicitly seen in the processing for message type.
+
+Case 3 Combined and Split:
+In this case, the above two techniques are combined to create a stream where
+one packet contains a complete OPC UA message as well as the start of a second,
+and then the packets that follow contain the remainder of the second OPC UA
+message. No additional considerations beyond those implemented for the prior
+two techniques were needed.
+

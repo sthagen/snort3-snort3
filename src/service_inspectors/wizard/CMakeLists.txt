@@ -1,3 +1,4 @@
+add_subdirectory(test)
 
 set(FILE_LIST
     curse_book.cc
@@ -8,6 +9,8 @@ set(FILE_LIST
     magic.h
     mms_curse.cc
     mms_curse.h
+    opcua_curse.cc
+    opcua_curse.h
     s7commplus_curse.cc
     s7commplus_curse.h
     ssl_curse.cc

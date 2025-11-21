@@ -56,6 +56,7 @@ extern const BaseApi* sin_iec104[];
 extern const BaseApi* sin_mms[];
 extern const BaseApi* sin_modbus[];
 extern const BaseApi* sin_netflow[];
+extern const BaseApi* sin_opcua[];
 extern const BaseApi* sin_s7commplus[];
 extern const BaseApi* sin_ssl[];
 #endif
@@ -99,6 +100,7 @@ void load_service_inspectors()
     PluginManager::load_plugins(sin_mms);
     PluginManager::load_plugins(sin_modbus);
     PluginManager::load_plugins(sin_netflow);
+    PluginManager::load_plugins(sin_opcua);
     PluginManager::load_plugins(sin_s7commplus);
     PluginManager::load_plugins(sin_ssl);
 #endif

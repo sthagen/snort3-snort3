@@ -1,0 +1,188 @@
+opcua inspector is a service inspector for the OPC Unified Architecture
+(OPC UA) protocol managed by the OPC Foundation.
+
+==== Overview
+
+OPC Unified Architecture (OPC UA) is a protocol maintained by the OPC 
+Foundation that aims to provide a platform-independent framework that 
+improves upon the success of OPC Classic while adding new features.
+
+OPC UA does not define a specific TCP port for its use, but instead
+requires each application to choose its own.
+
+The `opcua` service inspector decodes the message header and provides rule 
+options to access certain protocol fields and data content. This allows the 
+user to write rules for OPC UA messages without manually decoding the 
+protocol.
+
+
+==== Configuration
+
+OPC UA messages can be sent in a variety of ways including multiple PDUs 
+within one TCP packet, one PDU split across multiple TCP packets, or a 
+combination of the two. It is the aim of the `opcua` service inspector to 
+normalize the traffic such that only complete OPC UA messages are presented 
+to the user. No manual configuration other than enabling the appropriate 
+service inspector is necessary to leverage this functionality.
+
+
+==== Quick Guide
+
+A typical OPC UA configuration looks like the following:
+
+   wizard = { curses = {'opcua'}, }
+   opcua = { }
+   
+   binder =
+   {
+       { when = { service = 'opcua' }, use = { type = 'opcua' } },
+       { use = { type = 'wizard' } }
+   }
+
+In this example, the `opcua` inspector is defined based on patterns known to 
+be consistent with OPC UA messages.
+
+
+==== Rule Options
+
+New rule options are supported by enabling the `opcua` inspector:
+
+* ips_opcua_msg_service
+* ips_opcua_msg_type
+* ips_opcua_node_id
+* ips_opcua_node_namespace_index
+
+===== opcua_msg_service
+
+`opcua_msg_service` takes the supplied service name as a string and compares 
+it with the service in the message being analyzed. By default this rule 
+option works exclusively with the request/response services defined by the 
+OPC Foundation under the default namespace. 
+
+This rule option is intended to be a shorthand way to analyze common 
+services. Detection of services outside of the scope described here is 
+possible through use of the `opcua_node_namespace_index` and `opcua_node_id` 
+rule options instead. 
+
+This option takes one argument.
+
+In the following example, the rule is using the `opcua_msg_service` rule 
+option with a string argument containing the `BrowseRequest` service name on 
+which to alert. This is combined with a content match for "MSG" at the 
+beginning of the buffer as a fast pattern. 
+
+    alert opcua ( \
+      msg: "PROTOCOL-SCADA OPC UA BrowseRequest detected"; \
+      flow: to_server, established; \
+      content:"MSG", depth 3; \
+      opcua_msg_service:BrowseRequest; \
+      sid:1000000; \
+    )
+
+
+===== opcua_msg_type
+
+`opcua_msg_type` takes the supplied message type as a string and compares it 
+with the message type field in the message being analyzed. By default the 
+seven message types defined by the OPC Foundation (HEL, ACK, ERR, RHE, OPN, 
+MSG, and CLO) are supported. 
+
+This option takes one argument.
+
+In the following example, the rule is using the `opcua_msg_type` rule option 
+with a string argument containing the `ERR` message type on which to alert. 
+This is combined with a content match looking for the error code 0x80020000.
+
+    alert opcua ( \
+      msg: "PROTOCOL-SCADA OPC UA ERR 0x80020000 detected"; \
+      flow: to_client, established; \
+      opcua_msg_type:ERR; \
+      content:"|00 00 02 80|", offset 8, depth 4; \
+      sid:1000000; \
+    )
+
+
+===== opcua_node_id
+`opcua_node_id` takes the supplied node id as an integer and compares it with 
+the node id value in the message being analyzed. This rule option is expected 
+to be used in conjunction with the `opcua_node_namespace_index` rule option.
+
+No assumptions are being made of the namespace index when this rule option is 
+used. It is offered as an option to allow for detection of non-default 
+message services. 
+
+If attempting to detect one of the default services defined by the OPC 
+Foundation, the `opcua_msg_service` rule option is likely a better fit. 
+
+This option takes one argument.
+
+In the following example, the rule is using the `opcua_node_id` and the 
+`opcua_node_namespace_index` rule options to look for a request with a custom 
+message service. This is combined with a content match for "MSG" at the 
+beginning of the buffer as a fast pattern. 
+
+    alert opcua ( \
+      msg: "PROTOCOL-SCADA OPC UA custom message service detected"; \
+      flow: to_server, established; \
+      content:"MSG", depth 3; \
+      opcua_node_namespace_index:13; \
+      opcua_node_id:37; \
+      sid:1000000; \
+    )
+
+These two rule options can additionally be used to replicate the functionality 
+exposed by the `opcua_msg_service` rule option by specifying the namespace 
+index and node id manually, as shown in the example below. 
+
+    alert opcua ( \
+      msg: "PROTOCOL-SCADA OPC UA BrowseRequest detected"; \
+      flow: to_server, established; \
+      content:"MSG", depth 3; \
+      opcua_node_namespace_index:0; \
+      opcua_node_id:527; \
+      sid:1000000; \
+    )
+
+
+===== opcua_node_namespace_index
+`opcua_node_namespace_index` takes the supplied node id as an integer and 
+compares it with the node namespace index value in the message being 
+analyzed. This rule option is expected to be used in conjunction with the 
+`opcua_node_id` rule option.
+
+No assumptions are being made of the node id when this rule option is used. 
+It is offered as an option to allow for detection of non-default message 
+services. 
+
+If attempting to detect one of the default services defined by the OPC 
+Foundation, the `opcua_msg_service` rule option is likely a better fit. 
+
+This option takes one argument.
+
+In the following example, the rule is using the `opcua_node_id` and the 
+`opcua_node_namespace_index` rule options to look for a request with a 
+custom message service. This is combined with a content match for "MSG" 
+at the beginning of the buffer as a fast pattern. 
+
+    alert opcua ( \
+      msg: "PROTOCOL-SCADA OPC UA custom message service detected"; \
+      flow: to_server, established; \
+      content:"MSG", depth 3; \
+      opcua_node_namespace_index:13; \
+      opcua_node_id:37; \
+      sid:1000000; \
+    )
+
+These two rule options can additionally be used to replicate the 
+functionality exposed by the `opcua_msg_service` rule option by specifying 
+the namespace index and node id manually, as shown in the example below. 
+
+    alert opcua ( \
+      msg: "PROTOCOL-SCADA OPC UA BrowseRequest detected"; \
+      flow: to_server, established; \
+      content:"MSG", depth 3; \
+      opcua_node_namespace_index:0; \
+      opcua_node_id:527; \
+      sid:1000000; \
+    )
+

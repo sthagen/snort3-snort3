@@ -25,6 +25,7 @@ set (
     iec104.txt
     js_norm.txt
     mms.txt
+    opcua.txt
     overview.txt
     params.txt
     perf_monitor.txt

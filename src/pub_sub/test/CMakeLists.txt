@@ -21,6 +21,11 @@ add_cpputest( pub_sub_eve_process_event_test
     SOURCES
         ../eve_process_event.h
 )
+add_cpputest( pub_sub_ssh_events_test
+    SOURCES
+        ../ssh_events.cc
+)
+
 add_cpputest( pub_sub_http_transaction_end_event_test
     SOURCES
         ../http_transaction_end_event.cc

@@ -136,20 +136,31 @@ static void snort_ssh(SSH_PROTO_CONF* config, Packet* p)
 
     if (!(sessp->state_flags & SSH_FLG_SESS_ENCRYPTED))
     {
+        const char* login_direction = "";
         // If server and client have not performed the protocol
         // version exchange yet, must look for version strings.
         if (!(sessp->state_flags & search_dir_ver))
         {
+            const SfIp* server_ip = &p->flow->server_ip;
+            const SfIp* client_ip = &p->flow->client_ip;
+
+            if (server_ip->is_private() != client_ip->is_private())
+            {
+                login_direction = server_ip->is_private() ? "inbound" : "outbound";
+            }
+
             bool valid_version = process_ssh_version_string(config, sessp, p, direction);
             if (valid_version)
             {
                 std::string proto_string((const char *)(p->data), p->dsize);
-                SshEvent event(SSH_VERSION_STRING, SSH_NOT_FINISHED, proto_string, pkt_direction, p);
+                SshEvent event(SSH_VERSION_STRING, SSH_NOT_FINISHED, proto_string, pkt_direction, p, login_direction,
+                    sessp->version);
                 DataBus::publish(pub_id, SshEventIds::STATE_CHANGE, event, p->flow);
             }
             else
             {
-                SshEvent event(SSH_VALIDATION, SSH_INVALID_VERSION, "", pkt_direction, p);
+                SshEvent event(SSH_VALIDATION, SSH_INVALID_VERSION, "", pkt_direction, p, login_direction,
+                    sessp->version);
                 DataBus::publish(pub_id, SshEventIds::STATE_CHANGE, event, p->flow);
                 if (sessp->version == NON_SSH_TRAFFIC)
                     sessp->ssh_aborted = true;
@@ -173,12 +184,14 @@ static void snort_ssh(SSH_PROTO_CONF* config, Packet* p)
             }
             if (keyx_valid)
             {
-                SshEvent event(SSH_VALIDATION, SSH_VALID_KEXINIT, "", pkt_direction, p);
+                SshEvent event(SSH_VALIDATION, SSH_VALID_KEXINIT, "", pkt_direction, p, login_direction,
+                    sessp->version);
                 DataBus::publish(pub_id, SshEventIds::STATE_CHANGE, event, p->flow);
             }
             else
             {
-                SshEvent event(SSH_VALIDATION, SSH_INVALID_KEXINIT, "", pkt_direction, p);
+                SshEvent event(SSH_VALIDATION, SSH_INVALID_KEXINIT, "", pkt_direction, p, login_direction,
+                    sessp->version);
                 DataBus::publish(pub_id, SshEventIds::STATE_CHANGE, event, p->flow);
                 sessp->state_flags |= SSH_FLG_SESS_ENCRYPTED;
             }
@@ -423,18 +436,27 @@ static bool process_ssh2_kexinit(SSHData *sessionp, Packet *p, uint8_t direction
     default:
         return false;
     }
+
+    SshAlgoEvent::Algorithms algos;
+    
     uint16_t total_length = sizeof(SSH2KeyExchange);
     const uint8_t *data = p->data + sizeof(SSH2KeyExchange);
     for (int i = 0; i < NUM_KEXINIT_LISTS; i++)
     {
-        uint32_t list_length = ntohl(*((const uint32_t*)data)) + sizeof(uint32_t);
-        if (list_length > ssh_length or total_length + list_length > ssh_length)
+        uint32_t list_length = ntohl(*((const uint32_t*)data));
+        uint32_t total_list_length = list_length + sizeof(uint32_t);
+
+        if (total_list_length > ssh_length or total_length + total_list_length > ssh_length)
         {
             DetectionEngine::queue_event(GID_SSH, SSH_EVENT_PAYLOAD_SIZE);
             return false;
         }
-        total_length += list_length;
-        data += list_length;
+
+        if (list_length)
+            algos.unnamed[i] = (const char*)(data + sizeof(uint32_t));
+
+        total_length += total_list_length;
+        data += total_list_length;
     }
     total_length += sizeof(SSHKeyExchangeFinal) + ssh_pkt->msg.plen;
     if (total_length != ssh_length)
@@ -448,6 +470,14 @@ static bool process_ssh2_kexinit(SSHData *sessionp, Packet *p, uint8_t direction
         // using an unsupported future version
         return false;
     }
+
+    if (ssh_pkt->msg.code == SSH_MSG_KEXINIT)
+    {
+        uint8_t pkt_direction = direction == SSH_DIR_FROM_CLIENT ? PKT_FROM_CLIENT : PKT_FROM_SERVER;
+        SshAlgoEvent event(algos, pkt_direction);
+        DataBus::publish(pub_id, SshEventIds::ALGORITHM, event, p->flow);
+    }
+
     return true;
 }
 

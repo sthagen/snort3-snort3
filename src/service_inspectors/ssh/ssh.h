@@ -32,6 +32,7 @@
 
 #include "flow/flow.h"
 #include "protocols/packet.h"
+#include "ssh_types.h"
 
 // FIXIT-L move these to ssh.cc
 // Session state flags for SSHData::state_flags
@@ -124,7 +125,6 @@ public:
 #define SSH_PACKET_MAX_SIZE 35000
 #define SSH_MAX_BANNER_LEN 255
 #define SSH2_COOKIE_SIZE 16
-#define NUM_KEXINIT_LISTS 10
 #define SSH_MIN_BANNER_LEN 9 //SSH-2.0-*\n
 #define SSH1_KEYX_MIN_SIZE (4 + 8 + 1) // length + padding + message
 

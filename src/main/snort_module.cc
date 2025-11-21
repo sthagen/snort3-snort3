@@ -711,8 +711,10 @@ public:
     bool global_stats() const override
     { return true; }
 
-    void sum_stats(bool) override
-    { }  // accumulate externally
+    void sum_stats(bool dump_stats) override
+    { 
+      Module::sum_stats(dump_stats);
+    }
 
     void reset_stats() override
     {

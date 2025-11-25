@@ -1,3 +1,22 @@
+2025-11-24: 3.10.0.0
+
+* appid: ftp parsing bounds check
+* appid: ignore empty strings in ssl lookup api
+* dce_rpc: changed copy to move
+* dns: add counters for different DNS flavors
+* extractor: add quic extractor
+* extractor: fix cppcheck errors
+* file_api: copy cacheable property to new context from cached context and use filecontext from cache, only if the entry is marked as cacheable
+* http_inspect: rename request and response buffers
+* ips_options: make pcre match data thread specific
+* main: Retry queue timeout option added
+* mp_data_bus: unsubscribe API
+* opcua: adding support for opcua
+* opcua: inspector documentation
+* packet_io: changes in active_packet_trace_test
+* reload: make proc_stats thread_local
+* ssh: support fields for extractor
+
 2025-11-05: 3.9.7.0
 
 * appid: add multi-stream support for DNS

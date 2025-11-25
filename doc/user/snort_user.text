@@ -8,7 +8,7 @@ Snort 3 User Manual
 The Snort Team
 
 Revision History
-Revision 3.9.7.0 2025-11-05 22:24:16 EST TST
+Revision 3.10.0.0 2025-11-24 15:32:37 EST TST
 
 ---------------------------------------------------------------------
 
@@ -5941,6 +5941,9 @@ Services and their events:
 
       + ips_logging (matched rules sent to IPS logging)
       + context_logging (matched rule in an IPS logger)
+  * QUIC
+
+      + handshake (log on handshake completion)
 
 Common fields available for every service:
 
@@ -6050,6 +6053,16 @@ name of the RR type. This is also the default decoding applied to all
 RR types that don’t have a type specific decoder. When the name of
 the type is not known it is decoded as UNKNOWN-N, where N is RR type
 numeric value.
+
+Fields supported for QUIC:
+
+  * version - QUIC version
+  * client_initial_dcid - client initial destination connection ID
+  * client_scid - client source connection ID
+  * server_scid - server source connection ID
+  * server_name - server name indication (SNI) from client hello
+  * client_protocol - application protocol requested by client
+  * history - connection history string
 
 Fields supported for connection:
 

@@ -27,6 +27,7 @@
 
 #include "dce_curse.h"
 #include "mms_curse.h"
+#include "opcua_curse.h"
 #include "s7commplus_curse.h"
 #include "ssl_curse.h"
 
@@ -35,6 +36,7 @@ class CurseTracker
 public:
     DceTracker dce;
     MmsTracker mms;
+    OpcuaTracker opcua;
     S7commplusTracker s7commplus;
     SslTracker ssl;
 };
@@ -64,6 +66,7 @@ private:
     static bool dce_tcp_curse(const uint8_t* data, unsigned len, CurseTracker*);
     static bool dce_smb_curse(const uint8_t* data, unsigned len, CurseTracker*);
     static bool mms_curse(const uint8_t* data, unsigned len, CurseTracker*);
+    static bool opcua_curse(const uint8_t* data, unsigned len, CurseTracker*);
     static bool s7commplus_curse(const uint8_t* data, unsigned len, CurseTracker*);
 #ifdef CATCH_TEST_BUILD
 public:

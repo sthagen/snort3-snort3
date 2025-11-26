@@ -152,18 +152,14 @@ public:
     void set_tls_sni(const char* new_tls_sni, uint32_t len)
     {
         if (tls_sni)
-        {
             snort_free(tls_sni);
-        }
-        if (new_tls_sni)
-        {
-            tls_sni = len ? snort::snort_strndup(new_tls_sni, len) :
-                const_cast<char*>(new_tls_sni);
-        }
-        else
+        if (!new_tls_sni or *new_tls_sni == '\0')
         {
             tls_sni = nullptr;
+            return;
         }
+        tls_sni = len ? snort::snort_strndup(new_tls_sni, len) :
+            const_cast<char*>(new_tls_sni);
     }
 
     void set_tls_first_alt_name(const char* new_tls_first_alt_name, uint32_t len)

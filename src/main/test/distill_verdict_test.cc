@@ -59,6 +59,20 @@ unsigned DataBus::get_id(const PubKey&)
 { return 0; }
 void ThreadConfig::update_thread_status(bool) {}
 void ThreadConfig::kick_watchdog() {}
+
+// Mock the log function to copy the log message
+char captured_log[64];
+void LogMessage(const char* format, va_list& args)
+{
+    vsnprintf(captured_log, sizeof(captured_log),format, args);
+}
+void LogMessage(const char* format,...)
+{
+    va_list args;
+    va_start(args, format);
+    LogMessage(format, args);
+    va_end(args);
+}
 }
 
 const FlowCacheConfig& FlowControl::get_flow_cache_config() const
@@ -89,7 +103,7 @@ TEST_GROUP(distill_verdict_tests)
         pkt.action = &active_action;
         di = new SFDAQInstance(nullptr, 0, nullptr);
         pkt.daq_instance = di;
-        analyzer = new Analyzer(di, 0, nullptr);
+        analyzer = new Analyzer(di, 0, nullptr, 0, 40);
     }
 
     void teardown() override
@@ -185,6 +199,10 @@ TEST(distill_verdict_tests, deferred_trust_prevent_whitelist)
     mock().checkExpectations();
 }
 
+TEST(distill_verdict_tests, logmessage_verify)
+{
+   STRCMP_EQUAL(captured_log, "Retry queue interval is: 40 ms\n");
+}
 //-------------------------------------------------------------------------
 // main
 //-------------------------------------------------------------------------

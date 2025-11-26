@@ -98,7 +98,9 @@ void ClientDiscovery::reload() {}
 
 int AppIdDetector::initialize(AppIdInspector&){return 0;}
 int AppIdDetector::data_add(AppIdSession&, AppIdFlowData*){return 0;}
+#ifndef FTP_UNIT_TEST
 AppIdFlowData* AppIdDetector::data_get(const AppIdSession&) {return nullptr;}
+#endif
 void AppIdDetector::add_user(AppIdSession&, const char*, AppId, bool, AppidChangeBits&){}
 void AppIdDetector::add_payload(AppIdSession&, AppId){}
 void AppIdDetector::add_app(const snort::Packet&, AppIdSession&, AppidSessionDirection, AppId, AppId, const char*, AppidChangeBits&){}
@@ -233,6 +235,26 @@ int AppIdSession::add_flow_data_id(uint16_t, ServiceDetector*) { return 0; }
 AppIdHttpSession* AppIdSession::get_http_session(uint32_t) const { return nullptr; }
 AppIdHttpSession* AppIdSession::create_http_session(int64_t stream_id) { return nullptr; }
 void AppIdHttpSession::set_field(HttpFieldIds id, const std::string* str, AppidChangeBits&) { }
+
+void AppIdModule::reset_stats() {}
+void AppIdModule::sum_stats(bool) { }
+AppIdInspector::~AppIdInspector() = default;
+SfIpRet snort::SfIp::set(void const*, int) { return SFIP_SUCCESS; }
+SfIpRet snort::SfIp::set(void const*) { return SFIP_SUCCESS; }
+SfIpRet snort::SfIp::pton(const int, const char* ) { return SFIP_SUCCESS; }
+void AppIdInspector::eval(snort::Packet*) { }
+void AppIdInspector::show(const snort::SnortConfig*) const { }
+void AppIdInspector::tinit() { }
+void AppIdInspector::tterm() { }
+void AppIdInspector::tear_down(snort::SnortConfig*) { }
+snort::ProfileStats* AppIdModule::get_profile(
+        unsigned, const char*&, const char*&) const
+{
+    return nullptr;
+}
+bool AppIdInspector::configure(snort::SnortConfig*) { return true; }
+PegCount snort::Module::get_global_count(char const*) const { return 0; }
+snort::Module::Module(char const*, char const*) {}
 
 void snort::DataBus::publish(unsigned, unsigned, snort::DataEvent&, snort::Flow*) { }
 void snort::DataBus::publish(unsigned, unsigned, const uint8_t*, unsigned, snort::Flow*) { }

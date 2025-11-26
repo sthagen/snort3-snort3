@@ -25,6 +25,8 @@ set( FILE_LIST
     extractor_logger.cc
     extractor_logger.h
     extractor_null_conn.h
+    extractor_quic.cc
+    extractor_quic.h
     extractor_service.cc
     extractor_service.h
     extractor_ssl.cc

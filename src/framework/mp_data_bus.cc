@@ -177,16 +177,36 @@ const char* MPDataBus::get_name_from_id(unsigned id)
     return nullptr;
 }
 
+bool MPDataBus::is_ready()
+{
+    const SnortConfig* sc = SnortConfig::get_conf();
+    return sc && sc->mp_dbus;
+}
+
 void MPDataBus::subscribe(const PubKey& key, unsigned eid, DataHandler* h)
 {
-    if(! SnortConfig::get_conf()->mp_dbus)
+    const SnortConfig* sc = SnortConfig::get_conf();
+    if (!sc or !sc->mp_dbus)
     {
         ErrorMessage("MPDataBus: MPDataBus not initialized\n");
         return;
     }
 
-    SnortConfig::get_conf()->mp_dbus->_subscribe(key, eid, h);
+    sc->mp_dbus->_subscribe(key, eid, h);
     MPDataBusLog("Subscribed to event ID %u\n", eid);
+}
+
+void MPDataBus::unsubscribe(const PubKey& key, unsigned eid, DataHandler* h)
+{
+    const SnortConfig* sc = SnortConfig::get_conf();
+    if (!sc or !sc->mp_dbus)
+    {
+        ErrorMessage("MPDataBus: MPDataBus not initialized\n");
+        return;
+    }
+
+    sc->mp_dbus->_unsubscribe(key, eid, h);
+    MPDataBusLog("Unsubscribed from event ID %u\n", eid);
 }
 
 bool MPDataBus::publish(unsigned pub_id, unsigned evt_id, std::shared_ptr<DataEvent> e, Flow*)
@@ -195,8 +215,7 @@ bool MPDataBus::publish(unsigned pub_id, unsigned evt_id, std::shared_ptr<DataEv
                 std::make_shared<MPEventInfo>(std::move(e), MPEventType(evt_id), pub_id);
 
     const SnortConfig *sc = SnortConfig::get_conf();
-
-    if (sc->mp_dbus == nullptr)
+    if (!sc or !sc->mp_dbus)
     {
         ErrorMessage("MPDataBus: MPDataBus not initialized\n");
         return false;
@@ -215,7 +234,8 @@ bool MPDataBus::publish(unsigned pub_id, unsigned evt_id, std::shared_ptr<DataEv
 
 void MPDataBus::register_event_helpers(const PubKey& key, unsigned evt_id, MPSerializeFunc& mp_serializer_helper, MPDeserializeFunc& mp_deserializer_helper)
 {
-    if (!SnortConfig::get_conf()->mp_dbus or !SnortConfig::get_conf()->mp_dbus->transport_layer)
+    const SnortConfig* sc = SnortConfig::get_conf();
+    if (!sc or !sc->mp_dbus or !sc->mp_dbus->transport_layer)
     {
         ErrorMessage("MPDataBus: MPDataBus or transport layer not initialized\n");
         return;
@@ -225,7 +245,7 @@ void MPDataBus::register_event_helpers(const PubKey& key, unsigned evt_id, MPSer
 
     MPHelperFunctions helpers(mp_serializer_helper, mp_deserializer_helper);
     
-    SnortConfig::get_conf()->mp_dbus->transport_layer->register_event_helpers(pub_id, evt_id, helpers);
+    sc->mp_dbus->transport_layer->register_event_helpers(pub_id, evt_id, helpers);
     MPDataBusLog("Registered event helpers for event ID %u\n", evt_id);
 }
 
@@ -550,6 +570,38 @@ void MPDataBus::_subscribe(const PubKey& key, unsigned eid, DataHandler* h)
     _subscribe(pid, eid, h);
 }
 
+void MPDataBus::_unsubscribe(unsigned pid, unsigned eid, DataHandler* h)
+{
+    std::pair<unsigned, unsigned> key = {pid, eid};
+
+    auto it = mp_pub_sub.find(key);
+    if (it == mp_pub_sub.end())
+    {
+        MPDataBusLog("No subscribers found for publisher ID %u and event ID %u\n", pid, eid);
+        return;
+    }
+
+    SubList& subs = it->second;
+    auto handler_it = std::find(subs.begin(), subs.end(), h);
+    if (handler_it != subs.end())
+    {
+        subs.erase(handler_it);
+
+        delete h;
+        MPDataBusLog("Handler unsubscribed and deleted for publisher ID %u and event ID %u\n", pid, eid);
+        
+        if (subs.empty())
+        {
+            mp_pub_sub.erase(it);
+        }
+    }
+}
+
+void MPDataBus::_unsubscribe(const PubKey& key, unsigned eid, DataHandler* h)
+{
+    unsigned pid = get_id(key);
+    _unsubscribe(pid, eid, h);
+}
 
 bool MPDataBus::_publish(unsigned pid, unsigned eid, DataEvent& e, Flow* f)
 {

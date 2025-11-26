@@ -49,8 +49,8 @@
     "js_data",                    \
     "vba_data",                   \
     "http_method_str",            \
-    "request_size",               \
-    "response_size",              \
+    "http_request_size",          \
+    "http_response_size",         \
     "http_version_str",           \
     "http_user_agent_str",        \
     "http_referer_str",           \

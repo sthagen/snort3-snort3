@@ -8,7 +8,7 @@ Snort 3 Reference Manual
 The Snort Team
 
 Revision History
-Revision 3.9.7.0 2025-11-05 22:23:59 EST TST
+Revision 3.10.0.0 2025-11-24 15:32:19 EST TST
 
 ---------------------------------------------------------------------
 
@@ -126,31 +126,32 @@ Table of Contents
     5.32. netflow
     5.33. normalizer
     5.34. null_trace_logger
-    5.35. packet_capture
-    5.36. perf_monitor
-    5.37. pop
-    5.38. port_scan
-    5.39. reputation
-    5.40. rna
-    5.41. rpc_decode
-    5.42. s7commplus
-    5.43. sip
-    5.44. smtp
-    5.45. snort_ml
-    5.46. snort_ml_engine
-    5.47. so_proxy
-    5.48. ssh
-    5.49. ssl
-    5.50. stream
-    5.51. stream_file
-    5.52. stream_icmp
-    5.53. stream_ip
-    5.54. stream_tcp
-    5.55. stream_udp
-    5.56. stream_user
-    5.57. telnet
-    5.58. tlv_pdu
-    5.59. wizard
+    5.35. opcua
+    5.36. packet_capture
+    5.37. perf_monitor
+    5.38. pop
+    5.39. port_scan
+    5.40. reputation
+    5.41. rna
+    5.42. rpc_decode
+    5.43. s7commplus
+    5.44. sip
+    5.45. smtp
+    5.46. snort_ml
+    5.47. snort_ml_engine
+    5.48. so_proxy
+    5.49. ssh
+    5.50. ssl
+    5.51. stream
+    5.52. stream_file
+    5.53. stream_icmp
+    5.54. stream_ip
+    5.55. stream_tcp
+    5.56. stream_udp
+    5.57. stream_user
+    5.58. telnet
+    5.59. tlv_pdu
+    5.60. wizard
 
 6. IPS Action Modules
 
@@ -260,44 +261,48 @@ Table of Contents
     7.92. modbus_unit
     7.93. msg
     7.94. mss
-    7.95. pcre
-    7.96. pkt_data
-    7.97. pkt_num
-    7.98. priority
-    7.99. raw_data
-    7.100. reference
-    7.101. regex
-    7.102. rem
-    7.103. replace
-    7.104. rev
-    7.105. rpc
-    7.106. s7commplus_content
-    7.107. s7commplus_func
-    7.108. s7commplus_opcode
-    7.109. sd_pattern
-    7.110. seq
-    7.111. service
-    7.112. sha256
-    7.113. sha512
-    7.114. sid
-    7.115. sip_body
-    7.116. sip_header
-    7.117. sip_method
-    7.118. sip_stat_code
-    7.119. so
-    7.120. soid
-    7.121. ssl_state
-    7.122. ssl_version
-    7.123. stream_reassemble
-    7.124. stream_size
-    7.125. tag
-    7.126. target
-    7.127. tos
-    7.128. ttl
-    7.129. urg
-    7.130. vba_data
-    7.131. window
-    7.132. wscale
+    7.95. opcua_msg_service
+    7.96. opcua_msg_type
+    7.97. opcua_node_id
+    7.98. opcua_node_namespace_index
+    7.99. pcre
+    7.100. pkt_data
+    7.101. pkt_num
+    7.102. priority
+    7.103. raw_data
+    7.104. reference
+    7.105. regex
+    7.106. rem
+    7.107. replace
+    7.108. rev
+    7.109. rpc
+    7.110. s7commplus_content
+    7.111. s7commplus_func
+    7.112. s7commplus_opcode
+    7.113. sd_pattern
+    7.114. seq
+    7.115. service
+    7.116. sha256
+    7.117. sha512
+    7.118. sid
+    7.119. sip_body
+    7.120. sip_header
+    7.121. sip_method
+    7.122. sip_stat_code
+    7.123. so
+    7.124. soid
+    7.125. ssl_state
+    7.126. ssl_version
+    7.127. stream_reassemble
+    7.128. stream_size
+    7.129. tag
+    7.130. target
+    7.131. tos
+    7.132. ttl
+    7.133. urg
+    7.134. vba_data
+    7.135. window
+    7.136. wscale
 
 8. Search Engine Modules
 9. SO Rule Modules
@@ -1765,6 +1770,8 @@ Configuration:
   * string snort.--plugin-path: <path> a colon separated list of
     directories or plugin libraries
   * implied snort.--process-all-events: process all action groups
+  * int snort.--retry-timeout = 200: Number of milliseconds a packet
+    stays in the retry queue before being reexamined { 0:max32 }
   * string snort.--rule: <rules> to be added to configuration; may be
     repeated
   * string snort.--rule-path: <path> where to find rules files
@@ -3599,6 +3606,12 @@ Peg counts:
   * dns.packets: total packets processed (sum)
   * dns.requests: total dns requests (sum)
   * dns.responses: total dns responses (sum)
+  * dns.dns_over_udp: total dns packets over udp (sum)
+  * dns.dns_over_tcp: total dns packets over tcp (sum)
+  * dns.dns_over_http1: total dns packets over http/1.1 (sum)
+  * dns.dns_over_http2: total dns packets over http/2 (sum)
+  * dns.dns_over_http3: total dns packets over http/3 (sum)
+  * dns.dns_over_quic: total dns packets over quic (sum)
   * dns.concurrent_sessions: total concurrent dns sessions (now)
   * dns.max_concurrent_sessions: maximum concurrent dns sessions
     (max)
@@ -3682,7 +3695,7 @@ Configuration:
   * enum extractor.default_filter = pick: default action for protocol
     with no filter provided { pick | skip }
   * enum extractor.protocols[].service: service to extract from { 
-    http | ftp | ssl | conn | dns | weird | notice }
+    http | ftp | ssl | conn | dns | quic | weird | notice }
   * int extractor.protocols[].tenant_id = 0: tenant_id of target
     tenant { 0:max32 }
   * string extractor.protocols[].on_events: specify events to log
@@ -4898,7 +4911,60 @@ Usage: global
 Instance Type: global
 
 
-5.35. packet_capture
+5.35. opcua
+
+--------------
+
+Help: opcua inspection
+
+Type: inspector (service)
+
+Usage: inspect
+
+Instance Type: multiton
+
+Rules:
+
+  * 153:1 (opcua) invalid OPC UA MessageSize value detected
+  * 153:2 (opcua) abnormal OPC UA MessageSize value detected
+  * 153:3 (opcua) invalid OPC UA MsgType value detected
+  * 153:4 (opcua) invalid OPC UA IsFinal value detected
+  * 153:5 (opcua) OPC UA message split across multiple packets
+    detected
+  * 153:6 (opcua) multiple OPC UA messages within a single frame
+    detected
+  * 153:7 (opcua) large chunked OPC UA message detected
+  * 153:8 (opcua) OPC UA message with a non-zero Namespace Index
+    value detected
+  * 153:9 (opcua) OPC UA message with an invalid TypeId value
+    detected
+  * 153:10 (opcua) OPC UA message with non-default protocol version
+    detected
+  * 153:11 (opcua) OPC UA message with an invalid string size
+    detected
+  * 153:12 (opcua) OPC UA message with an abnormal string field
+    detected
+
+Peg counts:
+
+  * opcua.sessions: total sessions processed (sum)
+  * opcua.frames: total OPC UA messages (sum)
+  * opcua.concurrent_sessions: total concurrent OPC UA sessions (now)
+  * opcua.max_concurrent_sessions: maximum concurrent OPC UA sessions
+    (max)
+  * opcua.complete_messages: total reassembled OPC UA messages (sum)
+  * opcua.aborted_chunks: total aborted OPC UA message chunks (sum)
+  * opcua.inspector_aborts: number of times the service inspector
+    aborted processing (sum)
+  * opcua.splitter_aborts: number of times the stream splitter
+    aborted processing (sum)
+  * opcua.pipelined_messages: total number of times multiple messages
+    were discovered in one packet (sum)
+  * opcua.split_messages: total number of times a message split
+    across multiple packets was detected (sum)
+
+
+5.36. packet_capture
 
 --------------
 
@@ -4939,7 +5005,7 @@ Peg counts:
     (sum)
 
 
-5.36. perf_monitor
+5.37. perf_monitor
 
 --------------
 
@@ -5001,7 +5067,7 @@ Peg counts:
     by new flows (sum)
 
 
-5.37. pop
+5.38. pop
 
 --------------
 
@@ -5066,7 +5132,7 @@ Peg counts:
   * pop.js_pdf_scripts: total number of PDF files processed (sum)
 
 
-5.38. port_scan
+5.39. port_scan
 
 --------------
 
@@ -5240,7 +5306,7 @@ Peg counts:
     portscan (now)
 
 
-5.39. reputation
+5.40. reputation
 
 --------------
 
@@ -5297,7 +5363,7 @@ Peg counts:
     monitored (sum)
 
 
-5.40. rna
+5.41. rna
 
 --------------
 
@@ -5444,7 +5510,7 @@ Peg counts:
   * rna.total_bytes_in_interval: count of bytes processed (sum)
 
 
-5.41. rpc_decode
+5.42. rpc_decode
 
 --------------
 
@@ -5473,7 +5539,7 @@ Peg counts:
     sessions (max)
 
 
-5.42. s7commplus
+5.43. s7commplus
 
 --------------
 
@@ -5502,7 +5568,7 @@ Peg counts:
     sessions (max)
 
 
-5.43. sip
+5.44. sip
 
 --------------
 
@@ -5614,7 +5680,7 @@ Peg counts:
   * sip.code_9xx: 9xx (sum)
 
 
-5.44. smtp
+5.45. smtp
 
 --------------
 
@@ -5728,7 +5794,7 @@ Peg counts:
   * smtp.js_pdf_scripts: total number of PDF files processed (sum)
 
 
-5.45. snort_ml
+5.46. snort_ml
 
 --------------
 
@@ -5766,7 +5832,7 @@ Peg counts:
     bytes processed (sum)
 
 
-5.46. snort_ml_engine
+5.47. snort_ml_engine
 
 --------------
 
@@ -5810,7 +5876,7 @@ Peg counts:
   * snort_ml_engine.libml_calls: total libml calls (sum)
 
 
-5.47. so_proxy
+5.48. so_proxy
 
 --------------
 
@@ -5824,7 +5890,7 @@ Usage: global
 Instance Type: global
 
 
-5.48. ssh
+5.49. ssh
 
 --------------
 
@@ -5865,7 +5931,7 @@ Peg counts:
   * ssh.aborted_sessions: total session aborted (sum)
 
 
-5.49. ssl
+5.50. ssl
 
 --------------
 
@@ -5916,7 +5982,7 @@ Peg counts:
     (max)
 
 
-5.50. stream
+5.51. stream
 
 --------------
 
@@ -6062,7 +6128,7 @@ Peg counts:
   * stream.uni_ip_flows: number of uni ip flows in cache (now)
 
 
-5.51. stream_file
+5.52. stream_file
 
 --------------
 
@@ -6079,7 +6145,7 @@ Configuration:
   * bool stream_file.upload = false: indicate file transfer direction
 
 
-5.52. stream_icmp
+5.53. stream_icmp
 
 --------------
 
@@ -6107,7 +6173,7 @@ Peg counts:
   * stream_icmp.stale_packets: icmp stale packets (sum)
 
 
-5.53. stream_ip
+5.54. stream_ip
 
 --------------
 
@@ -6180,7 +6246,7 @@ Peg counts:
   * stream_ip.fragmented_bytes: total fragmented bytes (sum)
 
 
-5.54. stream_tcp
+5.55. stream_tcp
 
 --------------
 
@@ -6399,7 +6465,7 @@ Peg counts:
     exceeded due to a hole (sum)
 
 
-5.55. stream_udp
+5.56. stream_udp
 
 --------------
 
@@ -6429,7 +6495,7 @@ Peg counts:
   * stream_udp.ignored: udp packets ignored (sum)
 
 
-5.56. stream_user
+5.57. stream_user
 
 --------------
 
@@ -6447,7 +6513,7 @@ Configuration:
     1:max31 }
 
 
-5.57. telnet
+5.58. telnet
 
 --------------
 
@@ -6483,7 +6549,7 @@ Peg counts:
     sessions (max)
 
 
-5.58. tlv_pdu
+5.59. tlv_pdu
 
 --------------
 
@@ -6512,7 +6578,7 @@ Peg counts:
   * tlv_pdu.aborts: total unrecoverable scan errors (sum)
 
 
-5.59. wizard
+5.60. wizard
 
 --------------
 
@@ -6542,7 +6608,7 @@ Configuration:
   * string wizard.spells[].to_client[].spell: sequence of data with
     wild cards (*)
   * multi wizard.curses: enable service identification based on
-    internal algorithm { dce_smb | dce_udp | dce_tcp | mms |
+    internal algorithm { dce_smb | dce_udp | dce_tcp | mms | opcua |
     s7commplus | sslv2 }
   * int wizard.max_search_depth = 8192: maximum scan depth per flow {
     0:65535 }
@@ -8427,7 +8493,68 @@ Configuration:
     }
 
 
-7.95. pcre
+7.95. opcua_msg_service
+
+--------------
+
+Help: rule option to check the OPC UA message service
+
+Type: ips_option
+
+Usage: detect
+
+Configuration:
+
+  * string opcua_msg_service.~: message service to match
+
+
+7.96. opcua_msg_type
+
+--------------
+
+Help: rule option to check the OPC UA message type
+
+Type: ips_option
+
+Usage: detect
+
+Configuration:
+
+  * string opcua_msg_type.~: message type to match
+
+
+7.97. opcua_node_id
+
+--------------
+
+Help: rule option to check the OPC UA message node id
+
+Type: ips_option
+
+Usage: detect
+
+Configuration:
+
+  * string opcua_node_id.~: message node id to match
+
+
+7.98. opcua_node_namespace_index
+
+--------------
+
+Help: rule option to check the OPC UA message node namespace index
+
+Type: ips_option
+
+Usage: detect
+
+Configuration:
+
+  * string opcua_node_namespace_index.~: message node namespace index
+    to match
+
+
+7.99. pcre
 
 --------------
 
@@ -8450,7 +8577,7 @@ Peg counts:
   * pcre.pcre_error: total number of times pcre returns error (sum)
 
 
-7.96. pkt_data
+7.100. pkt_data
 
 --------------
 
@@ -8462,7 +8589,7 @@ Type: ips_option
 Usage: detect
 
 
-7.97. pkt_num
+7.101. pkt_num
 
 --------------
 
@@ -8478,7 +8605,7 @@ Configuration:
     { 1: }
 
 
-7.98. priority
+7.102. priority
 
 --------------
 
@@ -8494,7 +8621,7 @@ Configuration:
     1:max31 }
 
 
-7.99. raw_data
+7.103. raw_data
 
 --------------
 
@@ -8505,7 +8632,7 @@ Type: ips_option
 Usage: detect
 
 
-7.100. reference
+7.104. reference
 
 --------------
 
@@ -8520,7 +8647,7 @@ Configuration:
   * string reference.~ref: reference: <scheme>,<id>
 
 
-7.101. regex
+7.105. regex
 
 --------------
 
@@ -8544,7 +8671,7 @@ Configuration:
     instead of start of buffer
 
 
-7.102. rem
+7.106. rem
 
 --------------
 
@@ -8559,7 +8686,7 @@ Configuration:
   * string rem.~: comment
 
 
-7.103. replace
+7.107. replace
 
 --------------
 
@@ -8575,7 +8702,7 @@ Configuration:
   * string replace.~: byte code to replace with
 
 
-7.104. rev
+7.108. rev
 
 --------------
 
@@ -8590,7 +8717,7 @@ Configuration:
   * int rev.~: revision { 1:max32 }
 
 
-7.105. rpc
+7.109. rpc
 
 --------------
 
@@ -8607,7 +8734,7 @@ Configuration:
   * string rpc.~proc: procedure number or * for any
 
 
-7.106. s7commplus_content
+7.110. s7commplus_content
 
 --------------
 
@@ -8618,7 +8745,7 @@ Type: ips_option
 Usage: detect
 
 
-7.107. s7commplus_func
+7.111. s7commplus_func
 
 --------------
 
@@ -8633,7 +8760,7 @@ Configuration:
   * string s7commplus_func.~: function code to match
 
 
-7.108. s7commplus_opcode
+7.112. s7commplus_opcode
 
 --------------
 
@@ -8648,7 +8775,7 @@ Configuration:
   * string s7commplus_opcode.~: opcode code to match
 
 
-7.109. sd_pattern
+7.113. sd_pattern
 
 --------------
 
@@ -8672,7 +8799,7 @@ Peg counts:
   * sd_pattern.terminated: hyperscan terminated (sum)
 
 
-7.110. seq
+7.114. seq
 
 --------------
 
@@ -8688,7 +8815,7 @@ Configuration:
     range { 0: }
 
 
-7.111. service
+7.115. service
 
 --------------
 
@@ -8703,7 +8830,7 @@ Configuration:
   * string service.*: one or more comma-separated service names
 
 
-7.112. sha256
+7.116. sha256
 
 --------------
 
@@ -8723,7 +8850,7 @@ Configuration:
     start of buffer
 
 
-7.113. sha512
+7.117. sha512
 
 --------------
 
@@ -8743,7 +8870,7 @@ Configuration:
     start of buffer
 
 
-7.114. sid
+7.118. sid
 
 --------------
 
@@ -8758,7 +8885,7 @@ Configuration:
   * int sid.~: signature id { 1:max32 }
 
 
-7.115. sip_body
+7.119. sip_body
 
 --------------
 
@@ -8769,7 +8896,7 @@ Type: ips_option
 Usage: detect
 
 
-7.116. sip_header
+7.120. sip_header
 
 --------------
 
@@ -8781,7 +8908,7 @@ Type: ips_option
 Usage: detect
 
 
-7.117. sip_method
+7.121. sip_method
 
 --------------
 
@@ -8796,7 +8923,7 @@ Configuration:
   * string sip_method.*method: sip method
 
 
-7.118. sip_stat_code
+7.122. sip_stat_code
 
 --------------
 
@@ -8811,7 +8938,7 @@ Configuration:
   * int sip_stat_code.*code: status code { 1:999 }
 
 
-7.119. so
+7.123. so
 
 --------------
 
@@ -8828,7 +8955,7 @@ Configuration:
     buffer
 
 
-7.120. soid
+7.124. soid
 
 --------------
 
@@ -8844,7 +8971,7 @@ Configuration:
     like 3_45678_9
 
 
-7.121. ssl_state
+7.125. ssl_state
 
 --------------
 
@@ -8873,7 +9000,7 @@ Configuration:
     unknown
 
 
-7.122. ssl_version
+7.126. ssl_version
 
 --------------
 
@@ -8900,7 +9027,7 @@ Configuration:
     tls1.2
 
 
-7.123. stream_reassemble
+7.127. stream_reassemble
 
 --------------
 
@@ -8921,7 +9048,7 @@ Configuration:
     remainder of the session
 
 
-7.124. stream_size
+7.128. stream_size
 
 --------------
 
@@ -8939,7 +9066,7 @@ Configuration:
     direction(s) { either|to_server|to_client|both }
 
 
-7.125. tag
+7.129. tag
 
 --------------
 
@@ -8958,7 +9085,7 @@ Configuration:
   * int tag.bytes: tag for this many bytes { 1:max32 }
 
 
-7.126. target
+7.130. target
 
 --------------
 
@@ -8974,7 +9101,7 @@ Configuration:
     dst_ip }
 
 
-7.127. tos
+7.131. tos
 
 --------------
 
@@ -8989,7 +9116,7 @@ Configuration:
   * interval tos.~range: check if IP TOS is in given range { 0:255 }
 
 
-7.128. ttl
+7.132. ttl
 
 --------------
 
@@ -9005,7 +9132,7 @@ Configuration:
     0:255 }
 
 
-7.129. urg
+7.133. urg
 
 --------------
 
@@ -9021,7 +9148,7 @@ Configuration:
     { 0:65535 }
 
 
-7.130. vba_data
+7.134. vba_data
 
 --------------
 
@@ -9033,7 +9160,7 @@ Type: ips_option
 Usage: detect
 
 
-7.131. window
+7.135. window
 
 --------------
 
@@ -9049,7 +9176,7 @@ Configuration:
     range { 0:65535 }
 
 
-7.132. wscale
+7.136. wscale
 
 --------------
 
@@ -9559,6 +9686,8 @@ libraries see the Getting Started section of the manual.
   * --plugin-path <path> a colon separated list of directories or
     plugin libraries
   * --process-all-events process all action groups
+  * --retry-timeout Number of milliseconds a packet stays in the
+    retry queue before being reexamined (0:max32)
   * --rule <rules> to be added to configuration; may be repeated
   * --rule-path <path> where to find rules files
   * --rule-to-hex output so rule header to stdout for text rule on
@@ -10055,7 +10184,7 @@ libraries see the Getting Started section of the manual.
   * string extractor.protocols[].fields: specify fields to log
   * string extractor.protocols[].on_events: specify events to log
   * enum extractor.protocols[].service: service to extract from { 
-    http | ftp | ssl | conn | dns | weird | notice }
+    http | ftp | ssl | conn | dns | quic | weird | notice }
   * int extractor.protocols[].tenant_id = 0: tenant_id of target
     tenant { 0:max32 }
   * enum extractor.time = unix: output format for timestamp values { 
@@ -10731,6 +10860,11 @@ libraries see the Getting Started section of the manual.
   * bool normalizer.tcp.trim_win = false: trim data to window
   * bool normalizer.tcp.urp = false: adjust urgent pointer if beyond
     segment length
+  * string opcua_msg_service.~: message service to match
+  * string opcua_msg_type.~: message type to match
+  * string opcua_node_id.~: message node id to match
+  * string opcua_node_namespace_index.~: message node namespace index
+    to match
   * bool output.dump_chars_only = false: turns on character dumps
     (same as -C)
   * bool output.dump_payload = false: dumps application layer (same
@@ -11448,6 +11582,8 @@ libraries see the Getting Started section of the manual.
   * implied snort.--process-all-events: process all action groups
   * implied snort.-Q: enable inline mode operation
   * implied snort.-q: quiet mode - suppress normal logging on stdout
+  * int snort.--retry-timeout = 200: Number of milliseconds a packet
+    stays in the retry queue before being reexamined { 0:max32 }
   * string snort.-r: <pcap>… (same as --pcap-list)
   * string snort.-R: <rules> include this rules file in the default
     policy
@@ -11793,7 +11929,7 @@ libraries see the Getting Started section of the manual.
   * interval window.~range: check if TCP window size is in given
     range { 0:65535 }
   * multi wizard.curses: enable service identification based on
-    internal algorithm { dce_smb | dce_udp | dce_tcp | mms |
+    internal algorithm { dce_smb | dce_udp | dce_tcp | mms | opcua |
     s7commplus | sslv2 }
   * select wizard.hexes[].proto = any: protocol to scan { tcp | udp |
     any }
@@ -12273,6 +12409,12 @@ libraries see the Getting Started section of the manual.
   * dnp3.udp_packets: total udp packets (sum)
   * dns.aborted_sessions: total dns sessions aborted (sum)
   * dns.concurrent_sessions: total concurrent dns sessions (now)
+  * dns.dns_over_http1: total dns packets over http/1.1 (sum)
+  * dns.dns_over_http2: total dns packets over http/2 (sum)
+  * dns.dns_over_http3: total dns packets over http/3 (sum)
+  * dns.dns_over_quic: total dns packets over quic (sum)
+  * dns.dns_over_tcp: total dns packets over tcp (sum)
+  * dns.dns_over_udp: total dns packets over udp (sum)
   * dns.max_concurrent_sessions: maximum concurrent dns sessions
     (max)
   * dns.packets: total packets processed (sum)
@@ -12664,6 +12806,21 @@ libraries see the Getting Started section of the manual.
   * normalizer.test_tcp_ts_nop: test timestamp options cleared (sum)
   * normalizer.test_tcp_urgent_ptr: test packets without data with
     urgent pointer cleared (sum)
+  * opcua.aborted_chunks: total aborted OPC UA message chunks (sum)
+  * opcua.complete_messages: total reassembled OPC UA messages (sum)
+  * opcua.concurrent_sessions: total concurrent OPC UA sessions (now)
+  * opcua.frames: total OPC UA messages (sum)
+  * opcua.inspector_aborts: number of times the service inspector
+    aborted processing (sum)
+  * opcua.max_concurrent_sessions: maximum concurrent OPC UA sessions
+    (max)
+  * opcua.pipelined_messages: total number of times multiple messages
+    were discovered in one packet (sum)
+  * opcua.sessions: total sessions processed (sum)
+  * opcua.split_messages: total number of times a message split
+    across multiple packets was detected (sum)
+  * opcua.splitter_aborts: number of times the stream splitter
+    aborted processing (sum)
   * packet_capture.captured: packets captured after matching filter
     (sum)
   * packet_capture.processed: packets processed against filter (sum)
@@ -13284,6 +13441,7 @@ libraries see the Getting Started section of the manual.
   * 150: file_id
   * 151: iec104
   * 152: mms
+  * 153: opcua
   * 154: js_norm
   * 175: domain_filter
   * 256: dpx
@@ -16989,6 +17147,15 @@ and are not applicable elsewhere.
   * network (basic): configure basic network parameters
   * normalizer (inspector): packet scrubbing for inline mode
   * null_trace_logger (inspector): trace logger with a null printout
+  * opcua (inspector): opcua inspection
+  * opcua_msg_service (ips_option): rule option to check the OPC UA
+    message service
+  * opcua_msg_type (ips_option): rule option to check the OPC UA
+    message type
+  * opcua_node_id (ips_option): rule option to check the OPC UA
+    message node id
+  * opcua_node_namespace_index (ips_option): rule option to check the
+    OPC UA message node namespace index
   * output (basic): configure general output parameters
   * packet_capture (inspector): raw packet dumping facility
   * packet_tracer (basic): generate debug trace messages for packets
@@ -17224,6 +17391,7 @@ and are not applicable elsewhere.
   * inspector::netflow: netflow inspection
   * inspector::normalizer: packet scrubbing for inline mode
   * inspector::null_trace_logger: trace logger with a null printout
+  * inspector::opcua: opcua inspection
   * inspector::packet_capture: raw packet dumping facility
   * inspector::perf_monitor: performance monitoring and flow
     statistics collection
@@ -17429,6 +17597,14 @@ and are not applicable elsewhere.
   * ips_option::msg: rule option summarizing rule purpose output with
     events
   * ips_option::mss: detection for TCP maximum segment size
+  * ips_option::opcua_msg_service: rule option to check the OPC UA
+    message service
+  * ips_option::opcua_msg_type: rule option to check the OPC UA
+    message type
+  * ips_option::opcua_node_id: rule option to check the OPC UA
+    message node id
+  * ips_option::opcua_node_namespace_index: rule option to check the
+    OPC UA message node namespace index
   * ips_option::pcre: rule option for matching payload data with pcre
   * ips_option::pkt_data: rule option to set the detection cursor to
     the normalized packet data

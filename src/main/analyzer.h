@@ -81,7 +81,7 @@ public:
     static void set_main_hook(MainHook_f);
 
     Analyzer() = delete;
-    Analyzer(snort::SFDAQInstance*, unsigned id, const char* source, uint64_t msg_cnt = 0);
+    Analyzer(snort::SFDAQInstance*, unsigned id, const char* source, uint64_t msg_cnt = 0, const uint32_t retry_timeout = 200);
     ~Analyzer();
 
     void operator()(Swapper*, uint16_t run_num);

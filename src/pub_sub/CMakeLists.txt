@@ -53,6 +53,7 @@ add_library( pub_sub OBJECT
     http_transaction_end_event.cc
     quic_events.cc
     sip_events.cc
+    ssh_events.cc
 )
 
 install (FILES ${PUB_SUB_INCLUDES}

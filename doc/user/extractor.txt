@@ -70,6 +70,8 @@ Services and their events:
 * triggered IPS rule, whether built-in or text or SO (notice)
   ** `ips_logging` (matched rules sent to IPS logging)
   ** `context_logging` (matched rule in an IPS logger)
+* QUIC
+  ** `handshake` (log on handshake completion)
 
 Common fields available for every service:
 
@@ -157,6 +159,16 @@ SOA, SPF, SRV, SSHFP, TXT. For these RR types: CAA, HINFO, HTTPS, NSEC3, NSEC3PA
 contains only the name of the RR type. This is also the default decoding applied to all RR types that don't have
 a type specific decoder. When the name of the type is not known it is decoded as UNKNOWN-N, where N is RR type
 numeric value.
+
+Fields supported for QUIC:
+
+* `version` - QUIC version
+* `client_initial_dcid` - client initial destination connection ID
+* `client_scid` - client source connection ID
+* `server_scid` - server source connection ID
+* `server_name` - server name indication (SNI) from client hello
+* `client_protocol` - application protocol requested by client
+* `history` - connection history string
 
 Fields supported for connection:
 

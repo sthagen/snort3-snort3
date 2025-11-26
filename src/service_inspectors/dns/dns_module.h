@@ -46,6 +46,12 @@ struct DnsStats
     PegCount packets;
     PegCount requests;
     PegCount responses;
+    PegCount dns_over_udp;
+    PegCount dns_over_tcp;
+    PegCount dns_over_http1;
+    PegCount dns_over_http2;
+    PegCount dns_over_http3;
+    PegCount dns_over_quic;
     PegCount concurrent_sessions;
     PegCount max_concurrent_sessions;
     PegCount aborted_sessions;

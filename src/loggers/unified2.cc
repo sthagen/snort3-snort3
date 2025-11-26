@@ -242,11 +242,11 @@ static void alert_event(Packet* p, const char*, Unified2Config* config, const Ev
                 strncpy(u2_event.http_method,
                     reinterpret_cast<const char*>(buf.data), MAX_HTTP_METHOD_LEN - 1);
 
-            if ( gadget->get_buf("request_size", p, buf) )
-                u2_event.request_size = htonl(*reinterpret_cast<const uint32_t*>(buf.data));
+            if ( gadget->get_buf("http_request_size", p, buf) )
+                u2_event.http_request_size = htonl(*reinterpret_cast<const uint32_t*>(buf.data));
 
-            if ( gadget->get_buf("response_size", p, buf) )
-                u2_event.response_size = htonl(*reinterpret_cast<const uint32_t*>(buf.data));
+            if ( gadget->get_buf("http_response_size", p, buf) )
+                u2_event.http_response_size = htonl(*reinterpret_cast<const uint32_t*>(buf.data));
 
             if ( gadget->get_buf("http_version_str", p, buf) )
                 strncpy(u2_event.http_version,

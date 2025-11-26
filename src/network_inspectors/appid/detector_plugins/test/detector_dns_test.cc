@@ -43,6 +43,10 @@ public:
     {
         stream_id = 0;
     }
+    AppId get_appid_from_stream(const Flow*) override
+    {
+        return APP_ID_QUIC;
+    }
 };
 static QuicStreamIntf quic_stream_intf;
 
@@ -65,7 +69,7 @@ int ServiceDetector::incompatible_data(AppIdSession&, const snort::Packet*, Appi
     return 0;
 }
 // Stubs for AppIdInspector
-static ServiceDNSData dd;
+static ServiceDNSData dns_data;
 static bool return_null_data = false;
 ServiceDNSDoQData* dns_doq_data  = nullptr;
 AppIdConfig test_app_config;
@@ -86,24 +90,27 @@ int AppIdDetector::data_add(AppIdSession&, AppIdFlowData* dns_data)
 
 AppIdFlowData* AppIdDetector::data_get(const AppIdSession&)
 {
-    return return_null_data ? nullptr : &dd;
+    return return_null_data ? nullptr : &dns_data;
 }
 
-int ServiceDetector::fail_service(AppIdSession& asd, const Packet* pkt, AppidSessionDirection dir) { return 1; }
+int ServiceDetector::fail_service(AppIdSession& asd, const Packet* pkt, AppidSessionDirection dir)
+{
+    return 1;
+}
 
 TEST_GROUP(detector_dns_doq_tests)
 {
-    DnsTcpServiceDetector* test_detector = nullptr;
+    DnsTcpServiceDetector* const test_detector = nullptr;
     void setup() override
     {
-        test_detector = new DnsTcpServiceDetector(&test_discovery);
+        const_cast<DnsTcpServiceDetector*&>(test_detector) = new DnsTcpServiceDetector(&test_discovery);
     }
 
     void teardown() override
     {   
         delete test_detector;
-        test_detector = nullptr;
-        dd.free_dns_cache();
+        const_cast<DnsTcpServiceDetector*&>(test_detector) = nullptr;
+        dns_data.free_dns_cache();
     }
 };
 
@@ -112,7 +119,7 @@ TEST(detector_dns_doq_tests, doq_validator_match_full_session)
     OdpContext test_odp_ctxt(test_app_config, nullptr);
     AppIdModule test_module;
     AppIdInspector test_inspector(test_module);
-    dd.state = DNS_STATE_QUERY;
+    dns_data.state = DNS_STATE_QUERY;
     AppIdSession test_asd(IpProtocol::TCP, nullptr, (uint16_t)0, test_inspector, test_odp_ctxt, (uint32_t)0, 0);
     Flow* flow = new Flow;
     test_asd.flow = flow;
@@ -132,12 +139,12 @@ TEST(detector_dns_doq_tests, doq_validator_match_full_session)
     AppidChangeBits change_bits;
     AppIdDiscoveryArgs args(dns_tcp_packet, sizeof(dns_tcp_packet), APP_ID_FROM_INITIATOR, test_asd, nullptr, change_bits);
     auto result = test_detector->validate_doq(args);
-    dd.free_dns_cache();
+    dns_data.free_dns_cache();
     CHECK_EQUAL(APPID_INPROCESS, result);
 
     // Now send a response packet
-    dd.state = DNS_STATE_RESPONSE;
-    dd.id = 13330;
+    dns_data.state = DNS_STATE_RESPONSE;
+    dns_data.id = 13330;
     uint8_t dns_tcp_response[] = {
         0x00, 0x25,             // TCP length (37 bytes)
         0x12, 0x34,             // id
@@ -170,7 +177,7 @@ TEST(detector_dns_doq_tests, doq_validator_in_process_cached)
     OdpContext test_odp_ctxt(test_app_config, nullptr);
     AppIdModule test_module;
     AppIdInspector test_inspector(test_module);
-    dd.state = DNS_STATE_QUERY;
+    dns_data.state = DNS_STATE_QUERY;
     AppIdSession test_asd(IpProtocol::TCP, nullptr, (uint16_t)0, test_inspector, test_odp_ctxt, (uint32_t)0, 0);
     Flow* flow = new Flow;
     test_asd.flow = flow;
@@ -184,7 +191,7 @@ TEST(detector_dns_doq_tests, doq_validator_in_process_cached)
     AppidChangeBits change_bits;
     AppIdDiscoveryArgs args(dns_tcp_packet_1, sizeof(dns_tcp_packet_1), APP_ID_FROM_INITIATOR, test_asd, nullptr, change_bits);
     auto result = test_detector->validate_doq(args);
-    CHECK_EQUAL(6, dd.cached_len);
+    CHECK_EQUAL(6, dns_data.cached_len);
     CHECK_EQUAL(APPID_INPROCESS, result);
 
     uint8_t dns_tcp_packet_2[]= {
@@ -207,7 +214,7 @@ TEST(detector_dns_doq_tests, doq_validator_not_compatible)
     OdpContext test_odp_ctxt(test_app_config, nullptr);
     AppIdModule test_module;
     AppIdInspector test_inspector(test_module);
-    dd.state = DNS_STATE_QUERY;
+    dns_data.state = DNS_STATE_QUERY;
     AppIdSession test_asd(IpProtocol::TCP, nullptr, (uint16_t)0, test_inspector, test_odp_ctxt, (uint32_t)0, 0);
     Flow* flow = new Flow;
     test_asd.flow = flow;
@@ -238,7 +245,7 @@ TEST(detector_dns_doq_tests, doq_validator_no_match)
     OdpContext test_odp_ctxt(test_app_config, nullptr);
     AppIdModule test_module;
     AppIdInspector test_inspector(test_module);
-    dd.state = DNS_STATE_QUERY;
+    dns_data.state = DNS_STATE_QUERY;
     AppIdSession test_asd(IpProtocol::TCP, nullptr, (uint16_t)0, test_inspector, test_odp_ctxt, (uint32_t)0, 0);
     Flow* flow = new Flow;
     test_asd.flow = flow;
@@ -267,7 +274,7 @@ TEST(detector_dns_doq_tests, doq_validator_stream_intf)
     OdpContext test_odp_ctxt(test_app_config, nullptr);
     AppIdModule test_module;
     AppIdInspector test_inspector(test_module);
-    dd.state = DNS_STATE_QUERY;
+    dns_data.state = DNS_STATE_QUERY;
     AppIdSession test_asd(IpProtocol::TCP, nullptr, (uint16_t)0, test_inspector, test_odp_ctxt, (uint32_t)0, 0);
     Flow* flow = new Flow;
     test_asd.flow = flow;

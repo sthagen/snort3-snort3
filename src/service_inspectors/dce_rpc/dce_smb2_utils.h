@@ -132,7 +132,7 @@ inline void DCE2_Smb2InsertSidInSsd(DCE2_Smb2SsnData* ssd, const uint64_t sid,
     {
         stracker->insertConnectionTracker(ssd->flow_key, ssd);
     }
-    ssd->insert_session_tracker(sid, stracker);
+    ssd->insert_session_tracker(sid, std::move(stracker));
 }
 
 inline void DCE2_Smb2RemoveSidInSsd(DCE2_Smb2SsnData* ssd, const uint64_t sid)

@@ -459,6 +459,13 @@ bool FileFlows::file_process(Packet* p, const uint8_t* file_data, int data_size,
         PacketTracer::restart_timer();
 
     context = find_main_file_context(position, direction, file_index);
+    FileCache* file_cache = FileService::get_file_cache();
+    if (file_cache)
+    {
+        FileContext *cached_context = file_cache->get_file(flow, file_index, false, false);
+        if (cached_context and not cached_context->is_cacheable())
+            context->set_not_cacheable();
+    }
 
     set_current_file_context(context);
     context->set_weak_file_name((const char*)fname, name_size);

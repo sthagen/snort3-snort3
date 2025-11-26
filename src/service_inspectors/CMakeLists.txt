@@ -13,6 +13,7 @@ add_subdirectory(imap)
 add_subdirectory(mms)
 add_subdirectory(modbus)
 add_subdirectory(netflow)
+add_subdirectory(opcua)
 add_subdirectory(pop)
 add_subdirectory(rpc_decode)
 add_subdirectory(s7commplus)
@@ -36,6 +37,7 @@ if (STATIC_INSPECTORS)
         $<TARGET_OBJECTS:mms>
         $<TARGET_OBJECTS:modbus>
         $<TARGET_OBJECTS:netflow>
+        $<TARGET_OBJECTS:opcua>
         $<TARGET_OBJECTS:pop>
         $<TARGET_OBJECTS:rpc_decode>
         $<TARGET_OBJECTS:s7commplus>

@@ -31,6 +31,7 @@
 #include "extractor_dns.h"
 #include "extractor_ftp.h"
 #include "extractor_http.h"
+#include "extractor_quic.h"
 #include "extractor_ssl.h"
 
 using namespace snort;
@@ -133,6 +134,10 @@ ExtractorService* ExtractorService::make_service(Extractor& ins, const ServiceCo
 
     case ServiceType::DNS:
         srv = new DnsExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
+        break;
+
+    case ServiceType::QUIC:
+        srv = new QuicExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
         break;
 
     case ServiceType::IPS_BUILTIN:
@@ -243,6 +248,11 @@ void ExtractorService::validate(const ServiceConfig& cfg)
     case ServiceType::DNS:
         validate_events(DnsExtractorService::blueprint, cfg.on_events);
         validate_fields(DnsExtractorService::blueprint, cfg.fields);
+        break;
+
+    case ServiceType::QUIC:
+        validate_events(QuicExtractorService::blueprint, cfg.on_events);
+        validate_fields(QuicExtractorService::blueprint, cfg.fields);
         break;
 
     case ServiceType::IPS_BUILTIN:
@@ -503,6 +513,47 @@ const snort::Connector::ID& DnsExtractorService::get_log_id()
 { return log_id; }
 
 //-------------------------------------------------------------------------
+//  QuicExtractorService
+//-------------------------------------------------------------------------
+
+const ServiceBlueprint QuicExtractorService::blueprint =
+{
+    // events
+    {
+        "handshake",
+    },
+    // fields
+    {
+        "version",
+        "client_initial_dcid",
+        "client_scid",
+        "server_name",
+        "client_protocol",
+        "server_scid",
+        "history"
+    },
+};
+
+THREAD_LOCAL Connector::ID QuicExtractorService::log_id;
+
+QuicExtractorService::QuicExtractorService(uint32_t tenant, const std::vector<std::string>& srv_fields,
+    const std::vector<std::string>& srv_events, ServiceType s_type, Extractor& ins)
+    : ExtractorService(tenant, srv_fields, srv_events, blueprint, s_type, ins)
+{
+    for (const auto& event : get_events())
+    {
+        if (!strcmp("handshake", event.c_str()))
+            handlers.push_back(new QuicExtractor(ins, tenant_id, get_fields()));
+    }
+}
+
+const snort::Connector::ID& QuicExtractorService::internal_tinit()
+{ return log_id = logger->get_id(type.c_str()); }
+
+const snort::Connector::ID& QuicExtractorService::get_log_id()
+{ return log_id; }
+
+//-------------------------------------------------------------------------
 //  IpsUserExtractorService
 //-------------------------------------------------------------------------
 
@@ -604,6 +655,7 @@ TEST_CASE("Service Type", "[extractor]")
         ServiceType ssl = ServiceType::SSL;
         ServiceType conn = ServiceType::CONN;
         ServiceType dns = ServiceType::DNS;
+        ServiceType quic = ServiceType::QUIC;
         ServiceType weird = ServiceType::IPS_BUILTIN;
         ServiceType notice = ServiceType::IPS_USER;
         ServiceType any = ServiceType::ANY;
@@ -614,6 +666,7 @@ TEST_CASE("Service Type", "[extractor]")
         CHECK_FALSE(strcmp("ssl", ssl.c_str()));
         CHECK_FALSE(strcmp("conn", conn.c_str()));
         CHECK_FALSE(strcmp("dns", dns.c_str()));
+        CHECK_FALSE(strcmp("quic", quic.c_str()));
         CHECK_FALSE(strcmp("weird", weird.c_str()));
         CHECK_FALSE(strcmp("notice", notice.c_str()));
         CHECK_FALSE(strcmp("(not set)", any.c_str()));

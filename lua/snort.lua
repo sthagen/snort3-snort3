@@ -67,6 +67,7 @@ dnp3 = { }
 iec104 = { }
 mms = { }
 modbus = { }
+opcua = { }
 s7commplus = { }
 
 dce_smb = { }
@@ -150,6 +151,7 @@ binder =
     { when = { service = 'iec104' },           use = { type = 'iec104' } },
     { when = { service = 'mms' },              use = { type = 'mms' } },
     { when = { service = 'modbus' },           use = { type = 'modbus' } },
+    { when = { service = 'opcua' },            use = { type = 'opcua' } },
     { when = { service = 'pop3' },             use = { type = 'pop' } },
     { when = { service = 'ssh' },              use = { type = 'ssh' } },
     { when = { service = 'sip' },              use = { type = 'sip' } },

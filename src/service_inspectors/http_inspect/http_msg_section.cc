@@ -128,7 +128,7 @@ Field* HttpMsgSection::compute_http_method_str(const HttpBufferInfo&)
     return tmp_field(get_classic_buffer(HTTP_BUFFER_METHOD, 0, 0));
 }
 
-Field* HttpMsgSection::compute_request_size(const HttpBufferInfo&)
+Field* HttpMsgSection::compute_http_request_size(const HttpBufferInfo&)
 {
     uint32_t val = 0;
     val += get_section_len(request);
@@ -138,7 +138,7 @@ Field* HttpMsgSection::compute_request_size(const HttpBufferInfo&)
     return tmp_field(val);
 }
 
-Field* HttpMsgSection::compute_response_size(const HttpBufferInfo&)
+Field* HttpMsgSection::compute_http_response_size(const HttpBufferInfo&)
 {
     uint32_t val = 0;
     val += get_section_len(status);
@@ -212,8 +212,8 @@ const Field& HttpMsgSection::get_tmp_buffer(const HttpBufferInfo& buf)
 
     static const ComputeFunction compute_functions[TMP_BUFFER_CNT] = {
         &HttpMsgSection::compute_http_method_str,       // HTTP_BUFFER_METHOD_STR
-        &HttpMsgSection::compute_request_size,          // BUFFER_REQUEST_SIZE
-        &HttpMsgSection::compute_response_size,         // BUFFER_RESPONSE_SIZE
+        &HttpMsgSection::compute_http_request_size,     // HTTP_BUFFER_REQUEST_SIZE
+        &HttpMsgSection::compute_http_response_size,    // HTTP_BUFFER_RESPONSE_SIZE
         &HttpMsgSection::compute_http_version_str,      // HTTP_BUFFER_VERSION_STR
         &HttpMsgSection::compute_http_user_agent_str,   // HTTP_BUFFER_USER_AGENT_STR
         &HttpMsgSection::compute_http_referer_str,      // HTTP_BUFFER_REFERER_STR

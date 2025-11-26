@@ -180,7 +180,7 @@ bool Pig::prep(const char* source)
         return false;
     }
     requires_privileged_start = instance->can_start_unprivileged();
-    analyzer = new Analyzer(instance, idx, source, sc->pkt_cnt);
+    analyzer = new Analyzer(instance, idx, source, sc->pkt_cnt, sc->retry_timeout);
     analyzer->set_skip_cnt(sc->pkt_skip);
 #ifdef REG_TEST
     analyzer->set_pause_after_cnt(sc->pkt_pause_cnt);

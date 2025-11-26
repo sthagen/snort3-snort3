@@ -32,6 +32,7 @@ public:
         SSL,
         CONN,
         DNS,
+        QUIC,
         IPS_BUILTIN,
         IPS_USER,
         ANY,
@@ -59,6 +60,8 @@ public:
             return "conn";
         case DNS:
             return "dns";
+        case QUIC:
+            return "quic";
         case IPS_BUILTIN:
             return "weird";
         case IPS_USER:

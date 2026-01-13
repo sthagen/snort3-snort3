@@ -41,7 +41,7 @@ public:
     bool push();
 
     T get(T);
-    bool put(T);
+    bool put(const T&);
 
     T* grab_store(int& ix);
 
@@ -104,7 +104,7 @@ T Ring<T>::get(T v)
 }
 
 template <typename T>
-bool Ring<T>::put(T v)
+bool Ring<T>::put(const T& v)
 {
     T* p = write();
     if ( !p )

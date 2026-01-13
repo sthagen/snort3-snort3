@@ -118,6 +118,9 @@ static int SnortFTP(
 
         do_detection(p);
     }
+    else if (ret == FTPP_ALERT){
+        return ret;
+    }
 
     assert(FTPsession);
 

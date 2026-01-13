@@ -166,7 +166,16 @@ bool Stream::midstream_allowed(const Packet* p, bool alert)
         return true;
 
     if ( alert )
+    {
         DetectionEngine::queue_event(GID_STREAM_TCP, STREAM_TCP_NO_3WHS);
+        
+        if ( PacketTracer::is_active() )
+        {
+            time_t elapsed = p->pkth->ts.tv_sec - packet_first_time();
+            PacketTracer::log("Stream: midstream pickup disabled - require_3whs timeout exceeded "
+                "(hs_timeout=%d sec, elapsed=%ld sec since startup)\n", t, elapsed);
+        }
+    }
 
     return false;
 }

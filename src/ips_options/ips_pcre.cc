@@ -110,6 +110,7 @@ struct PcreCounts
 };
 
 PcreCounts pcre_counts;
+static const SnortConfig* pcre_counts_config_generation = nullptr;
 
 void show_pcre_counts()
 {
@@ -696,6 +697,13 @@ bool PcreModule::begin(const char* name, int v, SnortConfig* sc)
 
 bool PcreModule::set(const char* name, Value& v, SnortConfig* sc)
 {
+    // Reset PCRE counters once per new configuration build
+    if (sc != pcre_counts_config_generation)
+    {
+        pcre_counts = {};
+        pcre_counts_config_generation = sc;
+    }
+
     assert(v.is("~re"));
     re = v.get_string();
 

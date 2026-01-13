@@ -219,7 +219,7 @@ static void alert_event(Packet* p, const char*, Unified2Config* config, const Ev
             u2_event.pkt_mpls_label = htonl(p->ptrs.mplsHdr.label);
 
         if ( p->proto_bits & PROTO_BIT__VLAN )
-            u2_event.pkt_vlan_id = htons(layer::get_vlan_layer(p)->vid());
+            u2_event.pkt_vlan_id = htons(p->get_flow_vlan_id());
 
         u2_event.pkt_ip_proto = (uint8_t)p->get_ip_proto_next();
 
@@ -739,7 +739,7 @@ static void _AlertIP4_v2(Packet* p, const char*, Unified2Config* config, const E
             alertdata.mpls_label = htonl(p->ptrs.mplsHdr.label);
 
         if (p->proto_bits & PROTO_BIT__VLAN)
-            alertdata.vlanId = htons(layer::get_vlan_layer(p)->vid());
+            alertdata.vlanId = htons(p->get_flow_vlan_id());
 
         alertdata.pad2 = htons((uint16_t)p->user_ips_policy_id);
 
@@ -836,7 +836,7 @@ static void _AlertIP6_v2(Packet* p, const char*, Unified2Config* config, const E
             alertdata.mpls_label = htonl(p->ptrs.mplsHdr.label);
 
         if (p->proto_bits & PROTO_BIT__VLAN)
-            alertdata.vlanId = htons(layer::get_vlan_layer(p)->vid());
+            alertdata.vlanId = htons(p->get_flow_vlan_id());
 
         alertdata.pad2 = htons((uint16_t)p->user_ips_policy_id);
 

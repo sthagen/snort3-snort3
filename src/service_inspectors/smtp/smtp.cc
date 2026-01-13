@@ -926,7 +926,7 @@ static const uint8_t* SMTP_HandleCommand(SmtpProtoConf* config, Packet* p, SMTPD
         break;
 
     default:
-        switch (smtp_known_cmds[smtp_search_info.id].type)
+        switch (config->cmds[smtp_search_info.id].type)
         {
         case SMTP_CMD_TYPE_DATA:
             if ((smtp_ssn->state_flags & SMTP_FLAG_GOT_RCPT_CMD) ||

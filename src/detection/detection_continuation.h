@@ -180,6 +180,7 @@ void Continuation::eval(snort::Packet& p)
 
     while (i != &states)
     {
+        // coverity[use_after_free:FALSE]
         auto st = i;
         bool r = (**st).eval(p);
         i = st->get_next();

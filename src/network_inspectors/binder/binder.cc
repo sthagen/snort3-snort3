@@ -479,7 +479,7 @@ void Stuff::apply_assistant(Flow& flow, const char* service)
 class Binder : public Inspector
 {
 public:
-    Binder(std::vector<Binding>&, std::vector<Binding>&);
+    Binder(std::vector<Binding>&&, std::vector<Binding>&&);
     ~Binder() override;
 
     void remove_inspector_binding(SnortConfig*, const char*) override;
@@ -609,7 +609,7 @@ public:
     }
 };
 
-Binder::Binder(std::vector<Binding>& bv, std::vector<Binding>& pbv)
+Binder::Binder(std::vector<Binding>&& bv, std::vector<Binding>&& pbv)
     : bindings(std::move(bv)),  policy_bindings(std::move(pbv))
 { }
 
@@ -1092,9 +1092,7 @@ static void mod_dtor(Module* m)
 static Inspector* bind_ctor(Module* m)
 {
     BinderModule* mod = (BinderModule*)m;
-    std::vector<Binding>& bv = mod->get_bindings();
-    std::vector<Binding>& pbv = mod->get_policy_bindings();
-    return new Binder(bv, pbv);
+    return new Binder(mod->get_bindings(), mod->get_policy_bindings());
 }
 
 static void bind_dtor(Inspector* p)

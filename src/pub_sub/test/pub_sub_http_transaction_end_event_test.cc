@@ -23,6 +23,7 @@
 #endif
 
 #include "pub_sub/http_transaction_end_event.h"
+#include "pub_sub/http_form_data_event.h"
 #include "service_inspectors/http_inspect/http_common.h"
 #include "service_inspectors/http_inspect/http_enum.h"
 #include "service_inspectors/http_inspect/http_flow_data.h"
@@ -72,6 +73,9 @@ unsigned StreamSplitter::max(snort::Flow*) { return 0; }
 HttpParaList::UriParam::UriParam() { }
 HttpParaList::JsNormParam::~JsNormParam() { }
 HttpParaList::~HttpParaList() { }
+
+void HttpFormDataEvent::format_as_uri() const { }
+
 HttpInspect::HttpInspect(const HttpParaList* para) :
     params(para), xtra_trueip_id(0), xtra_uri_id(0),
     xtra_host_id(0), xtra_jsnorm_id(0)

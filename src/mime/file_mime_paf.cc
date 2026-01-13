@@ -28,25 +28,61 @@
 
 #include <cctype>
 
+#include "main/snort_module.h"
 #include "trace/trace_api.h"
 
 using namespace snort;
 
 static const char* boundary_str = "boundary=";
 
-/* Save the boundary string into paf state*/
-static inline bool store_boundary(MimeDataPafInfo* data_info,  uint8_t val)
+static inline bool handle_quoted(MimeDataPafInfo* data_info, uint8_t val)
+{
+    if (val == '"')
+    {
+        /* Trim trailing spaces before closing quote */
+        while (data_info->boundary_len > 0 and
+            isspace(data_info->boundary[data_info->boundary_len - 1]))
+            data_info->boundary_len--;
+
+        /* Closing quote - finalize boundary */
+        data_info->boundary[data_info->boundary_len] = '\0';
+        return true;
+    }
+
+    /* Inside quotes - add everything including spaces
+    until boundary limit is reached + reserve space for 0-terminator */
+    if (data_info->boundary_len < (int)sizeof(data_info->boundary) - 1)
+    {
+        data_info->boundary[data_info->boundary_len++] = val;
+    }
+    else
+    {
+        /* Trim trailing spaces */
+        while (data_info->boundary_len > 0 and
+            isspace(data_info->boundary[data_info->boundary_len - 1]))
+            data_info->boundary_len--;
+
+        /* Reached MAX allowed boundary len */
+        data_info->boundary[data_info->boundary_len] = '\0';
+        return true;
+    }
+
+    return false;
+}
+
+/* Save the boundary string into paf state */
+static inline bool store_boundary(MimeDataPafInfo* data_info, uint8_t val)
 {
     if (!data_info->boundary_search)
     {
-        if ((val == '.') || isspace (val))
+        if ((val == '.') or isspace(val))
             data_info->boundary_search = boundary_str;
         return false;
     }
 
     if (*(data_info->boundary_search) == '=')
     {
-        /*Skip spaces for the end of boundary*/
+        /* Skip spaces for the end of boundary */
         if (val == '=')
             data_info->boundary_search++;
         else if (!isspace(val))
@@ -54,38 +90,52 @@ static inline bool store_boundary(MimeDataPafInfo* data_info,  uint8_t val)
     }
     else if (*(data_info->boundary_search) == '\0')
     {
-        /*get boundary string*/
-        if (isspace(val) || (val == '"'))
+        /* Handle opening quote - first character after '=' */
+        if (!data_info->boundary_len and !data_info->boundary_quoted and val == '"')
+        {
+            data_info->boundary_quoted = true;
+            return false;  /* Skip the quote itself */
+        }
+
+        if (data_info->boundary_quoted)
+        {
+            return handle_quoted(data_info, val);
+        }
+
+        /* Unquoted mode - check terminators */
+        if ((val == ';') or isspace(val))
         {
             if (!data_info->boundary_len)
                 return false;
             else
             {
-                /*Found boundary string*/
+                /* Found boundary string */
                 data_info->boundary[data_info->boundary_len] = '\0';
                 return true;
             }
         }
-
-        if (data_info->boundary_len < (int)sizeof(data_info->boundary))
+        /* Need to subtract the size allocated for 0-terminator */
+        if (data_info->boundary_len < (int)sizeof(data_info->boundary) - 1)
         {
             data_info->boundary[data_info->boundary_len++] = val;
         }
         else
         {
-            /*Found boundary string*/
-            data_info->boundary[data_info->boundary_len -1] = '\0';
+            /* Reached MAX allowed boundary len */
+            assert(data_info->boundary_len == sizeof(data_info->boundary) - 1);
+            data_info->boundary[sizeof(data_info->boundary) - 1] = '\0';
+
             return true;
         }
     }
     else if ((val == *(data_info->boundary_search))
-        || (val == *(data_info->boundary_search) - 'a' + 'A'))
+        or (val == *(data_info->boundary_search) - 'a' + 'A'))
     {
         data_info->boundary_search++;
     }
     else
     {
-        if ((val == '.') || isspace (val))
+        if ((val == '.') or isspace(val))
             data_info->boundary_search = boundary_str;
         else
             data_info->boundary_search = nullptr;
@@ -95,7 +145,7 @@ static inline bool store_boundary(MimeDataPafInfo* data_info,  uint8_t val)
 }
 
 /* check the boundary string in the mail body*/
-static inline bool check_boundary(MimeDataPafInfo* data_info,  uint8_t data)
+static inline bool check_boundary(MimeDataPafInfo* data_info, uint8_t data)
 {
     const auto prev_state = data_info->boundary_state;
 
@@ -192,16 +242,19 @@ void reset_mime_paf_state(MimeDataPafInfo* data_info)
     data_info->boundary[0] = '\0';
     data_info->boundary_state = MIME_PAF_BOUNDARY_UNKNOWN;
     data_info->data_state = MIME_PAF_FINDING_BOUNDARY_STATE;
+    data_info->boundary_quoted = false;
 }
 
 /*  Process data boundary and flush each file based on boundary*/
-bool process_mime_paf_data(MimeDataPafInfo* data_info,  uint8_t data)
+bool process_mime_paf_data(MimeDataPafInfo* data_info, uint8_t data)
 {
     switch (data_info->data_state)
     {
     case MIME_PAF_FINDING_BOUNDARY_STATE:
         if (store_boundary(data_info, data))
         {
+            debug_logf(snort_trace, TRACE_MIME, nullptr, "MIME boundary found: %s\n", data_info->boundary);
+
             data_info->data_state = MIME_PAF_FOUND_FIRST_BOUNDARY_STATE;
         }
         break;
@@ -222,7 +275,7 @@ bool process_mime_paf_data(MimeDataPafInfo* data_info,  uint8_t data)
     return false;
 }
 
-bool check_data_end(void* data_end_state,  uint8_t val)
+bool check_data_end(void* data_end_state, uint8_t val)
 {
     DataEndState state =  *((DataEndState*)data_end_state);
 
@@ -266,3 +319,297 @@ bool check_data_end(void* data_end_state,  uint8_t val)
     return false;
 }
 } // namespace snort
+
+#ifdef UNIT_TEST
+
+#include "catch/snort_catch.h"
+
+#include <cstring>
+
+using namespace snort;
+
+static void process_boundary_value(MimeDataPafInfo* info, const char* boundary_part)
+{
+    info->boundary_search = boundary_str;
+
+    while (*boundary_part and !store_boundary(info, *boundary_part++))
+    { }
+}
+
+TEST_CASE("MIME boundary parsing", "[mime]")
+{
+    MimeDataPafInfo info;
+
+    SECTION("quoted boundary with spaces")
+    {
+        // Spaces are accepted in quoted-string boundaries
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary= \"boundary 123 foobar\"");
+
+        CHECK(strcmp(info.boundary, "boundary 123 foobar") == 0);
+        CHECK(info.boundary_len == 19);
+    }
+
+    SECTION("unquoted boundary with spaces")
+    {
+        // Unquoted boundary must be a valid "token" (per RFC 2045),
+        // and therefore stops at the first character not allowed in a token.
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=boundary 123  foobar");
+
+        CHECK(strcmp(info.boundary, "boundary") == 0);
+        CHECK(info.boundary_len == 8);
+    }
+
+    SECTION("quoted boundary with trailing spaces inside")
+    {
+        // RFC 2046: spaces at the end of the boundary is forbidden
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=\"foobar  \"");
+
+        CHECK(strcmp(info.boundary, "foobar") == 0);
+        CHECK(info.boundary_len == 6);
+    }
+
+    SECTION("quoted boundary with leading spaces")
+    {
+        // Leading spaces in quoted-string are not strictly forbidden by standard
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=\"  foobar\"");
+
+        CHECK(strcmp(info.boundary, "  foobar") == 0);
+        CHECK(info.boundary_len == 8);
+    }
+
+    SECTION("unquoted boundary with trailing spaces")
+    {
+        // RFC 2046: spaces at the end of the boundary is forbidden
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=foobar  ;");
+
+        CHECK(strcmp(info.boundary, "foobar") == 0);
+        CHECK(info.boundary_len == 6);
+    }
+
+    SECTION("unquoted boundary with leading spaces")
+    {
+        // Token(unquoted boundary) cannot start with spaces, they will be skipped
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=  foobar");
+
+        CHECK(strcmp(info.boundary, "foobar") == 0);
+        CHECK(info.boundary_len == 6);
+    }
+
+    SECTION("simple quoted boundary with spaces after boundary keyword")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary  =\"foobar\"");
+
+        CHECK(strcmp(info.boundary, "foobar") == 0);
+        CHECK(info.boundary_len == 6);
+    }
+
+    SECTION("simple unquoted boundary with spaces after boundary keyword")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary  =foobar");
+
+        CHECK(strcmp(info.boundary, "foobar") == 0);
+        CHECK(info.boundary_len == 6);
+    }
+
+    SECTION("boundary with special chars")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=\"-=_boundary_+=\"");
+
+        CHECK(strcmp(info.boundary, "-=_boundary_+=") == 0);
+        CHECK(info.boundary_len == 14);
+    }
+
+    SECTION("case insensitive boundary keyword")
+    {
+        // The keyword "boundary" should be case-insensitive
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "BOUNDARY=foobar");
+
+        CHECK(strcmp(info.boundary, "foobar") == 0);
+        CHECK(info.boundary_len == 6);
+    }
+
+    SECTION("empty quoted boundary")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=\"\"");
+
+        CHECK(info.boundary_len == 0);
+    }
+
+    SECTION("quoted spaces boundary")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=\"     \"");
+
+        CHECK(info.boundary_len == 0);
+    }
+
+    SECTION("boundary with equals sign")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary=\"boundary=foobar\"");
+
+        CHECK(strcmp(info.boundary, "boundary=foobar") == 0);
+        CHECK(info.boundary_len == 15);
+    }
+
+    SECTION("boundary without =")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary\"--foobar\"");
+
+        CHECK(strcmp(info.boundary, "") == 0);
+        CHECK(info.boundary_len == 0);
+    }
+
+    SECTION("another option after boundary ")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "Content-Type: multipart/form-data; boundary=foobar charset=utf-8");
+
+        CHECK(strcmp(info.boundary, "foobar") == 0);
+        CHECK(info.boundary_len == 6);
+    }
+
+    SECTION("quoted boundary with semicolon after closing quote")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary= \"foobar 123\";");
+
+        CHECK(strcmp(info.boundary, "foobar 123") == 0);
+        CHECK(info.boundary_len == 10);
+    }
+
+    SECTION("show case - quoted boundary without closing quote and semicolon")
+    {
+        // In quoted mode, semicolon is part of the boundary value
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary= \"foobar 123; charset=utf-8");
+
+        CHECK(strcmp(info.boundary, "foobar 123; charset=utf-8") == 0);
+        CHECK(info.boundary_len == 25);
+    }
+
+    SECTION("unquoted boundary with quote at the end")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        process_boundary_value(&info, "boundary= foobar 123\"");
+
+        CHECK(strcmp(info.boundary, "foobar") == 0);
+        CHECK(info.boundary_len == 6);
+    }
+
+    SECTION("quoted boundary overflow - exceeds MAX_MIME_BOUNDARY_LEN")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        // 75 chars boundary - should trigger overflow protection
+        process_boundary_value(&info, "boundary=\"123456789012345678901234567890123456789012345678901234567890123456789_EXTRA\"");
+
+        CHECK(info.boundary_len == MAX_MIME_BOUNDARY_LEN);
+        CHECK(strcmp(info.boundary, "123456789012345678901234567890123456789012345678901234567890123456789_") == 0);
+        CHECK(info.boundary[MAX_MIME_BOUNDARY_LEN] == '\0');
+
+        reset_mime_paf_state(&info);
+        process_boundary_value(&info, "boundary=\"     123456789012345678901234567890123456789012345678901234567890123456789_\"");
+        CHECK(strcmp(info.boundary, "     12345678901234567890123456789012345678901234567890123456789012345") == 0);
+        CHECK(info.boundary[info.boundary_len] == '\0');
+
+        reset_mime_paf_state(&info);
+        process_boundary_value(&info, "boundary=\"123456789012345678901234567890123456789012345678901234567890123456789_     \"");
+        CHECK(strcmp(info.boundary, "123456789012345678901234567890123456789012345678901234567890123456789_") == 0);
+        CHECK(info.boundary[info.boundary_len] == '\0');
+
+        reset_mime_paf_state(&info);
+        process_boundary_value(&info, "boundary=\"     123456789012345678901234567890123456789012345678901234567890123456789_     \"");
+        CHECK(strcmp(info.boundary, "     12345678901234567890123456789012345678901234567890123456789012345") == 0);
+        CHECK(info.boundary[info.boundary_len] == '\0');
+
+        reset_mime_paf_state(&info);
+        process_boundary_value(&info, "boundary=\"12345678901234567890123456789012345678901234567890123456789                \"");
+        CHECK(strcmp(info.boundary, "12345678901234567890123456789012345678901234567890123456789") == 0);
+        CHECK(info.boundary[info.boundary_len] == '\0');
+    }
+
+    SECTION("unquoted boundary overflow - exceeds MAX_MIME_BOUNDARY_LEN")
+    {
+        memset(&info, 0, sizeof(info));
+        reset_mime_paf_state(&info);
+
+        // 75 chars boundary - should trigger overflow protection
+        process_boundary_value(&info, "boundary=123456789012345678901234567890123456789012345678901234567890123456789_EXTRA");
+
+        CHECK(info.boundary_len == MAX_MIME_BOUNDARY_LEN);
+        CHECK(strcmp(info.boundary, "123456789012345678901234567890123456789012345678901234567890123456789_") == 0);
+        CHECK(info.boundary[MAX_MIME_BOUNDARY_LEN] == '\0');
+
+        reset_mime_paf_state(&info);
+        process_boundary_value(&info, "boundary=     123456789012345678901234567890123456789012345678901234567890123456789_");
+        CHECK(strcmp(info.boundary, "123456789012345678901234567890123456789012345678901234567890123456789_") == 0);
+        CHECK(info.boundary[info.boundary_len] == '\0');
+
+        reset_mime_paf_state(&info);
+        process_boundary_value(&info, "boundary=123456789012345678901234567890123456789012345678901234567890123456789_     ");
+        CHECK(strcmp(info.boundary, "123456789012345678901234567890123456789012345678901234567890123456789_") == 0);
+        CHECK(info.boundary[info.boundary_len] == '\0');
+
+        reset_mime_paf_state(&info);
+        process_boundary_value(&info, "boundary=     123456789012345678901234567890123456789012345678901234567890123456789_     ");
+        CHECK(strcmp(info.boundary, "123456789012345678901234567890123456789012345678901234567890123456789_") == 0);
+        CHECK(info.boundary[info.boundary_len] == '\0');
+
+        reset_mime_paf_state(&info);
+        process_boundary_value(&info, "boundary=12345678901234567890123456789012345678901234567890123456789                ");
+        CHECK(strcmp(info.boundary, "12345678901234567890123456789012345678901234567890123456789") == 0);
+        CHECK(info.boundary[info.boundary_len] == '\0');
+    }
+}
+
+#endif

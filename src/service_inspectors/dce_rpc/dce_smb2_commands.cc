@@ -78,7 +78,7 @@ static inline FileContext* DCE2_Smb2GetFileContext(DCE2_Smb2SsnData*, DCE2_Smb2F
     }
     bool is_new_context = false;
     if (ftracker->file_name_hash)
-            return file_flows->get_file_context(ftracker->file_name_hash, to_create, is_new_context, ftracker->file_id);
+        return file_flows->get_file_context(ftracker->file_name_hash, to_create, is_new_context, ftracker->file_id);
     return file_flows->get_file_context(ftracker->file_id, to_create, is_new_context);
 }
 
@@ -1047,7 +1047,13 @@ static void DCE2_Smb2WriteRequest(DCE2_Smb2SsnData* ssd, const Smb2Hdr* smb_hdr,
         {
             FileContext* file = DCE2_Smb2GetFileContext(ssd, ftracker, true);
             if (file)
-                file->set_file_size(!ftracker->file_size ? UNKNOWN_FILE_SIZE : ftracker->file_size);
+            {
+                //preserve cached file_size when ftracker->file_size=0
+                if (ftracker->file_size != 0)
+                    file->set_file_size(ftracker->file_size);
+                else if (file->get_file_size() == 0)
+                    file->set_file_size(UNKNOWN_FILE_SIZE);
+            }
         }
         if (!DCE2_Smb2ProcessFileData(ssd, file_data, data_size))
             return;

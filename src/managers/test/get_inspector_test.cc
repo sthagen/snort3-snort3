@@ -23,6 +23,8 @@
 
 #include <unordered_map>
 
+#include "packet_io/packet_tracer.h"
+#include "stream/base/stream_module.h"
 #include "get_inspector_stubs.h"
 
 #include <CppUTest/CommandLineTestRunner.h>
@@ -30,6 +32,11 @@
 #include <CppUTestExt/MockSupport.h>
 
 using namespace snort;
+
+THREAD_LOCAL BaseStats stream_base_stats = {};
+
+bool PacketTracer::is_active() { return false; }
+void PacketTracer::log(const char*, ...) {}
 
 NetworkPolicy* snort::get_network_policy()
 { return (NetworkPolicy*)mock().getData("network_policy").getObjectPointer(); }

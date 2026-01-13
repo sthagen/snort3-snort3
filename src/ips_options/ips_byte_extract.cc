@@ -155,11 +155,11 @@ IpsOption::EvalStatus ByteExtractOption::eval(Cursor& c, Packet* p)
 
     SetVarValueByIndex(value, config.var_number);
 
-    auto result = c.add_pos(config.offset + bytes_read);
-    assert(result);
-    UNUSED(result);
+    auto result = config.relative_flag
+        ? c.add_pos(config.offset + bytes_read)
+        : c.set_pos(config.offset + bytes_read);
 
-    return MATCH;
+    return result ? MATCH : NO_MATCH;
 }
 
 void ByteExtractOption::apply_alignment(uint32_t& value)

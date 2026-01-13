@@ -1,3 +1,57 @@
+2026-01-11: 3.10.1.0
+
+* alert_fast: ensure call_once definition doesn't collide in std vs glibc, thanks to krag on GitHub for suggesting this fix
+* alert_json: add support for logging appid, thanks to ssam18 on GitHub for suggesting this change
+* appid: add check to avoid setting brute force state for pending sessions that are pruned
+* appid: allow out-of-order packet inspection in third-party engine
+* appid: check for Lua table errors during initialization and cleanup
+* appid: enable out-of-order inspection by default
+* appid: fix client process regex mapping logic
+* appid: fix eve process handler event debug logging
+* appid: fix setting global ssh ignore flag
+* appid: fix size check in TFTP service detector
+* appid: mDNS TXT records parsing and deviceinfo event generation
+* appid: prevent multiple out-of-bounds reads in ssl
+* build: address compilation warnings
+* build: fix Coverity warnings in related components
+* cmake: fix pkg-config path for libdir, thanks to brianmcgillion on GitHub for submitting a similar fix
+* decoder: adding encode function for TransbridgeCodec
+* dns: add fix infinite recursion vulnerability
+* file: use new EVP functions rather than deprecated SHA functions
+* flow: add logs to show different ways a flow can fail to create
+* ftp_telnet: fix coverity errors and improve cmd_len configurability
+* ftp_telnet: fix ftp_cmd_pipe_index handling
+* ftp_telnet: Handle malformed traffic in ftp to generate alert
+* hash: update hashes to use new EVP functions, thanks to
+* http_inspect: add urlencoded to content-type list
+* http_inspect: fix coverity error
+* iec104: fix IEC 104 SQ0 bounds checks by removing duplicate asdu_size_map entries and using IO_GROUP sizes, preventing out-of-bounds reads
+* iec104: validate Type I length to prevent ASDU out-of-bounds read
+* ips_options: fix cursor position for byte_extract
+* ips_options: reset PCRE rule counts on new configuration loaded
+* main: update dioctl daqSnort latency common change
+* mime: add unit tests for data fitting memory limit
+* mime: add unit tests for data over memory limit
+* mime: add unit tests for file logging
+* mime: fix mime boundary parsing
+* mime: ignore field collection if not configured
+* mime: implement content parsing of multipart/form_data
+* mime: improve form-data collection for incomplete boundaries
+* mime: leave room for null-character in case of size limit hit
+* mime: remove unused forward-declaration
+* mime: rename class field to comply with the style
+* mime: return error code if cannot add headers for logging
+* pub_sub: add is_urlencoded method
+* sip: fix out-of-bounds reads in sip_parse_sdp_m
+* smb,dlp: update filename,filesize of FileInfo handling to enable dlp evaluation for repeated txns
+* smtp: usage of config cmds
+* snort2lua: fix failure in converting patterns containing commas
+* snort_ml: enable client body scanning by default
+* snort_ml: scan multipart form data
+* ssl: free certificate data if certificate length is 0
+* ssl: tls client hello check out of bounds fix
+* unified2: use proper API for obtaining VLAN ID from packet
+
 2025-11-24: 3.10.0.0
 
 * appid: ftp parsing bounds check

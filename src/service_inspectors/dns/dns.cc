@@ -326,8 +326,14 @@ static uint16_t ParseDNSHeader(
 }
 
 static uint16_t ParseDNSName(
-    const unsigned char* data, uint16_t bytes_unused, DNSData* dnsSessionData, bool parse_dns_name = false)
+    const unsigned char* data, uint16_t bytes_unused, DNSData* dnsSessionData, bool parse_dns_name = false,
+    int32_t start_offset = -1)
 {
+    // For initial call (start_offset == -1), calculate position from bytes_unused.
+    // For recursive calls following pointers, start_offset is explicitly provided.
+    if (start_offset < 0)
+        start_offset = dnsSessionData->bytes_unused - bytes_unused;
+
     uint16_t bytes_required = dnsSessionData->curr_txt.txt_len -
         dnsSessionData->curr_txt.txt_bytes_seen;
 
@@ -387,13 +393,21 @@ static uint16_t ParseDNSName(
                     if (dnsSessionData->length > 0)
                         dnsSessionData->curr_txt.offset += 2; // first two bytes are length in TCP
 
-                    if (parse_dns_name && dnsSessionData->data.size() > dnsSessionData->curr_txt.offset)
+                    if (parse_dns_name)
                     {
-                        // If the name field is a pointer, then parse the name field at that offset only if
-                        // the offset is within the bounds of the data buffer.
-                        dnsSessionData->curr_txt.name_state = DNS_RESP_STATE_NAME_SIZE;
-                        return ParseDNSName(&dnsSessionData->data[0] + dnsSessionData->curr_txt.offset,
-                            dnsSessionData->bytes_unused, dnsSessionData, parse_dns_name);
+                        // Per RFC 1035, compression pointers must point to a prior occurrence.
+                        // The pointer target (curr_txt.offset) must be less than where we started parsing (start_offset).
+                        // This prevents forward pointers and loops.
+                        if (dnsSessionData->data.size() > dnsSessionData->curr_txt.offset
+                            && static_cast<int32_t>(dnsSessionData->curr_txt.offset) < start_offset)
+                        {
+                            // If the name field is a pointer, then parse the name field at that offset only if
+                            // the offset is within the bounds of the data buffer and points backwards.
+                            dnsSessionData->curr_txt.name_state = DNS_RESP_STATE_NAME_SIZE;
+                            return ParseDNSName(&dnsSessionData->data[0] + dnsSessionData->curr_txt.offset,
+                                dnsSessionData->bytes_unused - dnsSessionData->curr_txt.offset, dnsSessionData,
+                                parse_dns_name, static_cast<int32_t>(dnsSessionData->curr_txt.offset));
+                        }
                     }
                 }
 
@@ -445,6 +459,12 @@ static uint16_t ParseDNSQuestion(
     if (dnsSessionData->curr_rec_state < DNS_RESP_STATE_Q_NAME_COMPLETE)
     {
         uint16_t new_bytes_unused = ParseDNSName(data, bytes_unused, dnsSessionData, true);
+
+        // Sanity check: new_bytes_unused should never exceed bytes_unused.
+        // If it does, the DNS data is malformed - return 0 to stop processing.
+        if (new_bytes_unused > bytes_unused)
+            return 0;
+
         uint16_t bytes_used = bytes_unused - new_bytes_unused;
 
         if (dnsSessionData->curr_txt.name_state == DNS_RESP_STATE_NAME_COMPLETE)
@@ -1113,6 +1133,14 @@ SfIp DnsResponseIp::get_ip()
         ip.set(data, family);
 
     return ip;
+}
+
+DnsResponseFqdn::DnsResponseFqdn(const unsigned char* data, uint16_t bytes_unused, DNSData* dnsSessionData) :
+    data(data), bytes_unused(bytes_unused), dnsSessionData(std::make_shared<DNSData>(*dnsSessionData))
+{
+    // Clear cur_fqdn_event in the copied DNSData to prevent nested object chains
+    // that cause stack exhaustion during destruction.
+    this->dnsSessionData->cur_fqdn_event = DnsResponseFqdn();
 }
 
 FqdnTtl DnsResponseFqdn::get_fqdn()

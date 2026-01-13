@@ -519,15 +519,11 @@ void BinderModule::commit_policy_binding()
     binding.when.dst_nets = nullptr;
 }
 
-vector<Binding>& BinderModule::get_bindings()
-{
-    return bindings; // move semantics
-}
+vector<Binding>&& BinderModule::get_bindings()
+{ return std::move(bindings); }
 
-vector<Binding>& BinderModule::get_policy_bindings()
-{
-    return policy_bindings; // move semantics
-}
+vector<Binding>&& BinderModule::get_policy_bindings()
+{ return std::move(policy_bindings); }
 
 const PegInfo* BinderModule::get_pegs() const
 { return bind_pegs; }

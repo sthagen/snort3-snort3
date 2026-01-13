@@ -196,9 +196,7 @@ public:
     DnsResponseFqdn()
     {}
 
-    DnsResponseFqdn(const unsigned char* data, uint16_t bytes_unused, DNSData* dnsSessionData) :
-        data(data), bytes_unused(bytes_unused), dnsSessionData(std::make_shared<DNSData>(*dnsSessionData))
-    {}
+    DnsResponseFqdn(const unsigned char* data, uint16_t bytes_unused, DNSData* dnsSessionData);
 
     FqdnTtl get_fqdn();
     void update_ttl(uint32_t ttl);

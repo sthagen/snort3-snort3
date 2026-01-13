@@ -797,7 +797,7 @@ static int ftp_validate_port(const uint8_t* data, uint16_t size, SfIp* address, 
     uint32_t addr;
     uint32_t addr2;
 
-    memset(address,0,sizeof(*address));
+    address->clear();
     *port = 0;
 
     end = data + size;
@@ -864,7 +864,7 @@ static int ftp_validate_eprt(const uint8_t* data, uint16_t size, SfIp* address, 
     uint32_t tmp;
     char tmp_str[INET6_ADDRSTRLEN+1];
 
-    memset(address, 0, sizeof(*address));
+    address->clear();
     *port = 0;
 
     end = data + size;

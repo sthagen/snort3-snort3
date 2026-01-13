@@ -29,6 +29,7 @@
 #include "log/messages.h"
 #include "managers/inspector_manager.h"
 #include "pub_sub/http_events.h"
+#include "pub_sub/http_form_data_event.h"
 #include "pub_sub/http_request_body_event.h"
 #include "utils/util.h"
 
@@ -39,63 +40,6 @@ using namespace std;
 
 THREAD_LOCAL SnortMLStats snort_ml_stats;
 THREAD_LOCAL ProfileStats snort_ml_prof;
-
-//--------------------------------------------------------------------------
-// HTTP body event handler
-//--------------------------------------------------------------------------
-
-class HttpBodyHandler : public DataHandler
-{
-public:
-    HttpBodyHandler(const SnortMLEngine& eng, const SnortML& ins)
-        : DataHandler(SNORT_ML_NAME), engine(eng), inspector(ins) {}
-
-    void handle(DataEvent& de, Flow*) override;
-
-private:
-    const SnortMLEngine& engine;
-    const SnortML& inspector;
-};
-
-void HttpBodyHandler::handle(DataEvent& de, Flow*)
-{
-    // cppcheck-suppress unreadVariable
-    Profile profile(snort_ml_prof);
-
-    HttpRequestBodyEvent* he = reinterpret_cast<HttpRequestBodyEvent*>(&de);
-
-    if (he->is_mime())
-        return;
-
-    int32_t body_len = 0;
-    const char* body = (const char*)he->get_client_body(body_len);
-
-    if (!body || body_len <= 0)
-        return;
-
-    const SnortMLConfig& conf = inspector.get_config();
-
-    const size_t len = std::min((size_t)conf.client_body_depth, (size_t)body_len);
-
-    float output = 0;
-    if (!engine.scan(body, len, output))
-        return;
-
-    snort_ml_stats.client_body_bytes += len;
-
-    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
-        "input (body): %.*s\n", (int)len, body);
-
-    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
-        "output: %f\n", static_cast<double>(output));
-
-    if ((double)output > conf.http_param_threshold)
-    {
-        snort_ml_stats.client_body_alerts++;
-        debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "<ALERT>\n");
-        DetectionEngine::queue_event(SNORT_ML_GID, SNORT_ML_SID);
-    }
-}
 
 //--------------------------------------------------------------------------
 // HTTP uri event handler
@@ -152,6 +96,116 @@ void HttpUriHandler::handle(DataEvent& de, Flow*)
 }
 
 //--------------------------------------------------------------------------
+// HTTP body event handler
+//--------------------------------------------------------------------------
+
+class HttpBodyHandler : public DataHandler
+{
+public:
+    HttpBodyHandler(const SnortMLEngine& eng, const SnortML& ins)
+        : DataHandler(SNORT_ML_NAME), engine(eng), inspector(ins) {}
+
+    void handle(DataEvent&, Flow*) override;
+
+private:
+    const SnortMLEngine& engine;
+    const SnortML& inspector;
+};
+
+void HttpBodyHandler::handle(DataEvent& de, Flow*)
+{
+    // cppcheck-suppress unreadVariable
+    Profile profile(snort_ml_prof);
+
+    HttpRequestBodyEvent* he = reinterpret_cast<HttpRequestBodyEvent*>(&de);
+
+    if (!he->is_urlencoded())
+        return;
+
+    int32_t body_len = 0;
+    const char* body = (const char*)he->get_client_body(body_len);
+
+    if (!body || body_len <= 0)
+        return;
+
+    const SnortMLConfig& conf = inspector.get_config();
+
+    const size_t len = std::min((size_t)conf.client_body_depth, (size_t)body_len);
+
+    float output = 0;
+    if (!engine.scan(body, len, output))
+        return;
+
+    snort_ml_stats.client_body_bytes += len;
+
+    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
+        "input (body): %.*s\n", (int)len, body);
+
+    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
+        "output: %f\n", static_cast<double>(output));
+
+    if ((double)output > conf.http_param_threshold)
+    {
+        snort_ml_stats.client_body_alerts++;
+        debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "<ALERT>\n");
+        DetectionEngine::queue_event(SNORT_ML_GID, SNORT_ML_SID);
+    }
+}
+
+//--------------------------------------------------------------------------
+// HTTP form event handler
+//--------------------------------------------------------------------------
+
+class HttpFormHandler : public DataHandler
+{
+public:
+    HttpFormHandler(const SnortMLEngine& eng, const SnortML& ins)
+        : DataHandler(SNORT_ML_NAME), engine(eng), inspector(ins) {}
+
+    void handle(DataEvent&, Flow*) override;
+
+private:
+    const SnortMLEngine& engine;
+    const SnortML& inspector;
+};
+
+void HttpFormHandler::handle(DataEvent& de, Flow*)
+{
+    // cppcheck-suppress unreadVariable
+    Profile profile(snort_ml_prof);
+
+    HttpFormDataEvent* he = reinterpret_cast<HttpFormDataEvent*>(&de);
+
+    const std::string& data = he->get_form_data_uri();
+
+    if (data.empty())
+        return;
+
+    const SnortMLConfig& conf = inspector.get_config();
+
+    const size_t len = std::min((size_t)conf.client_body_depth, data.length());
+
+    float output = 0;
+    if (!engine.scan(data.c_str(), len, output))
+        return;
+
+    snort_ml_stats.client_body_bytes += len;
+
+    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
+        "input (form): %.*s\n", (int)len, data.c_str());
+
+    debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr,
+        "output: %f\n", static_cast<double>(output));
+
+    if ((double)output > conf.http_param_threshold)
+    {
+        snort_ml_stats.client_body_alerts++;
+        debug_logf(snort_ml_trace, TRACE_CLASSIFIER, nullptr, "<ALERT>\n");
+        DetectionEngine::queue_event(SNORT_ML_GID, SNORT_ML_SID);
+    }
+}
+
+//--------------------------------------------------------------------------
 // inspector
 //--------------------------------------------------------------------------
 
@@ -185,6 +239,9 @@ bool SnortML::configure(SnortConfig* sc)
     {
         DataBus::subscribe(http_pub_key, HttpEventIds::REQUEST_BODY,
             new HttpBodyHandler(*engine, *this));
+
+        DataBus::subscribe(http_pub_key, HttpEventIds::MIME_FORM_DATA,
+            new HttpFormHandler(*engine, *this));
     }
 
     return true;

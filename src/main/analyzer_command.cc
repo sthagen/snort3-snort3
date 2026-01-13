@@ -39,7 +39,10 @@
 #include "analyzer.h"
 #include "reload_tracker.h"
 #include "reload_tuner.h"
-#include "snort.h"
+#include <unistd.h>
+#include <cstring>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "snort_config.h"
 #include "thread_config.h"
 #include "swapper.h"
@@ -48,6 +51,22 @@ using namespace snort;
 
 static THREAD_LOCAL timeval report_time{};
 static const timeval report_period = {10, 0};
+static const char* invalid_ip = "<invalid>";
+
+// Static helper for formatting IPv4/IPv6 addresses
+static void format_ip_addr(const struct in6_addr& addr, uint32_t is_ipv6, char* buf, size_t buflen)
+{
+    if (is_ipv6) {
+        if(!inet_ntop(AF_INET6, &addr, buf, buflen))
+            strcpy(buf, invalid_ip);
+    }
+    else {
+        struct in_addr v4addr;
+        std::memcpy(&v4addr, &addr, sizeof(v4addr));
+        if(!inet_ntop(AF_INET, &v4addr, buf, buflen))
+            strcpy(buf, invalid_ip);
+    }
+}
 
 static void tuner_next(ReloadResourceTuner* tuner)
 {
@@ -345,29 +364,60 @@ ACShowSnortPacketLatencyData::~ACShowSnortPacketLatencyData()
     const std::array<const char*, 3> protocol_names = { "TCP", "UDP", "Others" };
     int instance = 0;
 
-    LogRespond(ctrlcon, "%-3s \t%-6s \t%-8s \t%-12s \t%-12s \t%-12s \t%-20s \t%-15s \t%-12s\n", 
-        "Id", "Tid", "Proto", "Max_pkt(us)", "Pkt_count", "Sum_time(us)", 
-        "Conn_meta_null", "Avg Packet Time(us)", "Max Latency(us)");
-
+    // Print header for each instance
     for (auto& ld: latency_data)
-    {   
+    {
+        LogRespond(ctrlcon, "\n================ Instance: %-3d ================\nThreadID: %d\n", instance, ThreadConfig::get_instance_tid(instance));
         for (size_t i = 0; i < protocol_names.size(); i++)
         {
             auto& latency_data_proto = ld.snort_latency_data[i];
             double average_pkt_time = latency_data_proto.pkt_count > 0 ? 
             (latency_data_proto.sum_time*1.0 / latency_data_proto.pkt_count / 1000.0) : 0.0;
 
-            LogRespond(ctrlcon, "%-3d \t%-6d \t%-8s \t%-12lu \t%-12lu \t%-12lu \t%-20lu \t%-15.3f \t%-12lu\n",
-                instance, ThreadConfig::get_instance_tid(instance),
-                protocol_names[i],
-                latency_data_proto.snort_up_max_pkt_time/1000, 
-                latency_data_proto.pkt_count,
-                latency_data_proto.sum_time/1000,
-                latency_data_proto.conn_meta_null_counters, 
-                average_pkt_time,
-                latency_data_proto.max_pkt_time/1000);
+            char max_pkt_src_ip[INET6_ADDRSTRLEN], max_pkt_dst_ip[INET6_ADDRSTRLEN];
+            char up_max_pkt_src_ip[INET6_ADDRSTRLEN], up_max_pkt_dst_ip[INET6_ADDRSTRLEN];
+
+            format_ip_addr(latency_data_proto.max_pkt_src_addr, latency_data_proto.max_pkt_src_ipv6, max_pkt_src_ip, sizeof(max_pkt_src_ip));
+            format_ip_addr(latency_data_proto.max_pkt_dst_addr, latency_data_proto.max_pkt_dst_ipv6, max_pkt_dst_ip, sizeof(max_pkt_dst_ip));
+            format_ip_addr(latency_data_proto.snort_up_max_pkt_src_addr, latency_data_proto.snort_up_max_pkt_src_ipv6, up_max_pkt_src_ip, sizeof(up_max_pkt_src_ip));
+            format_ip_addr(latency_data_proto.snort_up_max_pkt_dst_addr, latency_data_proto.snort_up_max_pkt_dst_ipv6, up_max_pkt_dst_ip, sizeof(up_max_pkt_dst_ip));
+
+            LogRespond(ctrlcon, "  [%s]\n", protocol_names[i]);
+            if (latency_data_proto.snort_up_max_pkt_time != 0)
+                LogRespond(ctrlcon, "    Max Latency (us, since restart): %lu\n", latency_data_proto.snort_up_max_pkt_time/1000);
+            if (latency_data_proto.pkt_count != 0)
+                LogRespond(ctrlcon, "    Total Packet Count in last 5mins: %lu\n", latency_data_proto.pkt_count);
+            if (latency_data_proto.sum_time != 0)
+                LogRespond(ctrlcon, "    Sum of Packet Latencies in last 5mins (us): %lu\n", latency_data_proto.sum_time/1000);
+            if (latency_data_proto.conn_meta_null_counters != 0)
+                LogRespond(ctrlcon, "    Null ConnMeta Count in last 5mins: %lu\n", latency_data_proto.conn_meta_null_counters);
+            if (average_pkt_time != 0.0)
+                LogRespond(ctrlcon, "    Average Packet Latency in last 5mins (us): %.3f\n", average_pkt_time);
+            if (latency_data_proto.max_pkt_time != 0)
+                LogRespond(ctrlcon, "    Maximum Observed Latency in last 5mins (us): %lu\n", latency_data_proto.max_pkt_time/1000);
+
+            // Only print 5-tuple lines if any port is non-zero and if it has valid IPs
+            if ( (latency_data_proto.max_pkt_src_port != 0 || latency_data_proto.max_pkt_dst_port != 0)
+                && (strcmp(max_pkt_src_ip, invalid_ip) != 0)
+                && (strcmp(max_pkt_dst_ip, invalid_ip) != 0) )
+                LogRespond(ctrlcon, "    5min Max Latency Packet 5-tuple: %s:%u -> %s:%u (%s)\n",
+                    max_pkt_src_ip,
+                    latency_data_proto.max_pkt_src_port,
+                    max_pkt_dst_ip,
+                    latency_data_proto.max_pkt_dst_port,
+                    protocol_names[i]);
+            if ( (latency_data_proto.snort_up_max_pkt_src_port != 0 || latency_data_proto.snort_up_max_pkt_dst_port != 0)
+                && (strcmp(up_max_pkt_src_ip, invalid_ip) != 0)
+                && (strcmp(up_max_pkt_dst_ip, invalid_ip) != 0) )
+                LogRespond(ctrlcon, "    Max Latency Packet 5-tuple (us, since restart): %s:%u -> %s:%u (%s)\n",
+                    up_max_pkt_src_ip,
+                    latency_data_proto.snort_up_max_pkt_src_port,
+                    up_max_pkt_dst_ip,
+                    latency_data_proto.snort_up_max_pkt_dst_port,
+                    protocol_names[i]);
+
         }
-        LogRespond(ctrlcon, "----------------------------------------------------\n");
+        LogRespond(ctrlcon, "------------------------------------------------------------\n");
 		instance++;
     }
 }

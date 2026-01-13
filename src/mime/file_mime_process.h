@@ -27,6 +27,7 @@
 #include "file_api/file_api.h"
 #include "mime/file_mime_config.h"
 #include "mime/file_mime_decode.h"
+#include "mime/file_mime_form_data.h"
 #include "mime/file_mime_log.h"
 #include "mime/file_mime_paf.h"
 
@@ -48,12 +49,12 @@ namespace snort
 #define STATE_DATA_BODY    2    /* Data body section of data state */
 #define STATE_MIME_HEADER  3    /* MIME header section within data section */
 
-enum FilenameState
+enum AttributeState
 {
-    CONT_DISP_FILENAME_PARAM_NAME,
-    CONT_DISP_FILENAME_PARAM_EQUALS,
-    CONT_DISP_FILENAME_PARAM_VALUE_QUOTE,
-    CONT_DISP_FILENAME_PARAM_VALUE
+    ATTRIBUTE_NAME,
+    ATTRIBUTE_EQUALS,
+    ATTRIBUTE_VALUE_QUOTE,
+    ATTRIBUTE_VALUE
 };
 
 /* Maximum length of header chars before colon, based on Exim 4.32 exploit */
@@ -85,6 +86,13 @@ public:
     void set_host_name(const std::string& host);
     bool is_host_set() const;
 
+    MimeFormDataCollector::FieldVector&& form_data_content()
+    {
+        form_data_collector.finalize_field(filename);
+        form_data_collector.reset_part();
+        return std::move(form_data_collector.take_fields());
+    }
+
     const BufferData& get_ole_buf();
     const BufferData& get_vba_inspect_buf();
 
@@ -99,11 +107,14 @@ private:
     MailLogConfig* log_config = nullptr;
     MailLogState* log_state = nullptr;
     MimeStats* mime_stats = nullptr;
-    FilenameState filename_state = CONT_DISP_FILENAME_PARAM_NAME;
+    AttributeState attribute_state = ATTRIBUTE_NAME;
     std::string filename;
     std::string content_type;
     std::string host_name {""};
     bool host_set = false;
+
+    MimeFormDataCollector form_data_collector;
+
     bool continue_inspecting_file = true;
     // This counter is not an accurate count of files; used only for creating a unique mime_file_id
     uint32_t file_counter = 0;
@@ -113,6 +124,7 @@ private:
     uint64_t current_multiprocessing_file_id = 0;
     const uint8_t* uri;
     const int32_t uri_length;
+
     uint64_t get_file_cache_file_id();
     uint64_t get_multiprocessing_file_id();
     void mime_file_process(Packet* p, const uint8_t* data, int data_size, FilePosition position, bool upload);
@@ -131,12 +143,15 @@ private:
     const uint8_t* process_mime_header(Packet*, const uint8_t* ptr, const uint8_t* data_end_marker);
     bool process_header_line(const uint8_t*& ptr, const uint8_t* eol, const uint8_t* eolm, const
         uint8_t* start_hdr, Packet* p);
+    void process_content_type(const char* header, uint32_t header_length);
+    void process_content_transfer_encoding(const char* header, uint32_t header_length);
+    void process_content_disposition(const char* header, uint32_t header_length);
     const uint8_t* process_mime_body(const uint8_t* ptr, const uint8_t* data_end, FilePosition);
     const uint8_t* process_mime_data_paf(Packet*, const uint8_t* start, const uint8_t* end,
         bool upload, FilePosition, AttachmentBuffer* attachment);
-    int extract_file_name(const char*& start, int length);
-    int extract_content_type(const char*& start, uint32_t length);
 
+    int extract_value(const char*& start, uint32_t length);
+    int extract_attribute(const char*& start, int length, const char* attr);
 
     uint8_t* partial_header = nullptr;      // single header line split into multiple sections
     uint32_t partial_header_len = 0;

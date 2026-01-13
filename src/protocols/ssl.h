@@ -60,6 +60,8 @@
     + (uint32_t)(((const uint8_t*)(msb_ptr))[1] << 8) \
     + (uint32_t)(((const uint8_t*)(msb_ptr))[2])))
 
+#define SSL_CERTS_LEN_SIZE 3
+
 #define SSL_VERFLAGS \
     (SSL_VER_SSLV2_FLAG | SSL_VER_SSLV3_FLAG | \
     SSL_VER_TLS10_FLAG | SSL_VER_TLS11_FLAG | \

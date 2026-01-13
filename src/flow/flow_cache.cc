@@ -393,10 +393,27 @@ Flow* FlowCache::allocate(const FlowKey* key)
     time_t timestamp = packet_time();
     if ( hash_table->get_num_nodes() >= config.max_flows )
     {
-        if ( !prune_idle(timestamp, nullptr) )
+        if ( PacketTracer::is_active() )
         {
-            if ( !prune_unis(key->pkt_type) )
-                prune_excess(nullptr);
+            PacketTracer::log("Flow: at max_flows limit (%u/%u), attempting to prune for new allocation\n",
+                hash_table->get_num_nodes(), config.max_flows);
+        }
+
+        unsigned pruned_idle = prune_idle(timestamp, nullptr);
+        if ( !pruned_idle )
+        {
+            unsigned pruned_uni = prune_unis(key->pkt_type);
+            if ( !pruned_uni )
+            {
+                unsigned pruned_excess = prune_excess(nullptr);
+                if ( PacketTracer::is_active() && !pruned_excess )
+                {
+                    // CRITICAL: All pruning strategies failed
+                    PacketTracer::log("Flow: CRITICAL - allocation at max capacity, no flows could be pruned "
+                        "(idle=0, uni=0, excess=0), current=%u, max=%u\n",
+                        hash_table->get_num_nodes(), config.max_flows);
+                }
+            }
         }
     }
 

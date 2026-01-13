@@ -277,7 +277,8 @@ void ThreadRegexOffload::worker(
     {
         {
             std::unique_lock<std::mutex> lock(req->mutex);
-            req->cond.wait_for(lock, std::chrono::seconds(1));
+            req->cond.wait_for(lock, std::chrono::seconds(1),
+                [&]{ return !req->go || req->offload; });
 
             if ( !req->go )
                 break;

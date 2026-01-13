@@ -40,8 +40,7 @@ struct Packet;
 class ExpectEvent : public snort::DataEvent
 {
 public:
-    ExpectEvent(const snort::Packet* ctrl_packet, snort::ExpectFlow* ef,
-        const snort::FlowData* fd)
+    ExpectEvent(const snort::Packet* ctrl_packet, snort::ExpectFlow* ef, const snort::FlowData* fd)
     {
         p = ctrl_packet;
         expect_flow = ef;
@@ -51,10 +50,10 @@ public:
     const snort::Packet* get_packet() const override
     { return p; }
 
-    snort::ExpectFlow* get_expect_flow()
+    snort::ExpectFlow* get_expect_flow() const
     { return expect_flow; }
 
-    const snort::FlowData* get_flow_data()
+    const snort::FlowData* get_flow_data() const
     { return flow_data; }
 
 private:

@@ -8,7 +8,7 @@ Snort 3 Reference Manual
 The Snort Team
 
 Revision History
-Revision 3.10.0.0 2025-11-24 15:32:19 EST TST
+Revision 3.10.1.0 2026-01-11 17:51:32 EST TST
 
 ---------------------------------------------------------------------
 
@@ -5810,7 +5810,7 @@ Configuration:
 
   * int snort_ml.uri_depth = -1: number of input HTTP URI bytes to
     scan (-1 unlimited) { -1:max31 }
-  * int snort_ml.client_body_depth = 0: number of input HTTP client
+  * int snort_ml.client_body_depth = -1: number of input HTTP client
     body bytes to scan (-1 unlimited) { -1:max31 }
   * real snort_ml.http_param_threshold = 0.95: alert threshold for
     http_param_model { 0:1 }
@@ -6121,6 +6121,24 @@ Peg counts:
     to EOF (sum)
   * stream.excess_to_allowlist: number of flows moved to the
     allowlist due to excess (sum)
+  * stream.no_flow_no_proto_handler: packets without flow: no
+    protocol handler registered (sum)
+  * stream.no_flow_retry_packet: packets without flow: retry packet
+    dropped (sum)
+  * stream.no_flow_tcp_rst: packets without flow: TCP RST packet
+    (sum)
+  * stream.no_flow_unwanted: packets without flow: flow not wanted
+    (sum)
+  * stream.no_flow_midstream_reject: packets without flow: midstream
+    rejected (sum)
+  * stream.no_flow_alloc_failure: packets without flow: flow
+    allocation failed (sum)
+  * stream.no_flow_pkt_type_none: packets without flow: packet type
+    is NONE (sum)
+  * stream.no_flow_no_inspector: packets without flow: no flow
+    tracking inspector configured (sum)
+  * stream.no_flow_paf_no_flow: packets without flow: PAF payload but
+    no flow exists (sum)
   * stream.allowlist_flows: number of flows moved to the allowlist
     (now)
   * stream.current_flows: current number of flows in cache (now)
@@ -9328,7 +9346,7 @@ Configuration:
     stdout
   * multi alert_json.fields = timestamp pkt_num proto pkt_gen pkt_len
     dir src_ap dst_ap rule action: selected fields will be output in
-    given order left to right { action | class | b64_data |
+    given order left to right { action | app_id | class | b64_data |
     client_bytes | client_pkts | dir | dst_addr | dst_ap | dst_port |
     eth_dst | eth_len | eth_src | eth_type | flowstart_time |
     geneve_vni | gid | icmp_code | icmp_id | icmp_seq | icmp_type |
@@ -9783,7 +9801,7 @@ libraries see the Getting Started section of the manual.
     (0 is unlimited) { 0:maxSZ }
   * multi alert_json.fields = timestamp pkt_num proto pkt_gen pkt_len
     dir src_ap dst_ap rule action: selected fields will be output in
-    given order left to right { action | class | b64_data |
+    given order left to right { action | app_id | class | b64_data |
     client_bytes | client_pkts | dir | dst_addr | dst_ap | dst_port |
     eth_dst | eth_len | eth_src | eth_type | flowstart_time |
     geneve_vni | gid | icmp_code | icmp_id | icmp_seq | icmp_type |
@@ -11533,7 +11551,7 @@ libraries see the Getting Started section of the manual.
     engines
   * string snort.--metadata-filter: <filter> load only rules
     containing filter string in metadata if set
-  * int snort_ml.client_body_depth = 0: number of input HTTP client
+  * int snort_ml.client_body_depth = -1: number of input HTTP client
     body bytes to scan (-1 unlimited) { -1:max31 }
   * int snort_ml_engine.cache_memcap = 0: maximum memory for verdict
     cache in bytes, 0 = disabled { 0:maxSZ }
@@ -13149,6 +13167,24 @@ libraries see the Getting Started section of the manual.
   * stream_ip.trackers_completed: datagram trackers completed (sum)
   * stream_ip.trackers_freed: datagram trackers released (sum)
   * stream.memcap_prunes: sessions pruned due to memcap (sum)
+  * stream.no_flow_alloc_failure: packets without flow: flow
+    allocation failed (sum)
+  * stream.no_flow_midstream_reject: packets without flow: midstream
+    rejected (sum)
+  * stream.no_flow_no_inspector: packets without flow: no flow
+    tracking inspector configured (sum)
+  * stream.no_flow_no_proto_handler: packets without flow: no
+    protocol handler registered (sum)
+  * stream.no_flow_paf_no_flow: packets without flow: PAF payload but
+    no flow exists (sum)
+  * stream.no_flow_pkt_type_none: packets without flow: packet type
+    is NONE (sum)
+  * stream.no_flow_retry_packet: packets without flow: retry packet
+    dropped (sum)
+  * stream.no_flow_tcp_rst: packets without flow: TCP RST packet
+    (sum)
+  * stream.no_flow_unwanted: packets without flow: flow not wanted
+    (sum)
   * stream.pdu_eof_prunes: number of PDU flows pruned due to EOF
     (sum)
   * stream.pdu_memcap_prunes: number of PDU flows pruned due to

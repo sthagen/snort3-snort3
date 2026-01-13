@@ -302,6 +302,7 @@ bool rotate_file_for_max_size(const char* file_owner, const char* old_file,
     SnortSnprintf(rotate_file, PATH_MAX, "%s_" STDu64,  old_file, (uint64_t)ts);
 
     // If the rotate file doesn't exist, just rename the old one to the new one
+    // coverity[fs_check_call]
     if (stat(rotate_file, &fstats) != 0)
     {
         if (rename(old_file, rotate_file) != 0)
@@ -332,6 +333,7 @@ bool rotate_file_for_max_size(const char* file_owner, const char* old_file,
                 SnortSnprintf(rotate_file_with_index, PATH_MAX, "%s.%02d",
                     rotate_file, rotate_index);
             }
+            // coverity[fs_check_call]
             while (stat(rotate_file_with_index, &fstats) == 0);
 
             // Subtract one to append to last existing file
@@ -474,4 +476,3 @@ TEST_CASE("uint8_to_printable_str end with |", "[util]")
     CHECK((strcmp(print_str.c_str(),"a|00 |") == 0));
 }
 #endif
-

@@ -537,9 +537,9 @@ void UriNormalizer::load_default_unicode_map(uint8_t map[MAP_SIZE])
 // __STRDUMP_ENABLE__
 
     std::string token;
-
     while (ss >> token)
     {
+        // coverity[tainted_scalar]
         const uint16_t ucode = strtol(token.c_str(), nullptr, 16);
         map[ucode] = strtol(token.c_str()+5, nullptr, 16);
     }

@@ -115,6 +115,17 @@ struct BaseStats
      PegCount allowlist_eof_prunes;
      PegCount excess_to_allowlist;
 
+     // Flow creation failure counters
+     PegCount no_flow_no_proto_handler;
+     PegCount no_flow_retry_packet;
+     PegCount no_flow_tcp_rst;
+     PegCount no_flow_unwanted;
+     PegCount no_flow_midstream_reject;
+     PegCount no_flow_alloc_failure;
+     PegCount no_flow_pkt_type_none;
+     PegCount no_flow_no_inspector;
+     PegCount no_flow_paf_no_flow;
+
      // Keep the NOW stats at the bottom as it requires special sum_stats logic
      PegCount allowlist_flows;
      PegCount current_flows;

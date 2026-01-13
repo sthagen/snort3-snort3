@@ -1347,7 +1347,7 @@ static void parseIec104GenericIOGroup(const GenericIec104AsduIOGroup* genericIOG
 #define ASDU_MAP_SIZE_ITEM 0
 #define ASDU_MAP_OFFSET_ITEM 1
 
-const std::unordered_map<uint32_t, std::tuple<int,int> > asdu_size_map =
+static const std::unordered_map<uint32_t, std::tuple<int,int> > asdu_subgroup_size_map =
 {
 { IEC104_ASDU_M_SP_NA_1 , { sizeof(Iec104M_SP_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_sp_na_1.subgroup) } },
 { IEC104_ASDU_M_DP_NA_1 , { sizeof(Iec104M_DP_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_dp_na_1.subgroup) } },
@@ -1359,7 +1359,11 @@ const std::unordered_map<uint32_t, std::tuple<int,int> > asdu_size_map =
 { IEC104_ASDU_M_IT_NA_1 , { sizeof(Iec104M_IT_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_it_na_1.subgroup) } },
 { IEC104_ASDU_M_PS_NA_1 , { sizeof(Iec104M_PS_NA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_ps_na_1.subgroup) } },
 { IEC104_ASDU_M_ME_ND_1 , { sizeof(Iec104M_ME_ND_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.m_me_nd_1.subgroup) } },
-{ IEC104_ASDU_F_DR_TA_1 , { sizeof(Iec104F_DR_TA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.f_dr_ta_1.subgroup) } },
+{ IEC104_ASDU_F_DR_TA_1 , { sizeof(Iec104F_DR_TA_1_IO_Subgroup) , offsetof(Iec104ApciI, asdu.f_dr_ta_1.subgroup) } }
+};
+
+static const std::unordered_map<uint32_t, std::tuple<int,int> > asdu_io_group_size_map =
+{
 { IEC104_ASDU_M_SP_NA_1 , { sizeof(Iec104M_SP_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_sp_na_1) } },
 { IEC104_ASDU_M_SP_TA_1 , { sizeof(Iec104M_SP_TA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_sp_ta_1) } },
 { IEC104_ASDU_M_DP_NA_1 , { sizeof(Iec104M_DP_NA_1_IO_Group)    , offsetof(Iec104ApciI, asdu.m_dp_na_1) } },
@@ -1430,7 +1434,10 @@ const std::unordered_map<uint32_t, std::tuple<int,int> > asdu_size_map =
 
 static void parseIec104GenericAsdu(uint32_t asduType, const Iec104ApciI* apci, const uint16_t& data_size)
 {
-    if (asdu_size_map.find(asduType) == asdu_size_map.end())
+    const std::unordered_map<uint32_t, std::tuple<int, int>>& size_map = apci->asdu.variableStructureQualifier.sq ? 
+        asdu_subgroup_size_map : asdu_io_group_size_map;
+
+    if (size_map.find(asduType) == size_map.end())
     {
         // ASDU parsing not implemented for this type
         return;
@@ -1449,17 +1456,17 @@ static void parseIec104GenericAsdu(uint32_t asduType, const Iec104ApciI* apci, c
     // make sure the number of elements value is acceptable
     if (verifiedNumberOfElements > 0 && verifiedNumberOfElements <= 255) {
 
-        if ((const uint8_t*)apci + std::get<ASDU_MAP_OFFSET_ITEM>(asdu_size_map.at(asduType)) + (verifiedNumberOfElements * std::get<ASDU_MAP_SIZE_ITEM>(asdu_size_map.at(asduType))) > (const uint8_t*)apci + data_size)
+        if (reinterpret_cast<const uint8_t*>(apci) + std::get<ASDU_MAP_OFFSET_ITEM>(size_map.at(asduType)) + (verifiedNumberOfElements * std::get<ASDU_MAP_SIZE_ITEM>(size_map.at(asduType))) > reinterpret_cast<const uint8_t*>(apci) + data_size)
         {
             // number of elements exceeds the bounds of the data size, lowering to fit
-            if (std::get<ASDU_MAP_OFFSET_ITEM>(asdu_size_map.at(asduType)) > data_size)
+            if (std::get<ASDU_MAP_OFFSET_ITEM>(size_map.at(asduType)) > data_size)
             {
                 // If the offset is already greater than the data size, we can't fit any elements
                 verifiedNumberOfElements = 0;
             }
             else
             {
-                verifiedNumberOfElements = (data_size - std::get<ASDU_MAP_OFFSET_ITEM>(asdu_size_map.at(asduType))) / std::get<ASDU_MAP_SIZE_ITEM>(asdu_size_map.at(asduType));
+                verifiedNumberOfElements = (data_size - std::get<ASDU_MAP_OFFSET_ITEM>(size_map.at(asduType))) / std::get<ASDU_MAP_SIZE_ITEM>(size_map.at(asduType));
             }
 
             if (verifiedNumberOfElements == 0)

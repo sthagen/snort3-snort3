@@ -137,6 +137,11 @@ bool Iec104Decode(Packet* p, Iec104FlowData* iec104fd)
 
         case IEC104_APCI_TYPE_I:
         {
+            if (p->dsize < IEC104_APCI_TYPE_I_MIN_LEN)
+            {
+                return false;
+            }
+
             // build up the APCI
             const Iec104ApciI* apci = (const Iec104ApciI*) p->data;
 

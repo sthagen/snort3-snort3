@@ -39,6 +39,7 @@ struct HttpEventIds
     DOH_BODY,
     END_OF_TRANSACTION,
     HTTP_PUBLISH_LENGTH,
+    MIME_FORM_DATA,
 
     num_ids
 }; };

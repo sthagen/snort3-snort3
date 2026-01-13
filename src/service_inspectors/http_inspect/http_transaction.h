@@ -75,7 +75,7 @@ public:
     { return filename[source_id]; }
     const std::string& get_content_type(HttpCommon::SourceId source_id) const
     { return content_type[source_id]; }
-  
+
     void clear_section();
     bool is_clear() const { return active_sections == 0; }
     void garbage_collect();

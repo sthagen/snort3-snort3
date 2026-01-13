@@ -44,6 +44,7 @@
 #include "protocols/tcp.h"
 #include "protocols/udp.h"
 #include "protocols/vlan.h"
+#include "stream/base/stream_module.h"
 #include "utils/util.h"
 #include "trace/trace_api.h"
 
@@ -56,6 +57,7 @@ using namespace snort;
 
 THREAD_LOCAL const Trace* stream_trace = nullptr;
 THREAD_LOCAL FlowControl* flow_con = nullptr;
+THREAD_LOCAL BaseStats stream_base_stats = {};
 
 Analyzer* Analyzer::get_local_analyzer() { return nullptr; }
 void Analyzer::resume(uint64_t) { }

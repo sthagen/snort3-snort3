@@ -65,6 +65,7 @@ struct MimeDataPafInfo
     int boundary_search_len;
     const char* boundary_search;
     MimeBoundaryState boundary_state;
+    bool boundary_quoted;
 };
 
 inline bool scanning_boundary(MimeDataPafInfo* mime_info, uint32_t boundary_start, uint32_t* fp)

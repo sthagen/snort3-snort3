@@ -310,11 +310,11 @@ int sfsnprintfappend(char* dest, int dsize, const char* format, ...)
     int currLen, appendLen;
     va_list ap;
 
-    if (!dest || dsize == 0)
+    if (!dest || dsize <= 0)
         return -1;
 
     currLen = SnortStrnlen(dest, dsize);
-    if (currLen == -1)
+    if (currLen < 0 || currLen >= dsize)
         return -1;
 
     va_start(ap, format);
@@ -323,8 +323,9 @@ int sfsnprintfappend(char* dest, int dsize, const char* format, ...)
 
     dest[dsize-1]=0; /* guarantee a null termination */
 
-    if (appendLen >= (dsize - currLen))
-        appendLen = dsize - currLen - 1;
+    int remaining = dsize - currLen;
+    if (appendLen >= remaining)
+        appendLen = (remaining > 0) ? remaining - 1 : 0;
     else if (appendLen < 0)
         appendLen = 0;
 
@@ -349,4 +350,3 @@ int safe_snprintf(char* s, size_t n, const char* format, ... )
 }
 
 }
-

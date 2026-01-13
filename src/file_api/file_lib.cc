@@ -29,7 +29,7 @@
 
 #include "file_lib.h"
 
-#include <openssl/sha.h>
+#include <openssl/evp.h>
 
 #include <iostream>
 #include <iomanip>
@@ -512,7 +512,7 @@ FileContext::FileContext ()
 FileContext::~FileContext ()
 {
     if (file_signature_context)
-        snort_free(file_signature_context);
+        EVP_MD_CTX_free((EVP_MD_CTX*)file_signature_context);
 
     if (file_capture)
         stop_file_capture();
@@ -533,7 +533,7 @@ inline void FileContext::finalize_file_type()
 
 void FileContext::log_file_event(Flow* flow, FilePolicyBase* policy)
 {
-    // log file event either when filename is set or if it is a asymmetric flow  
+    // log file event either when filename is set or if it is a asymmetric flow
     if ( is_file_name_set() or !flow->two_way_traffic() )
     {
         bool log_needed = true;
@@ -655,10 +655,7 @@ void FileInfo::reset()
 {
     verdict = FILE_VERDICT_UNKNOWN;
     processing_complete = false;
-    set_file_size(0);
     reset_sha();
-    if (is_file_name_set())
-        unset_file_name();
     pending_expire_time.tv_sec = 0;
     pending_expire_time.tv_usec = 0;
 }
@@ -690,10 +687,7 @@ void FileContext::reset()
 {
     verdict = FILE_VERDICT_UNKNOWN;
     processing_complete = false;
-    set_file_size(0);
     reset_sha();
-    if (is_file_name_set())
-        unset_file_name();
     remove_segments();
 }
 
@@ -938,64 +932,85 @@ void FileContext::process_file_signature_sha256(const uint8_t* file_data, int da
     switch (position)
     {
     case SNORT_FILE_START:
+    {
         if (!file_signature_context)
-            file_signature_context = snort_calloc(sizeof(SHA256_CTX));
-        SHA256_Init((SHA256_CTX*)file_signature_context);
-        SHA256_Update((SHA256_CTX*)file_signature_context, file_data, data_size);
+            file_signature_context = EVP_MD_CTX_new();
+
+        EVP_MD_CTX* ctx = (EVP_MD_CTX*)file_signature_context;
+        EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
+        EVP_DigestUpdate(ctx, file_data, data_size);
         FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "position is start of file\n");
         if (file_state.sig_state == FILE_SIG_FLUSH)
         {
-            static uint8_t file_signature_context_backup[sizeof(SHA256_CTX)];
-            sha256 = (uint8_t*)snort_alloc(SHA256_HASH_SIZE);
-            memcpy(file_signature_context_backup, file_signature_context, sizeof(SHA256_CTX));
-
-            SHA256_Final(sha256, (SHA256_CTX*)file_signature_context);
-            memcpy(file_signature_context, file_signature_context_backup, sizeof(SHA256_CTX));
+            if (!sha256)
+                sha256 = (uint8_t*)snort_alloc(SHA256_HASH_SIZE);
+            EVP_MD_CTX* tmp = EVP_MD_CTX_new();
+            if (tmp && EVP_MD_CTX_copy_ex(tmp, ctx) == 1)
+            {
+                unsigned int out_len = 0;
+                EVP_DigestFinal_ex(tmp, sha256, &out_len);
+            }
+            if (tmp)
+                EVP_MD_CTX_free(tmp);
         }
         break;
+    }
 
     case SNORT_FILE_MIDDLE:
+    {
         if (!file_signature_context)
             return;
-        SHA256_Update((SHA256_CTX*)file_signature_context, file_data, data_size);
+        EVP_MD_CTX* ctx = (EVP_MD_CTX*)file_signature_context;
+        EVP_DigestUpdate(ctx, file_data, data_size);
         FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "position is middle of the file\n");
         if (file_state.sig_state == FILE_SIG_FLUSH)
         {
-            static uint8_t file_signature_context_backup[sizeof(SHA256_CTX)];
-            if ( !sha256 )
+            if (!sha256)
                 sha256 = (uint8_t*)snort_alloc(SHA256_HASH_SIZE);
-            memcpy(file_signature_context_backup, file_signature_context, sizeof(SHA256_CTX));
-
-            SHA256_Final(sha256, (SHA256_CTX*)file_signature_context);
-            memcpy(file_signature_context, file_signature_context_backup, sizeof(SHA256_CTX));
+            EVP_MD_CTX* tmp = EVP_MD_CTX_new();
+            if (tmp && EVP_MD_CTX_copy_ex(tmp, ctx) == 1)
+            {
+                unsigned int out_len = 0;
+                EVP_DigestFinal_ex(tmp, sha256, &out_len);
+            }
+            if (tmp)
+                EVP_MD_CTX_free(tmp);
         }
-
         break;
+    }
 
     case SNORT_FILE_END:
+    {
         if (!file_signature_context)
             return;
-        SHA256_Update((SHA256_CTX*)file_signature_context, file_data, data_size);
+        EVP_MD_CTX* ctx = (EVP_MD_CTX*)file_signature_context;
+        EVP_DigestUpdate(ctx, file_data, data_size);
         sha256 = new uint8_t[SHA256_HASH_SIZE];
-        SHA256_Final(sha256, (SHA256_CTX*)file_signature_context);
+        unsigned int out_len = 0;
+        EVP_DigestFinal_ex(ctx, sha256, &out_len);
         file_state.sig_state = FILE_SIG_DONE;
         FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "position is end of the file\n");
         break;
+    }
 
     case SNORT_FILE_FULL:
+    {
         if (!file_signature_context)
-            file_signature_context = snort_calloc(sizeof (SHA256_CTX));
-        SHA256_Init((SHA256_CTX*)file_signature_context);
-        SHA256_Update((SHA256_CTX*)file_signature_context, file_data, data_size);
+            file_signature_context = EVP_MD_CTX_new();
+        EVP_MD_CTX* ctx = (EVP_MD_CTX*)file_signature_context;
+        EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
+        EVP_DigestUpdate(ctx, file_data, data_size);
         sha256 = new uint8_t[SHA256_HASH_SIZE];
-        SHA256_Final(sha256, (SHA256_CTX*)file_signature_context);
+        unsigned int out_len = 0;
+        EVP_DigestFinal_ex(ctx, sha256, &out_len);
         file_state.sig_state = FILE_SIG_DONE;
         FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
             "position is full file\n");
         break;
+    }
 
     default:
         break;
@@ -1222,12 +1237,15 @@ TEST_CASE ("reset", "[file_info]")
     info.verdict = FILE_VERDICT_BLOCK;
     info.processing_complete = true;
     info.set_file_name("test", 4);
+    info.set_file_size(123);
 
     info.reset();
 
     CHECK (false == info.processing_complete);
     CHECK (FILE_VERDICT_UNKNOWN == info.verdict);
-    CHECK (false == info.is_file_name_set());
+    CHECK (true == info.is_file_name_set());
+    CHECK (std::string("test") == info.get_file_name());
+    CHECK (123 == info.get_file_size());
 }
 
 TEST_CASE ("re_eval", "[file_info]")

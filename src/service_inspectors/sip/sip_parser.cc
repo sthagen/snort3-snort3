@@ -354,7 +354,7 @@ static bool sip_startline_parse(SIPMsg* msg, const char* buff, const char* end, 
             DetectionEngine::queue_event(GID_SIP, SIP_EVENT_INVALID_VERSION);
         }
 
-        space = strchr(buff, ' ');
+        space = (const char*)memchr(buff, ' ', next - buff);
         if (space == nullptr)
             return false;
         statusCode = SnortStrtoul(space + 1, nullptr, 10);
@@ -679,7 +679,7 @@ static int sip_parse_from(SIPMsg* msg, const char* start, const char* end, SIP_P
             msg->dlgID.fromTagHash = strToHash(msg->from_tag,msg->fromTagLen);
             break;
         }
-        buff = (const char*)memchr(buff + 1, ';', msg->fromLen);
+        buff = (const char*)memchr(buff + 1, ';', end - (buff + 1));
     }
 
     userStart = (const char*)memchr(msg->from, ':', msg->fromLen);
@@ -733,7 +733,7 @@ static int sip_parse_to(SIPMsg* msg, const char* start, const char* end, SIP_PRO
             msg->dlgID.toTagHash = strToHash(msg->to_tag,msg->toTagLen);
             break;
         }
-        buff = (const char*)memchr(buff + 1, ';', msg->toLen);
+        buff = (const char*)memchr(buff + 1, ';', end - (buff + 1));
     }
 
     return SIP_PARSE_SUCCESS;
@@ -1114,7 +1114,6 @@ static int sip_parse_sdp_m(SIPMsg* msg, const char* start, const char* end)
 {
     int length;
     const char* spaceIndex;
-    char* next;
     SIP_MediaData* mdata;
 
     if (nullptr == msg->mediaSession)
@@ -1126,16 +1125,46 @@ static int sip_parse_sdp_m(SIPMsg* msg, const char* start, const char* end)
     if ((nullptr == spaceIndex)||(spaceIndex == end))
         return SIP_PARSE_ERROR;
 
-    mdata = (SIP_MediaData*)snort_calloc(sizeof(SIP_MediaData));
-    mdata->mport = (uint16_t)SnortStrtoul(spaceIndex + 1, &next, 10);
+    // Compute bounded token range for the port field: [port_start, token_end)
+    const char* port_start = spaceIndex + 1;
+    if (port_start >= end)
+        return SIP_PARSE_ERROR;
 
-    if ((nullptr != next)&&('/'==next[0]))
-        mdata->numPort = (uint8_t)SnortStrtoul(spaceIndex + 1, &next, 10);
+    const char* token_end = (const char*)memchr(port_start, ' ', end - port_start);
+    if (!token_end)
+        token_end = end;
+
+    if (token_end <= port_start)
+        return SIP_PARSE_ERROR;
+
+    // Copy bounded token into an exact-sized, NUL-terminated heap buffer
+    size_t token_len = (size_t)(token_end - port_start);
+    char* buf = (char*)snort_alloc(token_len + 1);
+    memcpy(buf, port_start, token_len);
+    buf[token_len] = '\0';
+
+    // Allocate media data
+    mdata = (SIP_MediaData*)snort_calloc(sizeof(SIP_MediaData));
+
+    // Parse mport from the local, NUL-terminated copy
+    char* next = nullptr;
+    mdata->mport = (uint16_t)SnortStrtoul(buf, &next, 10);
+
+    // Safely check for optional numPort using the local buffer bounds
+    if ((next != nullptr) && (next >= buf) && (next < buf + token_len))
+    {
+        if (*next == '/' && (next + 1) < (buf + token_len))
+        {
+            char* next2 = nullptr;
+            mdata->numPort = (uint8_t)SnortStrtoul(next + 1, &next2, 10);
+        }
+    }
     // Put
     mdata->nextM = msg->mediaSession->medias;
     mdata->maddress = msg->mediaSession->maddress_default;
     msg->mediaSession->medias = mdata;
 
+    snort_free(buf);
     return SIP_PARSE_SUCCESS;
 }
 

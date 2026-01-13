@@ -35,7 +35,7 @@ static const Parameter snort_ml_params[] =
     { "uri_depth", Parameter::PT_INT, "-1:max31", "-1",
       "number of input HTTP URI bytes to scan (-1 unlimited)" },
 
-    { "client_body_depth", Parameter::PT_INT, "-1:max31", "0",
+    { "client_body_depth", Parameter::PT_INT, "-1:max31", "-1",
       "number of input HTTP client body bytes to scan (-1 unlimited)" },
 
     { "http_param_threshold", Parameter::PT_REAL, "0:1", "0.95",

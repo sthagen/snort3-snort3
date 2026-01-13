@@ -40,6 +40,7 @@ enum
 {
     TRACE_INSPECTOR_MANAGER = 0,
     TRACE_MAIN,
+    TRACE_MIME,
 };
 
 #endif

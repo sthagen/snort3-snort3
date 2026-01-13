@@ -31,6 +31,10 @@
 #include "packet.h"
 #include "utils/util.h"
 
+#ifdef REG_TEST
+#include "log/messages.h"
+#endif
+
 #define THREE_BYTE_LEN(x) ((x)[2] | (x)[1] << 8 | (x)[0] << 16)
 
 #define SSL_ERROR_FLAGS \
@@ -225,14 +229,17 @@ static uint32_t SSL_decode_handshake_v3(const uint8_t* pkt, int size,
         case SSL_HS_CERT:
             if (server_cert_data != nullptr)
             {
+                if (size < SSL_CERTS_LEN_SIZE)
+                    return retval | SSL_TRUNCATED_FLAG;
+
                 certs_rec = (const ServiceSSLV3CertsRecord*)handshake;
                 server_cert_data->certs_len = ntoh3(certs_rec->certs_len);
-                if (server_cert_data->certs_len + sizeof(certs_rec->certs_len) > (unsigned int)size)
-                {
+
+                if (server_cert_data->certs_len + SSL_CERTS_LEN_SIZE > (unsigned int)size)
                     return retval | SSL_TRUNCATED_FLAG;
-                }
+
                 server_cert_data->certs_data = (uint8_t*)snort_alloc(server_cert_data->certs_len);
-                memcpy(server_cert_data->certs_data, pkt + sizeof(certs_rec->certs_len), server_cert_data->certs_len);
+                memcpy(server_cert_data->certs_data, pkt + SSL_CERTS_LEN_SIZE, server_cert_data->certs_len);
 
                 snort::parse_server_certificates(server_cert_data);
             }
@@ -323,7 +330,7 @@ static uint32_t SSL_decode_v3(const uint8_t* pkt, int size, uint32_t pkt_flags,
             break;
 
         case SSL_ALERT_REC:
-            if (reclen == sizeof(SSL_alert_t))
+            if (reclen == sizeof(SSL_alert_t) && size >= (int)sizeof(SSL_alert_t))
             {
                 const SSL_alert_t* ssl_alert = (const SSL_alert_t*)pkt;
                 if (ssl_alert->level == SSL_ALERT_LEVEL_FATAL && info_flags)
@@ -594,8 +601,8 @@ uint32_t SSL_decode(
 * continuing of command inspection like ftptelnet. */
 bool IsTlsClientHello(const uint8_t* ptr, const uint8_t* end)
 {
-    /* at least 3 bytes of data - see below */
-    if ((end - ptr) < 3)
+    /* at least 4 bytes of data - see below */
+    if ((end - ptr) < 4)
         return false;
 
     if ((ptr[0] == SSL3_FIRST_BYTE) && (ptr[1] == SSL3_SECOND_BYTE))
@@ -820,8 +827,20 @@ ParseHelloResult parse_server_hello_data(const uint8_t* pkt, uint16_t size, TLSC
 
 bool parse_server_certificates(SSLV3ServerCertData* server_cert_data)
 {
-    if (!server_cert_data->certs_data or !server_cert_data->certs_len)
+    if (!server_cert_data->certs_data)
+    {
+        server_cert_data->certs_len = 0;
         return false;
+    }
+    else if (!server_cert_data->certs_len)
+    {
+        snort_free(server_cert_data->certs_data);
+        server_cert_data->certs_data = nullptr;
+#ifdef REG_TEST
+        LogMessage("Free server certificate data due to length being 0!\n");
+#endif
+        return false;
+    }
 
     const uint8_t* data = server_cert_data->certs_data;
     int len = server_cert_data->certs_len;
@@ -894,8 +913,9 @@ bool parse_server_certificates(SSLV3ServerCertData* server_cert_data)
             if (lastpos != -1)
             {
                 X509_NAME_ENTRY* e = X509_NAME_get_entry(cert_subject, lastpos);
-                const unsigned char* str_data = ASN1_STRING_get0_data(X509_NAME_ENTRY_get_data(e));
-                int length = strlen((const char*)str_data);
+                ASN1_STRING* asn1_str = X509_NAME_ENTRY_get_data(e);
+                const unsigned char* str_data = ASN1_STRING_get0_data(asn1_str);
+                int length = ASN1_STRING_length(asn1_str);
 
                 bool wildcard = false;
                 if ((wildcard = (length > 2 and *str_data == '*' and *(str_data + 1) == '.')))
@@ -913,8 +933,9 @@ bool parse_server_certificates(SSLV3ServerCertData* server_cert_data)
             if (lastpos != -1)
             {
                 X509_NAME_ENTRY* e = X509_NAME_get_entry(cert_subject, lastpos);
-                const unsigned char* str_data = ASN1_STRING_get0_data(X509_NAME_ENTRY_get_data(e));
-                org_unit_len = strlen((const char*)str_data);
+                ASN1_STRING* asn1_str = X509_NAME_ENTRY_get_data(e);
+                const unsigned char* str_data = ASN1_STRING_get0_data(asn1_str);
+                org_unit_len = ASN1_STRING_length(asn1_str);
                 org_unit = snort_strndup((const char*)(str_data), org_unit_len);
             }
         }

@@ -85,7 +85,6 @@ private:
 
 //-------------------------------------------------------------------------
 
-#define CMD_LEN    0x0000
 #define CMD_ALLOW  0x0001
 #define CMD_CHECK  0x0002
 #define CMD_DATA   0x0004
@@ -98,6 +97,7 @@ private:
 #define CMD_VALID  0x0200
 #define CMD_REST   0x0400
 #define CMD_PROT   0x0800
+#define CMD_LEN    0x1000
 
 struct FtpCmd
 {

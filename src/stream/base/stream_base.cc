@@ -32,6 +32,7 @@
 #include "main/snort_config.h"
 #include "main/snort_types.h"
 #include "managers/inspector_manager.h"
+#include "packet_io/packet_tracer.h"
 #include "profiler/profiler_defs.h"
 #include "protocols/packet.h"
 #include "protocols/tcp.h"
@@ -107,6 +108,17 @@ const PegInfo base_pegs[] =
     { CountType::SUM, "pdu_eof_prunes", "number of PDU flows pruned due to EOF" },
     { CountType::SUM, "allowlist_eof_prunes", "number of allowlist flows pruned due to EOF" },
     { CountType::SUM, "excess_to_allowlist", "number of flows moved to the allowlist due to excess" },
+
+    // Flow creation failure counters
+    { CountType::SUM, "no_flow_no_proto_handler", "packets without flow: no protocol handler registered" },
+    { CountType::SUM, "no_flow_retry_packet", "packets without flow: retry packet dropped" },
+    { CountType::SUM, "no_flow_tcp_rst", "packets without flow: TCP RST packet" },
+    { CountType::SUM, "no_flow_unwanted", "packets without flow: flow not wanted" },
+    { CountType::SUM, "no_flow_midstream_reject", "packets without flow: midstream rejected" },
+    { CountType::SUM, "no_flow_alloc_failure", "packets without flow: flow allocation failed" },
+    { CountType::SUM, "no_flow_pkt_type_none", "packets without flow: packet type is NONE" },
+    { CountType::SUM, "no_flow_no_inspector", "packets without flow: no flow tracking inspector configured" },
+    { CountType::SUM, "no_flow_paf_no_flow", "packets without flow: PAF payload but no flow exists" },
 
     // Keep the NOW stats at the bottom as it requires special sum_stats logic
     { CountType::NOW, "allowlist_flows", "number of flows moved to the allowlist" },
@@ -314,6 +326,9 @@ void StreamBase::eval(Packet* p)
     switch ( p->type() )
     {
     case PktType::NONE:
+        stream_base_stats.no_flow_pkt_type_none++;
+        if ( PacketTracer::is_active() )
+            PacketTracer::log("Flow: packet without flow - packet type is NONE\n");
         break;
 
     case PktType::IP:

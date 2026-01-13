@@ -101,6 +101,7 @@ private:
     Field ole_data;
     std::list<MimeBufs>* mime_bufs = nullptr;
     bool last_attachment_complete = true;
+    MimeFormData mime_fields;
 
     int32_t publish_length = HttpCommon::STAT_NOT_PRESENT;
 };

@@ -30,6 +30,7 @@
 #include "file_api/file_flows.h"
 #include "hash/hash_key_operations.h"
 #include "log/messages.h"
+#include "mime/file_mime_form_data.h"
 #include "search_engines/search_tool.h"
 #include "utils/util_cstring.h"
 
@@ -184,6 +185,7 @@ const uint8_t* MimeSession::process_mime_header(Packet* p, const uint8_t* ptr,
 
     start_hdr = ptr;
     bool cont = true;
+
     while (cont and ptr < data_end_marker)
     {
         bool found_end_marker = get_mime_eol(ptr, data_end_marker, &eol, &eolm);
@@ -241,6 +243,7 @@ const uint8_t* MimeSession::process_mime_header(Packet* p, const uint8_t* ptr,
         }
         state_flags |= MIME_FLAG_SEEN_HEADERS;
     }
+
     if (!cont)
     {
         data_state = STATE_DATA_BODY;
@@ -248,6 +251,7 @@ const uint8_t* MimeSession::process_mime_header(Packet* p, const uint8_t* ptr,
         partial_data = nullptr;
         partial_data_len = 0;
     }
+
     return ptr;
 }
 
@@ -273,7 +277,7 @@ bool MimeSession::process_header_line(const uint8_t*& ptr, const uint8_t* eol, c
     if (!is_wsp(ptr))
     {
         // Clear flags from last header line
-        state_flags &= ~(MIME_FLAG_IN_CONTENT_TYPE | MIME_FLAG_IN_CONT_TRANS_ENC);
+        state_flags &= ~(MIME_FLAG_IN_CONTENT_TYPE | MIME_FLAG_IN_CONT_TRANS_ENC | MIME_FLAG_IN_CONT_DISP);
 
         bool got_non_printable_in_header_name = false;
 
@@ -328,18 +332,18 @@ bool MimeSession::process_header_line(const uint8_t*& ptr, const uint8_t* eol, c
             {
                 switch (mime_search_info.id)
                 {
-                    case HDR_CONTENT_TYPE:
-                        state_flags |= MIME_FLAG_IN_CONTENT_TYPE;
-                        break;
-                    case HDR_CONT_TRANS_ENC:
-                        state_flags |= MIME_FLAG_IN_CONT_TRANS_ENC;
-                        break;
-                    case HDR_CONT_DISP:
-                        state_flags |= MIME_FLAG_IN_CONT_DISP;
-                        break;
-                    default:
-                        assert(false);
-                        break;
+                case HDR_CONTENT_TYPE:
+                    state_flags |= MIME_FLAG_IN_CONTENT_TYPE;
+                    break;
+                case HDR_CONT_TRANS_ENC:
+                    state_flags |= MIME_FLAG_IN_CONT_TRANS_ENC;
+                    break;
+                case HDR_CONT_DISP:
+                    state_flags |= MIME_FLAG_IN_CONT_DISP;
+                    break;
+                default:
+                    assert(false);
+                    break;
                 }
             }
         }
@@ -380,45 +384,75 @@ bool MimeSession::process_header_line(const uint8_t*& ptr, const uint8_t* eol, c
         // FIXIT-L: either no data in header value OR this is folding split across PDU - second case should be implemented later on
         return true;
     }
-   
+
     if (state_flags & MIME_FLAG_IN_CONTENT_TYPE)
-    {
-        if (data_state == STATE_MIME_HEADER)
-        {
-            setup_attachment_processing();
-        }
+        process_content_type((const char*)header_value_ptr, header_value_len);
 
-        int len = extract_content_type((const char*&)header_value_ptr, header_value_len);
-        if (len > 0)
-            content_type.assign((const char*)header_value_ptr, len);
-        state_flags &= ~MIME_FLAG_IN_CONTENT_TYPE;
-    }
     else if (state_flags & MIME_FLAG_IN_CONT_TRANS_ENC)
-    {
-        setup_attachment_processing();
-        if (decode_state != nullptr and header_value_len > 0)
-        {
-            decode_state->process_decode_type((const char*)header_value_ptr, header_value_len);
-        }
-        // Don't clear the MIME_FLAG_IN_CONT_TRANS_ENC flag in case of folding
-    }
+        process_content_transfer_encoding((const char*)header_value_ptr, header_value_len);
+
     else if (state_flags & MIME_FLAG_IN_CONT_DISP)
-    {
-        int len = extract_file_name((const char*&)header_value_ptr, header_value_len);
-
-        if (len > 0)
-        {
-            filename.assign((const char*)header_value_ptr, len);
-
-            if (log_config->log_filename && log_state)
-            {
-                log_state->log_file_name(header_value_ptr, len);
-            }
-            state_flags &= ~MIME_FLAG_IN_CONT_DISP;
-        }
-    }
+        process_content_disposition((const char*)header_value_ptr, header_value_len);
 
     return true;
+}
+
+void MimeSession::process_content_type(const char* header, uint32_t header_length)
+{
+    if (data_state == STATE_MIME_HEADER)
+    {
+        setup_attachment_processing();
+    }
+
+    int len = extract_value(header, header_length);
+
+    if (len > 0)
+        content_type.assign(header, len);
+
+    state_flags &= ~MIME_FLAG_IN_CONTENT_TYPE;
+}
+
+void MimeSession::process_content_transfer_encoding(const char* header, uint32_t header_length)
+{
+    setup_attachment_processing();
+
+    if (decode_state != nullptr and header_length > 0)
+        decode_state->process_decode_type(header, header_length);
+
+    // Don't clear the MIME_FLAG_IN_CONT_TRANS_ENC flag in case of folding
+}
+
+void MimeSession::process_content_disposition(const char* header, uint32_t header_length)
+{
+    const uint8_t FORM_DATA_KEY_LENGTH = 9;
+    const char* value = header;
+    int value_length = extract_value(value, header_length);
+
+    if (value_length == FORM_DATA_KEY_LENGTH and SnortStrcasestr(value, value_length, "form-data"))
+    {
+        form_data_collector.set_is_form_data(true);
+        form_data_collector.set_is_file_upload(false);
+
+        const char* name = header;
+        int name_length = extract_attribute(name, header_length, "name");
+
+        if (name_length > 0)
+            form_data_collector.set_field_name(std::string(name, name_length));
+    }
+
+    const char* name = header;
+    int name_length = extract_attribute(name, header_length, "filename");
+
+    if (name_length > 0)
+    {
+        filename.assign(name, name_length);
+
+        if (form_data_collector.get_is_form_data())
+            form_data_collector.set_is_file_upload(true);
+
+        if (log_config->log_filename && log_state)
+            log_state->log_file_name((const uint8_t*)name, name_length);
+    }
 }
 
 /* Get the end of data body (excluding boundary)*/
@@ -451,7 +485,8 @@ static const uint8_t* GetDataEnd(const uint8_t* data_start,
         }
         break;
     }
-    return data_end_marker;
+
+    return end == start ? data_start : data_end_marker;
 }
 
 const uint8_t* MimeSession::process_mime_body(const uint8_t* ptr,
@@ -497,6 +532,10 @@ const uint8_t* MimeSession::process_mime_body(const uint8_t* ptr,
         if (decode_state->decode_data(ptr, attach_end) == DECODE_FAIL)
             decode_alert();
     }
+
+    if (form_data_collector.get_is_form_data() and !form_data_collector.get_is_file_upload())
+        form_data_collector.set_field_value(
+            ptr < attach_end ? std::string((const char*)ptr, attach_end - ptr) : std::string());
 
     return data_end;
 }
@@ -585,9 +624,7 @@ const uint8_t* MimeSession::process_mime_data_paf(
             if (isFileEnd(position))
                 data_state = STATE_MIME_HEADER;
 
-            if (!(state_flags & MIME_FLAG_FILE_ATTACH))
-                start = end;
-            else
+            if (state_flags & MIME_FLAG_FILE_ATTACH)
             {
                 start = process_mime_body(start, end, position);
 
@@ -637,25 +674,34 @@ const uint8_t* MimeSession::process_mime_data_paf(
                 {
                     switch (decode_state->get_decode_type())
                     {
-                        case DECODE_B64:
-                            mime_stats->b64_bytes += buf_size;
-                            break;
-                        case DECODE_QP:
-                            mime_stats->qp_bytes += buf_size;
-                            break;
-                        case DECODE_UU:
-                            mime_stats->uu_bytes += buf_size;
-                            break;
-                        case DECODE_BITENC:
-                            mime_stats->bitenc_bytes += buf_size;
-                            break;
-                        default:
-                            break;
+                    case DECODE_B64:
+                        mime_stats->b64_bytes += buf_size;
+                        break;
+                    case DECODE_QP:
+                        mime_stats->qp_bytes += buf_size;
+                        break;
+                    case DECODE_UU:
+                        mime_stats->uu_bytes += buf_size;
+                        break;
+                    case DECODE_BITENC:
+                        mime_stats->bitenc_bytes += buf_size;
+                        break;
+                    default:
+                        break;
                     }
                 }
 
                 decode_state->reset_decoded_bytes();
             }
+            else if (form_data_collector.get_is_form_data() and !form_data_collector.get_is_file_upload())
+            {
+                start = process_mime_body(start, end, position);
+            }
+            else
+            {
+                start = end;
+            }
+
             break;
         }
     }
@@ -677,7 +723,7 @@ const uint8_t* MimeSession::process_mime_data_paf(
 void MimeSession::reset_part_state()
 {
     state_flags = 0;
-    filename_state = CONT_DISP_FILENAME_PARAM_NAME;
+    attribute_state = ATTRIBUTE_NAME;
 
     delete[] partial_header;
     partial_header = nullptr;
@@ -693,9 +739,14 @@ void MimeSession::reset_part_state()
         decode_state->file_decomp_reset();
     }
 
+    form_data_collector.finalize_field(filename);
+    form_data_collector.reset_part();
+
     // Clear MIME's file data to prepare for next file
     filename.clear();
     content_type.clear();
+
+    // Reset form-data state for next part
     file_counter++;
     file_offset = 0;
     current_file_cache_file_id = 0;
@@ -787,78 +838,84 @@ MailLogState* MimeSession::get_log_state()
     return log_state;
 }
 
-int MimeSession::extract_file_name(const char*& start, int length)
+int MimeSession::extract_attribute(const char*& start, int length, const char* attr)
 {
-    const char* tmp = start;
-    const char* end = start+length;
-
     if (length <= 0)
         return -1;
 
+    const char* tmp = start;
+    const char* end = start + length;
+
     while (tmp < end)
     {
-        switch (filename_state)
+        switch (attribute_state)
         {
-            case CONT_DISP_FILENAME_PARAM_NAME:
+
+        case ATTRIBUTE_NAME:
+            tmp = SnortStrcasestr(start, length, attr);
+
+            if (tmp == nullptr)
+                return -1;
+
+            tmp = tmp + strlen(attr);
+            attribute_state = ATTRIBUTE_EQUALS;
+            break;
+
+        case ATTRIBUTE_EQUALS:
+            if ('=' == *tmp or isspace(*tmp))
             {
-                tmp = SnortStrcasestr(start, length, "filename");
-                if ( tmp == nullptr )
-                    return -1;
-                tmp = tmp + 8;
-                filename_state = CONT_DISP_FILENAME_PARAM_EQUALS;
-                break;
-            }
-            case CONT_DISP_FILENAME_PARAM_EQUALS:
-            {
-                //skip past whitespace and '='
-                if (isspace(*tmp) or (*tmp == '='))
-                    tmp++;
-                else if (*tmp == '"')
-                {
-                    // Skip past the quote
-                    tmp++;
-                    filename_state = CONT_DISP_FILENAME_PARAM_VALUE_QUOTE;
-                }
-                else
-                {
-                    filename_state = CONT_DISP_FILENAME_PARAM_VALUE;
-                    start = tmp;
-                }
-                break;
-            }
-            case CONT_DISP_FILENAME_PARAM_VALUE_QUOTE:
-                start = tmp;
-                tmp = SnortStrnPbrk(start,(end - tmp),"\"");
-                if (tmp)
-                {
-                    end = tmp;
-                    return (end - start);
-                }
-                // Since we have the full header line and there can't be wrapping within a quoted
-                // string, getting here means the line is malformed. Treat like unquoted string
-                filename_state = CONT_DISP_FILENAME_PARAM_VALUE;
-                tmp = start;
-                break;
-            case CONT_DISP_FILENAME_PARAM_VALUE:
-                // Go until we get a ';' or whitespace
-                if ((*tmp == ';') or isspace(*tmp))
-                {
-                    end = tmp;
-                    return (end - start);
-                }
                 tmp++;
-                break;
+            }
+            else if (*tmp == '"')
+            {
+                tmp++;
+                attribute_state = ATTRIBUTE_VALUE_QUOTE;
+            }
+            else
+            {
+                start = tmp;
+                attribute_state = ATTRIBUTE_VALUE;
+            }
+            break;
+
+        case ATTRIBUTE_VALUE_QUOTE:
+            start = tmp;
+            tmp = SnortStrnPbrk(start, end - tmp, "\"");
+
+            if (tmp)
+            {
+                attribute_state = ATTRIBUTE_NAME;
+                end = tmp;
+                return end - start;
+            }
+
+            // Since we have the full header line and there can't be wrapping within a quoted
+            // string, getting here means the line is malformed. Treat like unquoted string
+            tmp = start;
+            attribute_state = ATTRIBUTE_VALUE;
+            break;
+
+        case ATTRIBUTE_VALUE:
+            if (';' == *tmp or isspace(*tmp))
+            {
+                attribute_state = ATTRIBUTE_NAME;
+                end = tmp;
+                return end - start;
+            }
+
+            tmp++;
+            break;
+
+        default:
+            assert(false);
+            return -1;
         }
     }
-    if (filename_state == CONT_DISP_FILENAME_PARAM_VALUE)
-    {
-        // The filename is ended by the eol marker
-        return (end - start);
-    }
-    return -1;
+
+    return ATTRIBUTE_VALUE == attribute_state ? end - start : -1;
 }
 
-int MimeSession::extract_content_type(const char*& start, uint32_t length)
+int MimeSession::extract_value(const char*& start, uint32_t length)
 {
     assert(start);
 
@@ -976,7 +1033,6 @@ void MimeSession::mime_file_process(Packet* p, const uint8_t* data, int data_siz
         {
             continue_inspecting_file = file_flows->set_file_name((const uint8_t*)filename.c_str(),
                 filename.length(), 0, get_multiprocessing_file_id(), uri, uri_length);
-            filename.clear();
         }
     }
 }

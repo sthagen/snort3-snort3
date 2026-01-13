@@ -320,7 +320,7 @@ static PS_TRACKER* ps_tracker_get(PS_HASH_KEY* key)
 
 
     if ( ht )
-        memset(ht, 0x00, sizeof(PS_TRACKER));
+        *ht = {};
 
     return ht;
 }
@@ -453,7 +453,7 @@ void PortScan::ps_proto_update_window(unsigned interval, PS_PROTO* proto, time_t
 {
     if (pkt_time > proto->window)
     {
-        memset(proto, 0x00, sizeof(PS_PROTO));
+        *proto = {};
 
         proto->window = pkt_time + interval;
     }

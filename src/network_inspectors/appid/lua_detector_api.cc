@@ -3375,6 +3375,26 @@ static int set_user_detector_data_item(lua_State *L)
     return result;
 }
 
+#ifdef REG_TEST
+int lua_remove_registry_table_test(lua_State* L)
+{
+    const char* table_entry = lua_tostring(L, 2);
+    if (!table_entry)
+    {
+        return 0;
+    }
+    lua_getfield(L, LUA_REGISTRYINDEX, table_entry);
+    if (lua_isnil(L, -1))
+    {
+        APPID_LOG(nullptr, TRACE_ERROR_LEVEL, "appid: Registry table %s not found \n", table_entry);
+        return 0;
+    }
+    lua_pushnil(L);
+    lua_setfield(L, LUA_REGISTRYINDEX, table_entry);
+    return 1;
+}
+#endif
+
 static const luaL_Reg detector_methods[] =
 {
     /* Obsolete API names.  No longer use these!  They are here for backward
@@ -3507,6 +3527,10 @@ static const luaL_Reg detector_methods[] =
     {"addCipService",            detector_add_cip_service},
     {"addEnipCommand",           detector_add_enip_command},
 
+#ifdef REG_TEST
+    {"luaRemoveRegistryTableTest", lua_remove_registry_table_test},
+#endif
+
     { nullptr, nullptr }
 };
 
@@ -3603,7 +3627,7 @@ int LuaStateDescriptor::lua_validate(AppIdDiscoveryArgs& args)
     if (lua_pcall(my_lua_state, 0, 1, 0))
     {
         // Runtime Lua errors are suppressed in production code since detectors are written for
-        // efficiency and with defensive minimum checks. Errors are dealt as exceptions
+        // efficiency and with minimum defensive checks. Errors are dealt as exceptions
         // that don't impact processing by other detectors or future packets by the same detector.
         APPID_LOG(args.pkt, TRACE_ERROR_LEVEL, "lua detector %s: error validating %s\n",
             package_info.name.c_str(), lua_tostring(my_lua_state, -1));

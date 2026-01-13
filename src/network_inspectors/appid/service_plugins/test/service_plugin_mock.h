@@ -98,7 +98,7 @@ void ClientDiscovery::reload() {}
 
 int AppIdDetector::initialize(AppIdInspector&){return 0;}
 int AppIdDetector::data_add(AppIdSession&, AppIdFlowData*){return 0;}
-#ifndef FTP_UNIT_TEST
+#if !defined(FTP_UNIT_TEST) && !defined(TFTP_UNIT_TEST)
 AppIdFlowData* AppIdDetector::data_get(const AppIdSession&) {return nullptr;}
 #endif
 void AppIdDetector::add_user(AppIdSession&, const char*, AppId, bool, AppidChangeBits&){}

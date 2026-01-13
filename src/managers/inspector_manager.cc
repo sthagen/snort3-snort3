@@ -40,10 +40,12 @@
 #include "main/snort_config.h"
 #include "main/snort_module.h"
 #include "main/thread_config.h"
+#include "packet_io/packet_tracer.h"
 #include "protocols/packet.h"
 #include "profiler/profiler_defs.h"
 #include "pub_sub/intrinsic_event_ids.h"
 #include "search_engines/search_tool.h"
+#include "stream/base/stream_module.h"
 #include "target_based/snort_protocols.h"
 #include "time/clock_defs.h"
 #include "time/stopwatch.h"
@@ -1979,6 +1981,15 @@ inline void InspectorManager::internal_execute(Packet* p)
         SingleInstanceInspectorPolicy* ft = sc->policy_map->get_flow_tracking();
         if (ft->instance )
             ::execute<T>(p, &ft->instance, 1);
+        else
+        {
+            if ( !p->flow )
+            {
+                stream_base_stats.no_flow_no_inspector++;
+                if ( PacketTracer::is_active() )
+                    PacketTracer::log("Flow: packet without flow - no flow tracking inspector configured\n");
+            }
+        }
     }
 
     // must check between each ::execute()
@@ -1992,7 +2003,16 @@ inline void InspectorManager::internal_execute(Packet* p)
             DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::FLOW_STATE_RELOADED, p, p->flow);
     }
     else
+    {
+        if ( p->has_paf_payload() )
+        {
+            stream_base_stats.no_flow_paf_no_flow++;
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("Flow: packet without flow - PAF payload but flow was deleted/expired\n");
+        }
+
         DataBus::publish(intrinsic_pub_id, IntrinsicEventIds::PKT_WITHOUT_FLOW, p);
+    }
 
     FrameworkPolicy* fp = get_inspection_policy()->framework_policy;
     assert(fp);

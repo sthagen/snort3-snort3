@@ -46,20 +46,17 @@ struct MailLogConfig
     uint32_t email_hdrs_log_depth = 0;
 };
 
-class Flow;
-
 class SO_PUBLIC MailLogState : public snort::StashGenericObject
 {
 public:
     MailLogState(MailLogConfig* conf);
     ~MailLogState() override;
 
-    /* accumulate MIME attachment filenames. The filenames are appended by commas */
     int log_file_name(const uint8_t* start, int length);
-
     int log_email_hdrs(const uint8_t* start, int length);
     int log_email_id(const uint8_t* start, int length, EmailUserType);
 
+    // if length is greater than 0 then buffer points to a null-terminated string
     void get_file_name(uint8_t** buf, uint32_t* len);
     void get_email_hdrs(uint8_t** buf, uint32_t* len);
     void get_email_id(uint8_t** buf, uint32_t* len, EmailUserType);
@@ -72,7 +69,7 @@ public:
 private:
     int log_flags = 0;
     uint8_t* buf = nullptr;
-    unsigned char* emailHdrs = nullptr;
+    unsigned char* hdrs = nullptr;
     uint32_t log_depth = 0;
     uint32_t hdrs_logged;
     uint8_t* recipients = nullptr;

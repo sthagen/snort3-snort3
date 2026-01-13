@@ -220,10 +220,8 @@ void Module::init_stats(bool new_thread)
 
     for ( unsigned thread_index = 0; thread_index < number_of_threads; thread_index++)
     {
-        std::vector<PegCount> stats(num_counts);
-        std::vector<PegCount> dump_stats(num_counts);
-        counts.push_back(stats);
-        dump_stats_counts.push_back(dump_stats);
+        counts.emplace_back(num_counts);
+        dump_stats_counts.emplace_back(num_counts);
         dump_stats_initialized.push_back(0);
     }
     dump_stats_results.resize(num_counts);

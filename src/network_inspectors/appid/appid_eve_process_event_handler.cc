@@ -55,6 +55,8 @@ void AppIdEveProcessEventHandler::handle(DataEvent& event, Flow* flow)
 
         APPID_LOG(p, TRACE_DEBUG_LEVEL, "New AppId session at mercury event\n");
     }
+    else if (appidDebug->is_enabled())
+        appidDebug->activate(flow, asd, inspector.get_ctxt().config.log_all_sessions);
 
     if (!asd->get_session_flags(APPID_SESSION_DISCOVER_APP | APPID_SESSION_SPECIAL_MONITORED))
         return;
@@ -104,7 +106,8 @@ void AppIdEveProcessEventHandler::handle(DataEvent& event, Flow* flow)
 
         snort_free(version);
     }
-    else if (!name.empty() and is_client_process_flag)
+
+    if ((client_id == APP_ID_NONE) and !name.empty() and is_client_process_flag)
     {
         client_id = odp_ctxt.get_eve_ca_matchers().match_eve_ca_pattern(name, conf);
 

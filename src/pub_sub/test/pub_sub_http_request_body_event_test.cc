@@ -30,6 +30,7 @@
 #include "service_inspectors/http_inspect/http_enum.h"
 #include "service_inspectors/http_inspect/http_field.h"
 #include "service_inspectors/http_inspect/http_msg_body_cl.h"
+#include "service_inspectors/http_inspect/http_msg_head_shared.h"
 
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
@@ -64,6 +65,7 @@ void HttpMsgSection::clear() {}
 #ifdef REG_TEST
 void HttpMsgBody::print_body_section(FILE*, const char*) {}
 #endif
+int32_t HttpMsgHeadShared::get_content_type() { return content_type; }
 
 HttpMsgSection::HttpMsgSection(const uint8_t* buffer, const uint16_t buf_size,
     HttpFlowData* session_data_, HttpCommon::SourceId source_id_, bool buf_owner,

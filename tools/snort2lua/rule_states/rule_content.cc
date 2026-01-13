@@ -174,22 +174,60 @@ template<const std::string* option_name>
 bool Content<option_name>::extract_payload(std::istringstream& stream,
     std::string& option)
 {
-    if ( !stream.good() )
+    while (stream.good() && std::isspace(stream.peek()))
+        stream.get();
+
+    if (!stream.good())
         return false;
 
-    std::getline(stream, option, ',');
-    if (option.empty())
-        return false;
-
-    const std::size_t quote = option.find('"');
-    if ( (quote != std::string::npos) && (quote == option.rfind('"')) )
+    if (stream.peek() == '!')
     {
-        std::string tmp;
-        std::getline(stream, tmp, '"');
-        option += "," + tmp + "\"";
-        std::getline(stream, tmp, ',');
-        option += tmp;
+        char c;
+        stream.get(c);
+        option.push_back(c);
+
+        while (stream.good() && std::isspace(stream.peek()))
+            stream.get();
     }
+
+    if (stream.peek() == '"')
+    {
+        char c;
+        stream.get(c);
+        option.push_back(c);
+
+        bool escaped = false;
+
+        while (stream.get(c))
+        {
+            option.push_back(c);
+
+            if (escaped)
+                escaped = false;
+            else if (c == '\\')
+                escaped = true;
+            else if (c == '"')
+                break;
+        }
+
+        while (stream.good())
+        {
+            const int next = stream.peek();
+
+            if (next == ',')
+            {
+                stream.get();
+                break;
+            }
+
+            if (next == EOF or !std::isspace(next))
+                break;
+
+            stream.get();
+        }
+    }
+    else
+        return false;
 
     util::trim(option);
     return true;
@@ -218,7 +256,7 @@ bool Content<option_name>::convert(std::istringstream& data_stream)
 
     // This first loop parses all of the options between the
     // content keyword and the first semicolon.
-    while ( extract_payload(arg_stream, keyword) )
+    while ( std::getline(arg_stream, keyword, ',') )
     {
         std::istringstream opts(keyword);
         val = "";

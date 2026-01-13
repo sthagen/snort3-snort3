@@ -32,6 +32,7 @@
 
 #include "pp_telnet.h"
 
+#include <climits>
 #include "detection/detection_buf.h"
 #include "detection/detection_engine.h"
 #include "protocols/packet.h"
@@ -180,7 +181,7 @@ int normalize_telnet(
                 /* wind it back a character? */
                 if (ignoreEraseCmds == FTPP_APPLY_TNC_ERASE_CMDS)
                 {
-                    if (write_ptr  > start)
+                    if (write_ptr  > start && buf.len > 0)
                     {
                         write_ptr--;
                         buf.len--;
@@ -193,7 +194,7 @@ int normalize_telnet(
                 if (ignoreEraseCmds == FTPP_APPLY_TNC_ERASE_CMDS)
                 {
                     /* Go back to previous CR null or CR LF? */
-                    while (write_ptr > start)
+                    while (write_ptr > start && buf.len > 0)
                     {
                         /* Go to previous char */
                         write_ptr--;
@@ -206,8 +207,11 @@ int normalize_telnet(
                              * forward past those two -- that is the
                              * beginning of this line
                              */
-                            write_ptr+=2;
-                            buf.len+=2;
+                            if (buf.len <= UINT_MAX - 2)
+                            {
+                                write_ptr+=2;
+                                buf.len+=2;
+                            }
                             break;
                         }
                     }
@@ -387,7 +391,7 @@ int normalize_telnet(
             case 0x7F: /* Delete */
             case 0x08: /* Backspace/Ctrl-H */
                 /* wind it back a character */
-                if (write_ptr > start)
+                if (write_ptr > start && buf.len > 0)
                 {
                     write_ptr--;
                     buf.len--;

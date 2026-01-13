@@ -62,8 +62,8 @@ public:
     PegCount* get_counts() const override;
     snort::ProfileStats* get_profile() const override;
 
-    std::vector<Binding>& get_bindings();
-    std::vector<Binding>& get_policy_bindings();
+    std::vector<Binding>&& get_bindings();
+    std::vector<Binding>&& get_policy_bindings();
 
     Usage get_usage() const override
     { return INSPECT; }

@@ -44,7 +44,7 @@ using namespace snort;
 /* accumulate MIME attachment filenames. The filenames are appended by commas */
 int MailLogState::log_file_name(const uint8_t* start, int length)
 {
-    if (!start || (length <= 0))
+    if (!filenames || !start || length <= 0)
         return -1;
 
     uint8_t* alt_buf = filenames;
@@ -54,11 +54,10 @@ int MailLogState::log_file_name(const uint8_t* start, int length)
     int sep = (*alt_len > 0) ? 1 : 0;
     int log_avail = alt_size - *alt_len - sep;
 
-    if (!alt_buf || (log_avail <= 0))
+    if (!alt_buf || log_avail <= 0)
         return -1;
 
-    else if (log_avail < length )
-        length = log_avail;
+    length = std::min(length, log_avail - 1);
 
     if (length > 0)
     {
@@ -80,22 +79,16 @@ int MailLogState::log_file_name(const uint8_t* start, int length)
 /* Accumulate EOL separated headers, one or more at a time */
 int MailLogState::log_email_hdrs(const uint8_t* start, int length)
 {
-    if (length <= 0)
+    if (!hdrs || length <= 0)
         return -1;
 
     int log_avail = log_depth - hdrs_logged;
-    uint8_t* log_buf = (uint8_t*)emailHdrs;
+    uint8_t* log_buf = (uint8_t*)hdrs;
 
     if (log_avail <= 0)
-        return 0;
-
-    if (length > log_avail)
-        length = log_avail;
-
-    /* appended by the EOL \r\n */
-
-    if (length > log_avail)
         return -1;
+
+    length = std::min(length, log_avail - 1);
 
     if (length > 0)
         memcpy_s(log_buf + hdrs_logged, log_avail, start, length);
@@ -152,11 +145,10 @@ int MailLogState::log_email_id(const uint8_t* start, int length, EmailUserType t
     int sep = (*alt_len > 0) ? 1 : 0;
     int log_avail = alt_size - *alt_len - sep;
 
-    if (log_avail <= 0 || !alt_buf)
+    if (!alt_buf || log_avail <= 0)
         return -1;
 
-    else if (log_avail < length )
-        length = log_avail;
+    length = std::min(length, log_avail - 1);
 
     if (length > 0)
     {
@@ -185,7 +177,7 @@ void MailLogState::get_file_name(uint8_t** buf, uint32_t* len)
 
 void MailLogState::get_email_hdrs(uint8_t** buf, uint32_t* len)
 {
-    *buf = emailHdrs;
+    *buf = hdrs;
     *len = hdrs_logged;
 }
 
@@ -231,11 +223,11 @@ MailLogState::MailLogState(MailLogConfig* conf)
         uint32_t bufsz = (2 * MAX_EMAIL) + MAX_FILE + conf->email_hdrs_log_depth;
         buf = (uint8_t*)snort_calloc(bufsz);
 
-        log_depth = conf->email_hdrs_log_depth;
-        recipients = buf;
-        senders = buf + MAX_EMAIL;
-        filenames = buf + (2 * MAX_EMAIL);
-        emailHdrs = buf + (2 * MAX_EMAIL) + MAX_FILE;
+        log_depth = conf->log_email_hdrs ? conf->email_hdrs_log_depth : 0;
+        recipients = conf->log_rcptto ? buf : nullptr;
+        senders = conf->log_mailfrom ? buf + MAX_EMAIL : nullptr;
+        filenames = conf->log_filename ? buf + (2 * MAX_EMAIL) : nullptr;
+        hdrs = conf->log_email_hdrs ? buf + (2 * MAX_EMAIL) + MAX_FILE : nullptr;
     }
 
     rcpts_logged = 0;

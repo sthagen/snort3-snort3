@@ -101,7 +101,7 @@ static inline void process_http_session(const Packet& p, AppIdSession& asd,
 
         if (spdyRequestScheme && spdyRequestHost && spdyRequestPath )
         {
-            string* url;
+            const string* url;
             if (asd.get_session_flags(APPID_SESSION_DECRYPTED)
                 && *spdyRequestScheme == "http")
             {
@@ -503,7 +503,7 @@ static void set_tp_reinspect(AppIdSession& asd, const Packet* p, AppidSessionDir
 {
     // restart inspection by 3rd party
     if (!asd.tp_reinspect_by_initiator and (direction == APP_ID_FROM_INITIATOR) and
-        check_reinspect(p, asd) and p->packet_flags & PKT_STREAM_ORDER_OK)
+        check_reinspect(p, asd) and ((p->packet_flags & PKT_STREAM_ORDER_OK) or asd.get_odp_ctxt().inspect_ooo_flows))
     {
         asd.tp_reinspect_by_initiator = true;
         asd.set_session_flags(APPID_SESSION_APP_REINSPECT);
@@ -555,7 +555,7 @@ bool do_tp_discovery(ThirdPartyAppIdContext& tp_appid_ctxt, AppIdSession& asd, I
     if (!p->dsize and !asd.get_odp_ctxt().tp_allow_probes)
         return false;
 
-    bool process_packet = (protocol != IpProtocol::TCP or (p->packet_flags & PKT_STREAM_ORDER_OK) or
+    bool process_packet = (protocol != IpProtocol::TCP or ((p->packet_flags & PKT_STREAM_ORDER_OK) or asd.get_odp_ctxt().inspect_ooo_flows) or
         asd.get_odp_ctxt().tp_allow_probes);
 
     if (!process_packet)
@@ -615,8 +615,7 @@ bool do_tp_discovery(ThirdPartyAppIdContext& tp_appid_ctxt, AppIdSession& asd, I
 
     if (tp_app_id == APP_ID_SSH and !(p->flow->get_session_flags() & SSNFLAG_MIDSTREAM))
     {
-        APPID_LOG(p, TRACE_DEBUG_LEVEL, "Setting the ignore and early detection flag\n");
-         asd.get_odp_ctxt().get_app_info_mgr().set_app_info_flags(tp_app_id, APPINFO_FLAG_IGNORE);
+        APPID_LOG(p, TRACE_DEBUG_LEVEL, "Setting the early detection flag\n");
          asd.set_session_flags(APPID_SESSION_WAIT_FOR_EXTERNAL);
          asd.expected_external_app_id = tp_app_id;
     }
@@ -633,7 +632,7 @@ bool do_tp_discovery(ThirdPartyAppIdContext& tp_appid_ctxt, AppIdSession& asd, I
             asd.set_client_id(*p, direction, tp_app_id, change_bits);
     }
 
-    if ( app_info_flags & APPINFO_FLAG_IGNORE )
+    if (( app_info_flags & APPINFO_FLAG_IGNORE ) or asd.get_session_flags(APPID_SESSION_WAIT_FOR_EXTERNAL))
     {
         APPID_LOG(p, TRACE_DEBUG_LEVEL, "3rd party ignored\n");
 

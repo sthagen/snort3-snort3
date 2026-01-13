@@ -318,8 +318,10 @@ static const char* _POFindMatchingBraces(const char* s)
         }
         else if (*s == ']')
         {
-            if (depth-- == 0)
+            if (depth == 0)
                 return s;
+
+            --depth;
         }
     } while (*s++);
     return nullptr;
@@ -427,7 +429,6 @@ static PortObject* _POParseString(POParser* pop)
         }
 
         PortObjectFree(potmp);
-        potmp = nullptr;
     }
 
     /* Check for mis-matched brackets */

@@ -36,6 +36,7 @@
 #include "protocols/tcp.h"
 #include "protocols/udp.h"
 #include "protocols/vlan.h"
+#include "stream/base/stream_module.h"
 #include "stream/stream.h"
 #include "utils/util.h"
 #include "flow/expect_cache.h"
@@ -89,6 +90,7 @@ Flow* HighAvailabilityManager::import(Packet&, FlowKey&) { return nullptr; }
 bool FlowCache::move_to_allowlist(snort::Flow*) { return true; }
 uint64_t FlowCache::get_lru_flow_count(uint8_t) const { return 0; }
 SO_PUBLIC void snort::ts_print(const struct timeval*, char*, bool) { }
+THREAD_LOCAL BaseStats stream_base_stats = {};
 
 namespace snort
 {
@@ -154,20 +156,20 @@ TEST(stale_flow, stale_flow)
     Flow* flow = new Flow;
     FlowCacheConfig fcg;
     FlowCache *cache = new FlowCache(fcg);
-    FlowControl *flow_con = new FlowControl(fcg);
+    FlowControl *flow_control = new FlowControl(fcg);
     DAQ_PktHdr_t dh = { };
 
     dh.flags = DAQ_PKT_FLAG_NEW_FLOW;
     p->pkth = &dh;
-    CHECK(flow_con->stale_flow_cleanup(cache, flow, p) == nullptr);
+    CHECK(flow_control->stale_flow_cleanup(cache, flow, p) == nullptr);
 
     dh.flags &= ~DAQ_PKT_FLAG_NEW_FLOW;
-    CHECK(flow_con->stale_flow_cleanup(cache, flow, p) == flow);
+    CHECK(flow_control->stale_flow_cleanup(cache, flow, p) == flow);
 
     p->pkth = nullptr;
     delete flow;
     delete p;
-    delete flow_con;
+    delete flow_control;
     delete cache;
 }
 

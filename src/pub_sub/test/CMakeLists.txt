@@ -17,6 +17,10 @@ add_cpputest( pub_sub_http_body_event_test
     SOURCES
         ../http_body_event.cc
 )
+add_cpputest( pub_sub_http_form_data_event_test
+    SOURCES
+        ../http_form_data_event.cc
+)
 add_cpputest( pub_sub_eve_process_event_test
     SOURCES
         ../eve_process_event.h

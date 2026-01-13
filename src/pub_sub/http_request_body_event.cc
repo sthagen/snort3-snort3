@@ -82,6 +82,19 @@ bool HttpRequestBodyEvent::is_mime() const
     return false;
 }
 
+bool HttpRequestBodyEvent::is_urlencoded() const
+{
+    if (http_msg_body)
+    {
+        HttpMsgHeader* header = http_msg_body->get_header(HttpCommon::SRC_CLIENT);
+
+        if (header)
+            return header->get_content_type() == HttpEnums::CT_APPLICATION_X_WWW_FORM_URLENCODED;
+    }
+
+    return false;
+}
+
 int64_t HttpRequestBodyEvent::get_httpx_stream_id() const
 {
     return http_flow_data->get_hx_stream_id();

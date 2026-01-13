@@ -305,7 +305,7 @@ HttpBodyCutter::HttpBodyCutter(bool accelerated_blocking_, ScriptFinder* finder_
     {
         if ((compression == CMP_GZIP) || (compression == CMP_DEFLATE))
         {
-            compress_stream = new z_stream;
+            compress_stream = new z_stream();
             compress_stream->zalloc = Z_NULL;
             compress_stream->zfree = Z_NULL;
             compress_stream->next_in = Z_NULL;

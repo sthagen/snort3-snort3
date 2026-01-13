@@ -41,6 +41,8 @@ public:
     void get_protocol_ids(std::vector<ProtocolId>& v) override;
     bool decode(const RawData&, CodecData&, DecodeData&) override;
     void log(TextLog* const, const uint8_t* pkt, const uint16_t len) override;
+    bool encode(const uint8_t* const raw_in, const uint16_t raw_len, 
+        EncState& enc, Buffer& buf, Flow*) override;
 };
 } // anonymous namespace
 
@@ -82,6 +84,34 @@ void TransbridgeCodec::log(TextLog* const text_log, const uint8_t* raw_pkt,
         TextLog_Print(text_log, "  len:0x%04X", static_cast<uint16_t>(prot_id));
     else
         TextLog_Print(text_log, "  type:0x%04X", static_cast<uint16_t>(prot_id));
+}
+
+bool TransbridgeCodec::encode(const uint8_t* const raw_in, const uint16_t raw_len, EncState& enc,
+    Buffer& buf, Flow*)
+{
+    if ( !buf.allocate(raw_len) )
+        return false;
+
+    const auto* hi = reinterpret_cast<const eth::EtherHdr*>(raw_in);
+    auto* ho = reinterpret_cast<eth::EtherHdr*>(buf.data());
+
+    ho->ether_type = enc.ethertype_set() ? htons(to_utype(enc.next_ethertype)) : hi->ether_type;
+
+    if ( enc.forward() )
+    {
+        memcpy(ho->ether_src, hi->ether_src, sizeof(ho->ether_src));
+        memcpy(ho->ether_dst, hi->ether_dst, sizeof(ho->ether_dst));
+    }
+    else
+    {
+        memcpy(ho->ether_src, hi->ether_dst, sizeof(ho->ether_src));
+        memcpy(ho->ether_dst, hi->ether_src, sizeof(ho->ether_dst));
+    }
+
+    enc.next_ethertype = ProtocolId::ETHERTYPE_NOT_SET;
+    enc.next_proto = IpProtocol::PROTO_NOT_SET;
+
+    return true;
 }
 
 //-------------------------------------------------------------------------

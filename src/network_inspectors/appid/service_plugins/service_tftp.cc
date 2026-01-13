@@ -170,7 +170,7 @@ int TftpServiceDetector::validate(AppIdDiscoveryArgs& args)
         size -= sizeof(uint16_t);
         if (!(*data))
             goto bail;
-        for (; *data && size; data++, size--)
+        for (; size && *data; data++, size--)
         {
             if (!isprint(*data))
                 goto bail;

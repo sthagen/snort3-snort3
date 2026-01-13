@@ -44,8 +44,11 @@
 #include "flow_cache.h"
 #include "ha.h"
 #include "session.h"
+#include "stream/base/stream_module.h"
 
 using namespace snort;
+
+extern THREAD_LOCAL BaseStats stream_base_stats;
 
 FlowControl::FlowControl(const FlowCacheConfig& fc)
 {
@@ -160,6 +163,7 @@ void FlowControl::timeout_flows(unsigned max, time_t cur_time)
 {
     cache->timeout(max, cur_time);
 }
+
 
 Flow* FlowControl::stale_flow_cleanup(FlowCache* cache, Flow* flow, Packet* p)
 {
@@ -374,7 +378,7 @@ void FlowControl::init_proto(PktType type, InspectSsnFunc get_ssn)
     get_proto_session[to_utype(type)] = get_ssn;
 }
 
-static bool want_flow(PktType type, Packet* p)
+static bool want_flow(PktType type, Packet* p, bool count_stats = true)
 {
     if ( type != PktType::TCP )
         return true;
@@ -384,12 +388,26 @@ static bool want_flow(PktType type, Packet* p)
         // Do not start a new flow from a retry packet.
         p->active->drop_packet(p);
         p->disable_inspect = true;
+        if ( count_stats )
+        {
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("Flow: packet without flow - retry packets cannot initiate new flows\n");
+            stream_base_stats.no_flow_retry_packet++;
+        }
         return false;
     }
 
     if ( p->ptrs.tcph->is_rst() )
+    {
         // guessing direction based on ports is misleading
+        if ( count_stats )
+        {
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("Flow: packet without flow - TCP RST packets cannot initiate new flows\n");
+            stream_base_stats.no_flow_tcp_rst++;
+        }
         return false;
+    }
 
     if ( p->ptrs.tcph->is_syn_only() )
     {
@@ -404,9 +422,28 @@ static bool want_flow(PktType type, Packet* p)
     }
 
     if ( p->ptrs.tcph->is_syn_ack() or p->dsize )
-        return Stream::midstream_allowed(p, true);
+    {
+        bool allowed = Stream::midstream_allowed(p, true);
+        if ( !allowed && count_stats )
+        {
+            if ( PacketTracer::is_active() )
+                PacketTracer::log("Flow: packet without flow - midstream pickup rejected: SYN_ACK=%d, dsize=%u, require_3whs timeout exceeded\n",
+                    p->ptrs.tcph->is_syn_ack(), p->dsize);
+            stream_base_stats.no_flow_midstream_reject++;
+        }
+        return allowed;
+    }
 
     p->packet_flags |= PKT_FROM_CLIENT;
+
+    if ( count_stats )
+    {
+        if ( PacketTracer::is_active() )
+            PacketTracer::log("Flow: packet without flow - TCP packet without SYN options/SYN-ACK/data, require_3whs=%d\n",
+                Stream::require_3whs());
+        stream_base_stats.no_flow_unwanted++;
+    }
+
     return false;
 }
 
@@ -443,7 +480,12 @@ static void drop_stale_packet(snort::Packet *p, snort::Flow *flow)
 bool FlowControl::process(PktType type, Packet* p, bool* new_flow)
 {
     if ( !get_proto_session[to_utype(type)] )
+    {
+        if ( PacketTracer::is_active() )
+            PacketTracer::log("Flow: packet without flow - no protocol handler registered for PktType=%u\n", to_utype(type));
+        stream_base_stats.no_flow_no_proto_handler++;
         return false;
+    }
 
     FlowKey key;
     bool reversed = set_key(&key, p);
@@ -485,7 +527,10 @@ bool FlowControl::process(PktType type, Packet* p, bool* new_flow)
             flow = cache->allocate(&key);
 
             if ( !flow )
+            {
+                stream_base_stats.no_flow_alloc_failure++;
                 return true;
+            }
 
             if ( p->is_tcp() and p->ptrs.tcph->is_syn_ack() )
                 flow->flags.key_is_reversed = !reversed;
@@ -547,7 +592,7 @@ unsigned FlowControl::process(Flow* flow, Packet* p, bool new_ha_flow)
         if ( flow->flow_state == Flow::FlowState::INSPECT and !flow->session->precheck(p) )
         {
             // flow expired, must recheck eligibility
-            if ( !want_flow(flow->pkt_type, p) )
+            if ( !want_flow(flow->pkt_type, p, false) )
             {
                 flow->session_state |= STREAM_STATE_CLOSED;
                 return 0;  // flow will be deleted

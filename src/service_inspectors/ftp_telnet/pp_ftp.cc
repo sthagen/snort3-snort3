@@ -51,11 +51,34 @@ using namespace snort;
 #endif
 
 /*
- * Used to keep track of pipelined commands and the last one
- * that resulted in a
+ * Function: is_command_valid
+ *
+ * Purpose: Validates FTP response command format to detect malformed responses
+ *
+ * Arguments: start    => Pointer to start of command
+ *            cmd_size => Size of the command
+ *
+ * Returns: bool => true if command is valid, false if malformed
  */
-static THREAD_LOCAL int ftp_cmd_pipe_index = 0;
+static bool is_command_valid(const char *start, size_t cmd_size) {
+    if (cmd_size >= 3 &&
+        isdigit((unsigned char)start[0]) &&
+        isdigit((unsigned char)start[1]) &&
+        isdigit((unsigned char)start[2])) {
+        return true;
+    }
 
+    if (cmd_size >= 4 &&
+        (start[0] != start[1] || start[0] != start[2] || start[0] != start[3])) {
+        return true;
+    }
+
+    if (cmd_size < 4) {
+        return true;
+    }
+
+    return false;
+}
 /*
  * Function: getIP959(char **ip_start,
  *                 char *last_char,
@@ -1079,10 +1102,10 @@ static int do_stateful_checks(FTP_SESSION* session, Packet* p,
         }
         else if (session->data_chan_state & DATA_CHAN_PASV_CMD_ISSUED)
         {
-            if (ftp_cmd_pipe_index == session->data_chan_index)
+            if (session->ftp_cmd_pipe_index == session->data_chan_index)
             {
                 if (session->data_xfer_index == -1)
-                    ftp_cmd_pipe_index = 0;
+                    session->ftp_cmd_pipe_index = 0;
                 session->data_chan_index = -1;
 
                 if ( rsp_code >= 227 && rsp_code <= 229 )
@@ -1221,10 +1244,10 @@ static int do_stateful_checks(FTP_SESSION* session, Packet* p,
         }
         else if (session->data_chan_state & DATA_CHAN_PORT_CMD_ISSUED)
         {
-            if (ftp_cmd_pipe_index == session->data_chan_index)
+            if (session->ftp_cmd_pipe_index == session->data_chan_index)
             {
                 if (session->data_xfer_index == -1)
-                    ftp_cmd_pipe_index = 0;
+                    session->ftp_cmd_pipe_index = 0;
                 session->data_chan_index = -1;
                 if (rsp_code == 200)
                 {
@@ -1232,7 +1255,7 @@ static int do_stateful_checks(FTP_SESSION* session, Packet* p,
                     session->data_chan_state |= DATA_CHAN_PORT_CMD_ACCEPT;
                     session->data_chan_index = -1;
                 }
-                else if (ftp_cmd_pipe_index == session->data_chan_index)
+                else if (session->ftp_cmd_pipe_index == session->data_chan_index)
                 {
                     session->data_chan_index = -1;
                     session->data_chan_state &= ~DATA_CHAN_PORT_CMD_ISSUED;
@@ -1241,10 +1264,10 @@ static int do_stateful_checks(FTP_SESSION* session, Packet* p,
         }
         else if (session->data_chan_state & DATA_CHAN_REST_CMD_ISSUED)
         {
-            if (ftp_cmd_pipe_index == session->data_xfer_index)
+            if (session->ftp_cmd_pipe_index == session->data_xfer_index)
             {
                 if (session->data_chan_index == 0)
-                    ftp_cmd_pipe_index = 1;
+                    session->ftp_cmd_pipe_index = 1;
                 session->data_xfer_index = 0;
                 if (rsp_code == 350)
                 {
@@ -1262,10 +1285,10 @@ static int do_stateful_checks(FTP_SESSION* session, Packet* p,
         }
         else if (session->data_chan_state & DATA_CHAN_XFER_CMD_ISSUED)
         {
-            if (ftp_cmd_pipe_index == session->data_xfer_index)
+            if (session->ftp_cmd_pipe_index == session->data_xfer_index)
             {
                 if (session->data_chan_index == -1)
-                    ftp_cmd_pipe_index = 0;
+                    session->ftp_cmd_pipe_index = 0;
 
                 session->data_xfer_index = -1;
 
@@ -1375,7 +1398,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
     if (iMode == FTPP_SI_CLIENT_MODE)
     {
         req = &ftpssn->client.request;
-        ftp_cmd_pipe_index = 0;
+        ftpssn->ftp_cmd_pipe_index = 0;
     }
     else if (iMode == FTPP_SI_SERVER_MODE)
     {
@@ -1538,7 +1561,17 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
                     ptr++;
                 }
             }
+            //Raise an alert if the response code is not valid
+            if (!is_command_valid(req->cmd_begin, req->cmd_size))
+            {
+                ftpssn->server.response.state = FTP_RESPONSE_INV;
+                Stream::stop_inspection(p->flow, p, SSN_DIR_BOTH, -1, 0);
 
+                ftpssn->ft_ssn.fallback = true;
+                DetectionEngine::queue_event(GID_FTP, FTP_ABORTED_SESSION);
+                ++ftstats.aborted_sessions;
+                return FTPP_ALERT;
+            }
             if (encrypted)
             {
                 /* If the session wasn't already marked as encrypted...
@@ -1774,7 +1807,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
                 if (CmdConf->data_chan_cmd)
                 {
                     ftpssn->data_chan_state |= DATA_CHAN_PASV_CMD_ISSUED;
-                    ftpssn->data_chan_index = ftp_cmd_pipe_index;
+                    ftpssn->data_chan_index = ftpssn->ftp_cmd_pipe_index;
                     if (ftpssn->data_chan_state & DATA_CHAN_PORT_CMD_ISSUED)
                     {
                         /*
@@ -1795,7 +1828,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
                         if ((errno == ERANGE || errno == EINVAL) || (offset > 0))
                         {
                             ftpssn->data_chan_state |= DATA_CHAN_REST_CMD_ISSUED;
-                            ftpssn->data_xfer_index = ftp_cmd_pipe_index;
+                            ftpssn->data_xfer_index = ftpssn->ftp_cmd_pipe_index;
                         }
                     }
                 }
@@ -1840,7 +1873,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
                         }
                     }
                     ftpssn->data_chan_state |= DATA_CHAN_XFER_CMD_ISSUED;
-                    ftpssn->data_xfer_index = ftp_cmd_pipe_index;
+                    ftpssn->data_xfer_index = ftpssn->ftp_cmd_pipe_index;
                 }
                 else if (CmdConf->encr_cmd)
                 {
@@ -1901,7 +1934,7 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
         }
 
         if (iMode == FTPP_SI_CLIENT_MODE)
-            ftp_cmd_pipe_index++;
+            ftpssn->ftp_cmd_pipe_index++;
         else if ((rsp_code != 226) && (rsp_code != 426))
         {
             /*
@@ -1911,13 +1944,13 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
              * The 226 may or may not be sent by the server.
              * Both are 2nd response to a transfer command.
              */
-            ftp_cmd_pipe_index++;
+            ftpssn->ftp_cmd_pipe_index++;
         }
     }
 
     if (iMode == FTPP_SI_CLIENT_MODE)
     {
-        ftp_cmd_pipe_index = 0;
+        ftpssn->ftp_cmd_pipe_index = 0;
     }
 
     if (encrypted)

@@ -229,6 +229,7 @@ static const TraceOption snort_trace_options[] =
     { "inspector_manager", TRACE_INSPECTOR_MANAGER, "enable inspector manager trace logging" },
 #ifdef DEBUG_MSGS
     { "main", TRACE_MAIN, "enable main trace logging" },
+    { "mime", TRACE_MIME, "enable mime trace logging" },
 #endif
 
     { nullptr, 0, nullptr }

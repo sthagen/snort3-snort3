@@ -162,6 +162,12 @@ struct FTP_SESSION
     int data_chan_state;
     int data_chan_index;
     int data_xfer_index;
+    /* 
+     * Used to keep track of pipelined commands - moved from thread_local storage
+     * to FTP_SESSION structure to avoid cross-session contamination when
+     * processing consecutive packets from different FTP flows.
+     */
+    int ftp_cmd_pipe_index;
     bool data_xfer_dir;
     snort::SfIp clientIP;
     uint16_t clientPort;

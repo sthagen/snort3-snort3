@@ -260,7 +260,8 @@ void snort::DataBus::publish(unsigned, unsigned, snort::DataEvent&, snort::Flow*
 void snort::DataBus::publish(unsigned, unsigned, const uint8_t*, unsigned, snort::Flow*) { }
 void snort::DataBus::publish(unsigned, unsigned, snort::Packet*, snort::Flow*) { }
 
-snort::Packet* snort::DetectionEngine::get_current_packet() { return nullptr; }
+static snort::Packet s_mock_packet(false);
+snort::Packet* snort::DetectionEngine::get_current_packet() { return &s_mock_packet; }
 
 unsigned AppIdInspector::get_pub_id() { return 0; }
 #endif

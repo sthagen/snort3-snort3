@@ -1,3 +1,19 @@
+2026-01-21: 3.10.2.0
+
+* appid: configurable midstream service discovery
+* appid: prefer QUIC client appid over SSL
+* appid: prevent out-of-bounds read in bootp option parsing
+* appid: prevent out-of-bounds read in sslv2 server-hello detection
+* control: refactor connection ownership model and improve thread safety
+* extractor: avoid reporting default values for missing SSL fields
+* file_api: coverity fix
+* flow: refactor dump_flows command to dump flow state in binary format
+* mime: fix compile issues
+* react: block flow when packets are not reset candidates
+* show_flows: implement utility program to convert dump_flows binary files to text Flow state data for each flow
+* smtp: handle split CRLF in multi-line response parsing
+* ssl: ssl client hello event is published with empty hostname
+
 2026-01-11: 3.10.1.0
 
 * alert_fast: ensure call_once definition doesn't collide in std vs glibc, thanks to krag on GitHub for suggesting this fix

@@ -28,6 +28,7 @@
 
 #include "control/control.h"
 #include "detection/detection_engine.h"
+#include "flow/dump_flows.h"
 #include "flow/expect_cache.h"
 #include "flow/flow_cache.h"
 #include "flow/ha.h"
@@ -83,7 +84,7 @@ void TraceApi::filter(const Packet&) {}
 static unsigned preemptive_kick_count = 0;
 
 void ThreadConfig::preemptive_kick() { preemptive_kick_count++; }
-unsigned ThreadConfig::get_instance_max() { return 0; }
+unsigned ThreadConfig::get_instance_max() { return 1; }
 
 // Helper function to reset and get kick count
 unsigned get_preemptive_kick_count() { return preemptive_kick_count; }
@@ -148,20 +149,114 @@ int ExpectCache::add_flow(const Packet*, PktType, IpProtocol, const SfIp*, uint1
 unsigned int get_random_seed()
 { return 3193; }
 
-class DummyCache : public FlowCache
+class DumpFlowsTest : public DumpFlows
 {
     public:
-        DummyCache(const FlowCacheConfig& cfg) : FlowCache(cfg) {}
-        ~DummyCache() = default;
-        bool filter_flows(const Flow& flow, const FilterFlowCriteria& ffc) const override { (void)flow; (void)ffc; return true; };
+        DumpFlowsTest(ControlConn* conn, DumpFlowsFilter* dff) 
+        : DumpFlows(conn, dff) 
+        { }
+
+        ~DumpFlowsTest() override= default;
+
+        bool execute(FlowCache*);
+
+    void set_protocol_list(PktType proto_id)
+    {
+        protocols.clear();
+        protocols.push_back(static_cast<LRUType>(proto_id));
+    }
+
+    void set_filter_criteria(const snort::SfIp& src_ip, const snort::SfIp& dst_ip,
+        const snort::SfIp& src_subnet, const snort::SfIp& dst_subnet,
+        const uint16_t src_port, const uint16_t dst_port)
+    {
+        dff.src_port = src_port;
+        dff.dst_port = dst_port;
+        dff.src_ip = src_ip;
+        dff.dst_ip = dst_ip;
+        dff.src_subnet = src_subnet;
+        dff.dst_subnet = dst_subnet;
+
+        // Fast path: check if all filter fields are empty to avoid expensive filter_flows calls
+        dff.filter_none = ( !dff.src_ip.is_set() and
+            !dff.dst_ip.is_set() and
+             dff.src_port == 0 and
+             dff.dst_port == 0 );
+    }
 };
 
-class DummyCacheWithFilter : public FlowCache
+bool DumpFlowsTest::execute(FlowCache* cache)
 {
-    public:
-        DummyCacheWithFilter(const FlowCacheConfig& cfg) : FlowCache(cfg) {}
-        ~DummyCacheWithFilter() = default;
+    DumpFlowsControl& dfc = dump_flows_control[0];
+
+    if ( !dfc.flow_table )
+    {
+        if ( open_file(dfc) )
+            tinit(dfc, cache->get_flow_table());
+        else
+        {
+            CHECK(false);
+            return false;
+        }
+    }
+    
+    dfc.next = 1;
+    dfc.has_more_flows = false;
+    for( unsigned idx = 0; idx < protocols.size(); idx++ )
+        dump_flows(dfc, idx);
+
+    return !dfc.has_more_flows;
+}
+
+class DumpFlowsSummaryTest : public DumpFlowsSummary
+{ 
+    public:DumpFlowsSummaryTest(ControlConn* conn, DumpFlowsFilter* dff)
+    : DumpFlowsSummary(conn, dff)
+    { }
+
+    ~DumpFlowsSummaryTest() override = default;
+
+    bool execute(FlowCache*);
+
+    FlowsSummary& get_flows_summary() { return flows_summaries[0]; }
+
+    void set_protocol_list(PktType proto_id)
+    {
+        protocols.clear();
+        protocols.push_back(static_cast<LRUType>(proto_id));
+    }
+
+    void set_filter_criteria(const snort::SfIp& src_ip, const snort::SfIp& dst_ip,
+        const snort::SfIp& src_subnet, const snort::SfIp& dst_subnet,
+        const uint16_t src_port, const uint16_t dst_port)
+    {
+        dff.src_port = src_port;
+        dff.dst_port = dst_port;
+        dff.src_ip = src_ip;
+        dff.dst_ip = dst_ip;
+        dff.src_subnet = src_subnet;
+        dff.dst_subnet = dst_subnet;
+
+        // Fast path: check if all filter fields are empty to avoid expensive filter_flows calls
+        dff.filter_none = ( !dff.src_ip.is_set() and
+            !dff.dst_ip.is_set() and
+             dff.src_port == 0 and
+             dff.dst_port == 0 );
+    }
 };
+
+bool DumpFlowsSummaryTest::execute(FlowCache* cache)
+{
+    DumpFlowsControl& dfc = dump_flows_control[0];
+
+    if ( !dfc.flow_table )
+        tinit(dfc, cache->get_flow_table());
+        
+    for( unsigned idx = 0; idx < protocols.size(); idx++ )
+        dump_flows_summary(dfc, idx, flows_summaries[0]);
+
+    return true;
+}
 
 TEST_GROUP(flow_prune) { };
 
@@ -304,7 +399,7 @@ TEST(flow_prune, prune_proto)
     fcg.max_flows = 5;
     fcg.prune_flows = 3;
 
-    for(uint8_t i = to_utype(PktType::NONE); i <= to_utype(PktType::MAX); i++)
+    for(uint8_t i = to_utype(PktType::NONE); i < to_utype(PktType::MAX); i++)
         fcg.proto[i].nominal_timeout = 5;
 
     FlowCache *cache = new FlowCache(fcg);
@@ -422,7 +517,7 @@ TEST(allowlist_test, move_to_allowlist)
 {
     FlowCacheConfig fcg;
     fcg.max_flows = 5;
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
     int port = 1;
 
     // Adding two UDP flows and moving them to allow list
@@ -451,7 +546,7 @@ TEST(allowlist_test, allowlist_timeout_prune_fail)
 {
     FlowCacheConfig fcg;
     fcg.max_flows = 5;
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
     int port = 1;
 
     for (unsigned i = 0; i < 2; ++i)
@@ -480,11 +575,10 @@ TEST(allowlist_test, allowlist_timeout_prune_fail)
 
 TEST(allowlist_test, allowlist_memcap_prune_pass)
 {
-    PruneStats stats;
     FlowCacheConfig fcg;
     fcg.max_flows = 10;
     fcg.prune_flows = 5;
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
     int port = 1;
 
     for (unsigned i = 0; i < 10; ++i)
@@ -516,7 +610,7 @@ TEST(allowlist_test, allowlist_timeout_with_other_protos)
     fcg.max_flows = 10;
     fcg.prune_flows = 10;
 
-    for (uint8_t i = to_utype(PktType::NONE); i <= to_utype(PktType::MAX); ++i)
+    for (uint8_t i = to_utype(PktType::NONE); i < to_utype(PktType::MAX); ++i)
         fcg.proto[i].nominal_timeout = 5;
 
     FlowCache* cache = new FlowCache(fcg);
@@ -626,7 +720,7 @@ TEST(allowlist_test, excess_prune)
     FlowCacheConfig fcg;
     fcg.max_flows = 5;
     fcg.prune_flows = 2;
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
     int port = 1;
 
     for (unsigned i = 0; i < 6; ++i)
@@ -653,46 +747,50 @@ TEST(allowlist_test, excess_prune)
     delete cache;
 }
 
-TEST_GROUP(dump_flows) { };
+TEST_GROUP(dump_flows)
+ {
+    FlowCacheConfig fcg;
+    FlowCache* cache;
+    DumpFlowsTest* df;
+
+    void setup()
+    {
+        fcg.max_flows = 500;
+        cache = new FlowCache(fcg);
+        DumpFlowsFilter* dff = new DumpFlowsFilterAnd(false);
+        dff->file_name = "dump_flows_test";
+        df = new DumpFlowsTest(nullptr, dff);
+    }
+
+    void teardown()
+    {
+        delete cache;
+        delete df;
+    }    
+};
 
 TEST(dump_flows, dump_flows_with_all_empty_caches)
 {
-    FlowCacheConfig fcg;
-    FilterFlowCriteria ffc;
-    std::fstream dump_stream;
-    DummyCache *cache = new DummyCache(fcg);
-    CHECK(cache->dump_flows(dump_stream, 100, ffc, true, 1 ) == true);
+    CHECK(df->execute(cache) == true);
     CHECK(cache->get_flows_allocated() == 0);
-    delete cache;
 }
 
 TEST(dump_flows, dump_flows_with_one_tcp_flow)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 5;
-    FilterFlowCriteria ffc;
-    std::fstream dump_stream;
-    DummyCache *cache = new DummyCache(fcg);
-
     FlowKey flow_key;
     flow_key.port_l = 1;
     flow_key.pkt_type = PktType::TCP;
     cache->allocate(&flow_key);
-    CHECK(cache->dump_flows(dump_stream, 100, ffc, true, 1 ) == true);
+
+    CHECK(df->execute(cache) == true);
     CHECK (cache->get_count() == 1);
 
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
-    delete cache;
 }
 
 TEST(dump_flows, dump_flows_with_102_tcp_flows)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 500;
-    FilterFlowCriteria ffc;
-    std::fstream dump_stream;
-    DummyCache *cache = new DummyCache(fcg);
     int port = 1;
 
     for ( unsigned i = 0; i < 102; i++ )
@@ -703,24 +801,19 @@ TEST(dump_flows, dump_flows_with_102_tcp_flows)
         cache->allocate(&flow_key);
     }
     CHECK (cache->get_count() == 102);
+
     //since we only dump 100 flows at a time. The first call will return false
     //second time when it is called , it dumps the remaining 2 flows and returns true
-    CHECK(cache->dump_flows(dump_stream, 100, ffc, true, 1 ) == false);
-    CHECK(cache->dump_flows(dump_stream, 100, ffc, false, 1 ) == true);
+    CHECK(df->execute(cache) == false);
+    CHECK(df->execute(cache) == true);
 
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
     CHECK (cache->get_count() == 0);
-    delete cache;
 }
 
 TEST(dump_flows, dump_flows_with_102_tcp_flows_and_202_udp_flows)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 500;
-    FilterFlowCriteria ffc;
-    std::fstream dump_stream;
-    DummyCache *cache = new DummyCache(fcg);
     int port = 1;
 
     for ( unsigned i = 0; i < 102; i++ )
@@ -740,25 +833,20 @@ TEST(dump_flows, dump_flows_with_102_tcp_flows_and_202_udp_flows)
     }
 
     CHECK (cache->get_count() == 304);
+
     //since we only dump 100 flows at a time. The first 2 calls will return false
     //third time when it is called , it dumps the remaining 2 UDP flows and returns true
-    CHECK(cache->dump_flows(dump_stream, 100, ffc, true, 1 ) == false);
-    CHECK(cache->dump_flows(dump_stream, 100, ffc, false, 1 ) == false);
-    CHECK(cache->dump_flows(dump_stream, 100, ffc, false, 1 ) == true);
+    CHECK(df->execute(cache) == false);
+    CHECK(df->execute(cache) == false);
+    CHECK(df->execute(cache) == true);
 
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
     CHECK (cache->get_count() == 0);
-    delete cache;
 }
 
 TEST(dump_flows, dump_flows_with_allowlist)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 500;
-    FilterFlowCriteria ffc;
-    std::fstream dump_stream;
-    DummyCache* cache = new DummyCache(fcg);
     int port = 1;
     FlowKey flow_key[10];
 
@@ -782,9 +870,8 @@ TEST(dump_flows, dump_flows_with_allowlist)
     CHECK(cache->count_flows_in_lru(allowlist_lru_index) == 5);  // Check 5 allow listed flows
 
     // Check that the first dump call works (with allow listed and non-allow listed flows)
-    CHECK(cache->dump_flows(dump_stream, 10, ffc, true, 1) == true);
-
-
+    CHECK(df->execute(cache) == true);
+ 
     // Verify that allow listed flows exist and are correctly handled
     for (unsigned i = 0; i < 5; ++i)
     {
@@ -799,81 +886,73 @@ TEST(dump_flows, dump_flows_with_allowlist)
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
     CHECK(cache->get_count() == 0);
-    delete cache;
 }
 
 TEST(dump_flows, dump_flows_no_flows_to_dump)
 {
-    FlowCacheConfig fcg;
-    FilterFlowCriteria ffc;
-    fcg.max_flows = 10;
-    std::fstream dump_stream;
-
-    DummyCache* cache = new DummyCache(fcg);
-    CHECK(cache->dump_flows(dump_stream, 100, ffc, true, 1) == true);
-
-    delete cache;
+    CHECK(df->execute(cache) == true);
 }
 
-TEST_GROUP(dump_flows_summary) { };
+TEST_GROUP(dump_flows_summary)
+{
+    FlowCacheConfig fcg;
+    FlowCache* cache;
+    DumpFlowsSummaryTest* dfs;
+    std::vector<PktType> types = {PktType::IP, PktType::ICMP, PktType::TCP, PktType::UDP};
+
+    void setup()
+    {
+        fcg.max_flows = 500;
+        cache = new FlowCache(fcg);
+        DumpFlowsFilter* dff = new DumpFlowsFilterAnd(false);
+        dfs = new DumpFlowsSummaryTest(nullptr, dff);
+    }
+
+    void teardown()
+    {
+        delete cache;
+        delete dfs;
+    }    
+};
 
 TEST(dump_flows_summary, dump_flows_summary_with_all_empty_caches)
 {
-    FlowCacheConfig fcg;
-    FilterFlowCriteria ffc;
-    FlowsSummary flows_summary;
-    DummyCache *cache = new DummyCache(fcg);
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
+    CHECK(dfs->execute(cache) == true);
     CHECK(cache->get_flows_allocated() == 0);
 
     FlowsTypeSummary expected_type{};
-    CHECK(expected_type == flows_summary.type_summary);
+    CHECK(expected_type == dfs->get_flows_summary().type_summary);
 
     FlowsStateSummary expected_state{};
-    CHECK(expected_state == flows_summary.state_summary);
-
-    delete cache;
+    CHECK(expected_state == dfs->get_flows_summary().state_summary);
 }
+
 
 TEST(dump_flows_summary, dump_flows_summary_with_one_tcp_flow)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 5;
-    FilterFlowCriteria ffc;
-    FlowsSummary flows_summary;
-    DummyCache *cache = new DummyCache(fcg);
-
     FlowKey flow_key;
     flow_key.port_l = 1;
     flow_key.pkt_type = PktType::TCP;
     cache->allocate(&flow_key);
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
+
+    CHECK(dfs->execute(cache) == true);
     CHECK(cache->get_count() == 1);
 
     FlowsTypeSummary expected_type{};
     expected_type[to_utype(PktType::TCP)] = 1;
-    CHECK(expected_type == flows_summary.type_summary);
+    CHECK(expected_type == dfs->get_flows_summary().type_summary);
 
     FlowsStateSummary expected_state{};
     expected_state[to_utype(snort::Flow::FlowState::SETUP)] = 1;
-    CHECK(expected_state == flows_summary.state_summary);
+    CHECK(expected_state == dfs->get_flows_summary().state_summary);
 
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
-    delete cache;
 }
-
 
 TEST(dump_flows_summary, dump_flows_summary_with_5_of_each_flow)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 50;
-    FilterFlowCriteria ffc;
-    FlowsSummary flows_summary;
-    DummyCache *cache = new DummyCache(fcg);
     int port = 1;
-
-    std::vector<PktType> types = {PktType::IP, PktType::ICMP, PktType::TCP, PktType::UDP};
 
     for (const auto& type : types)
     {
@@ -886,30 +965,24 @@ TEST(dump_flows_summary, dump_flows_summary_with_5_of_each_flow)
         }
     }
     CHECK (cache->get_count() == 5 * types.size());
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
+    CHECK(dfs->execute(cache) == true);
 
     FlowsTypeSummary expected_type{};
     for (const auto& type : types)
         expected_type[to_utype(type)] = 5;
-    CHECK(expected_type == flows_summary.type_summary);
+    CHECK(expected_type == dfs->get_flows_summary().type_summary);
 
     FlowsStateSummary expected_state{};
     expected_state[to_utype(snort::Flow::FlowState::SETUP)] = 5 * types.size();
-    CHECK(expected_state == flows_summary.state_summary);
+    CHECK(expected_state == dfs->get_flows_summary().state_summary);
 
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
     CHECK (cache->get_count() == 0);
-    delete cache;
 }
 
 TEST(dump_flows_summary, dump_flows_summary_with_different_flow_states)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 50;
-    FilterFlowCriteria ffc;
-    FlowsSummary flows_summary;
-    DummyCache *cache = new DummyCache(fcg);
     int port = 1;
     unsigned flows_number = 5;
 
@@ -928,32 +1001,27 @@ TEST(dump_flows_summary, dump_flows_summary_with_different_flow_states)
         }
     }
 
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
+    CHECK(dfs->execute(cache) == true);
+
     CHECK(cache->get_count() == flows_number * types.size());
 
     FlowsTypeSummary expected_type{};
     expected_type[to_utype(PktType::TCP)] = flows_number * types.size();
-    CHECK(expected_type == flows_summary.type_summary);
+    CHECK(expected_type == dfs->get_flows_summary().type_summary);
 
     FlowsStateSummary expected_state{};
     for (const auto& type : types)
     {
         expected_state[to_utype(type)] = flows_number;
     }
-    CHECK(expected_state == flows_summary.state_summary);
+    CHECK(expected_state == dfs->get_flows_summary().state_summary);
 
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
-    delete cache;
 }
 
 TEST(dump_flows_summary, dump_flows_summary_with_allowlist)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 50;
-    FilterFlowCriteria ffc;
-    FlowsSummary flows_summary{};
-    DummyCache* cache = new DummyCache(fcg);
     int port = 1;
     FlowKey flow_key[10];
 
@@ -976,15 +1044,15 @@ TEST(dump_flows_summary, dump_flows_summary_with_allowlist)
     CHECK(cache->count_flows_in_lru(to_utype(PktType::TCP)) == 5);  // Check 5 TCP flows
     CHECK(cache->count_flows_in_lru(allowlist_lru_index) == 5);  // Check 5 allow listed flows
 
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
+    CHECK(dfs->execute(cache) == true);
 
     FlowsTypeSummary expected_type{};
     expected_type[to_utype(PktType::TCP)] = 10;
-    CHECK(expected_type == flows_summary.type_summary);
+    CHECK(expected_type == dfs->get_flows_summary().type_summary);
 
     FlowsStateSummary expected_state{};
     expected_state[to_utype(snort::Flow::FlowState::SETUP)] = 10;
-    CHECK(expected_state == flows_summary.state_summary);
+    CHECK(expected_state == dfs->get_flows_summary().state_summary);
 
     // Verify that allow listed flows exist and are correctly handled
     for (unsigned i = 0; i < 5; ++i)
@@ -1000,19 +1068,11 @@ TEST(dump_flows_summary, dump_flows_summary_with_allowlist)
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
     CHECK(cache->get_count() == 0);
-    delete cache;
 }
 
-TEST(dump_flows_summary, dump_flows_summary_with_filter)
+TEST(dump_flows_summary, dump_flows_summary_with_protocol_filter)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 50;
-    FilterFlowCriteria ffc;
-    FlowsSummary flows_summary;
-    DummyCacheWithFilter *cache = new DummyCacheWithFilter(fcg);
     unsigned flows_number = 5;
-
-    std::vector<PktType> types = {PktType::IP, PktType::ICMP, PktType::TCP, PktType::UDP};
 
     for (const auto& type : types)
     {
@@ -1032,59 +1092,102 @@ TEST(dump_flows_summary, dump_flows_summary_with_filter)
     CHECK(cache->get_count() == flows_number * types.size());
 
     // check proto filter
-    ffc.pkt_type = PktType::TCP;
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
+    dfs->set_protocol_list(PktType::TCP);
+    CHECK(dfs->execute(cache) == true);
 
     FlowsTypeSummary expected_type{};
     expected_type[to_utype(PktType::TCP)] = flows_number;
-    CHECK(expected_type == flows_summary.type_summary);
+    CHECK(expected_type == dfs->get_flows_summary().type_summary);
 
     FlowsStateSummary expected_state{};
     expected_state[to_utype(snort::Flow::FlowState::SETUP)] = flows_number;
-    CHECK(expected_state == flows_summary.state_summary);
-
-    //check port filter
-    ffc.pkt_type = PktType::NONE;
-    ffc.source_port = 1;
-    flows_summary = {};
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
-
-    expected_type = {};
-    for (const auto& type : types)
-        expected_type[to_utype(type)] = 1;
-    CHECK(expected_type == flows_summary.type_summary);
-
-    expected_state = {};
-    expected_state[to_utype(snort::Flow::FlowState::SETUP)] = types.size();
-    CHECK(expected_state == flows_summary.state_summary);
-
-    // check combined filter
-    ffc.pkt_type = PktType::UDP;
-    ffc.source_port = 1;
-    ffc.destination_port = 80;
-    flows_summary = {};
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
-
-    expected_type = {};
-    expected_type[to_utype(PktType::UDP)] = 1;
-    CHECK(expected_type == flows_summary.type_summary);
-
-    expected_state = {};
-    expected_state[to_utype(snort::Flow::FlowState::SETUP)] = 1;
-    CHECK(expected_state == flows_summary.state_summary);
+    CHECK(expected_state == dfs->get_flows_summary().state_summary);
 
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
-    delete cache;
 }
 
+TEST(dump_flows_summary, dump_flows_summary_with_port_filter)
+{
+    unsigned flows_number = 5;
+
+    for (const auto& type : types)
+    {
+        int port = 1;
+        for (unsigned i = 0; i < 5; i++)
+        {
+            FlowKey flow_key;
+            flow_key.port_l = port++;
+            flow_key.port_h = 80;
+            flow_key.pkt_type = type;
+            cache->allocate(&flow_key);
+
+            Flow* flow = cache->find(&flow_key);
+            flow->pkt_type = type;
+        }
+    }
+    CHECK(cache->get_count() == flows_number * types.size());
+
+    //check port filter
+    SfIp src_ip, src_subnet, dst_ip, dst_subnet;
+    dfs->set_filter_criteria(src_ip, dst_ip, src_subnet, dst_subnet, 1, 0);
+    CHECK(dfs->execute(cache) == true);
+
+    FlowsTypeSummary expected_type{};
+    for (const auto& type : types)
+        expected_type[to_utype(type)] = 1;
+
+    CHECK(expected_type == dfs->get_flows_summary().type_summary);
+
+    FlowsStateSummary expected_state{};
+    expected_state[to_utype(snort::Flow::FlowState::SETUP)] = types.size();
+    CHECK(expected_state == dfs->get_flows_summary().state_summary);
+
+    cache->purge();
+    CHECK(cache->get_flows_allocated() == 0);
+}
+
+TEST(dump_flows_summary, dump_flows_summary_with_multiple_filter)
+{
+    unsigned flows_number = 5;
+
+    for (const auto& type : types)
+    {
+        int port = 1;
+        for (unsigned i = 0; i < 5; i++)
+        {
+            FlowKey flow_key;
+            flow_key.port_l = port++;
+            flow_key.port_h = 80;
+            flow_key.pkt_type = type;
+            cache->allocate(&flow_key);
+
+            Flow* flow = cache->find(&flow_key);
+            flow->pkt_type = type;
+        }
+    }
+    CHECK(cache->get_count() == flows_number * types.size());
+
+    dfs->set_protocol_list(PktType::UDP);
+
+    //check with multiple filter criteria
+    SfIp src_ip, src_subnet, dst_ip, dst_subnet;
+    dfs->set_filter_criteria(src_ip, dst_ip, src_subnet, dst_subnet, 1, 80);
+    CHECK(dfs->execute(cache) == true);
+
+    FlowsTypeSummary expected_type{};
+    expected_type[to_utype(PktType::UDP)] = 1;
+    CHECK(expected_type == dfs->get_flows_summary().type_summary);
+
+    FlowsStateSummary expected_state{};
+    expected_state[to_utype(snort::Flow::FlowState::SETUP)] = 1;
+    CHECK(expected_state == dfs->get_flows_summary().state_summary);
+
+    cache->purge();
+    CHECK(cache->get_flows_allocated() == 0);
+}
 TEST(dump_flows_summary, watchdog_kick_functionality)
 {
-    FlowCacheConfig fcg;
-    fcg.max_flows = 1000;
-    FilterFlowCriteria ffc;
-    FlowsSummary flows_summary;
-    DummyCache *cache = new DummyCache(fcg);
     int port = 1;
 
     // Reset kick counter before test
@@ -1103,8 +1206,8 @@ TEST(dump_flows_summary, watchdog_kick_functionality)
 
     CHECK(cache->get_count() == 64);
 
-    // Call dump_flows_summary which should trigger watchdog kicks
-    CHECK(cache->dump_flows_summary(flows_summary, ffc) == true);
+    // execute dump_flows_summary which should trigger watchdog kicks
+    CHECK(dfs->execute(cache) == true);
 
     // Check that watchdog was kicked the expected number of times
     // With 64 flows and watch dog mask = 7, kicks should happen at:
@@ -1114,25 +1217,22 @@ TEST(dump_flows_summary, watchdog_kick_functionality)
     CHECK_EQUAL(8, kick_count);
 
     // Verify all flows were processed correctly
-    CHECK_EQUAL(64, flows_summary.type_summary[to_utype(PktType::TCP)]);
-    CHECK_EQUAL(64, flows_summary.state_summary[to_utype(snort::Flow::FlowState::SETUP)]);
+    CHECK_EQUAL(64, dfs->get_flows_summary().type_summary[to_utype(PktType::TCP)]);
+    CHECK_EQUAL(64, dfs->get_flows_summary().state_summary[to_utype(snort::Flow::FlowState::SETUP)]);
 
     cache->purge();
     CHECK(cache->get_flows_allocated() == 0);
-    delete cache;
 }
-
-
 
 TEST_GROUP(flow_cache_lrus)
 {
     FlowCacheConfig fcg;
-    DummyCache* cache;
+    FlowCache* cache;
 
     void setup()
     {
         fcg.max_flows = 20;
-        cache = new DummyCache(fcg);
+        cache = new FlowCache(fcg);
     }
 
     void teardown()
@@ -1163,7 +1263,7 @@ TEST(flow_cache_lrus, count_flows_in_lru_test)
     for (int i = 0; i < 10; ++i)
     {
         flow_keys[i].port_l = i;
-        Flow* flow = cache->allocate(&flow_keys[i]);
+        const Flow* flow = cache->allocate(&flow_keys[i]);
         CHECK(flow != nullptr);
     }
 
@@ -1203,7 +1303,7 @@ TEST(flow_cache_allowlist_pruning, allowlist_on_excess_true)
     fcg.allowlist_cache = true;
     fcg.move_to_allowlist_on_excess = true;
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
 
     // Add flows until we trigger excess pruning
     for (int i = 0; i < 4; i++) {
@@ -1229,7 +1329,7 @@ TEST(flow_cache_allowlist_pruning, allowlist_on_excess_false_no_allowlist)
     fcg.allowlist_cache = false; // Disable allowlist_cache
     fcg.move_to_allowlist_on_excess = true;
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
 
     for (int i = 0; i < 4; i++) {
         FlowKey flow_key;
@@ -1256,7 +1356,7 @@ TEST(flow_cache_allowlist_pruning, allowlist_on_excess_false_no_move_on_excess)
     fcg.allowlist_cache = true;
     fcg.move_to_allowlist_on_excess = false; // Disable move_to_allowlist_on_excess
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
 
     // Add flows until we trigger excess pruning
     for (int i = 0; i < 4; i++) {
@@ -1284,7 +1384,7 @@ TEST(flow_cache_allowlist_pruning, prune_one_excess_in_allowlist)
     fcg.allowlist_cache = true;
     fcg.move_to_allowlist_on_excess = true;
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
     // Create a test flow
     FlowKey flow_key;
     flow_key.port_l = 1234;
@@ -1313,7 +1413,7 @@ TEST(flow_cache_allowlist_pruning, prune_one_timeout_in_allowlist)
     fcg.max_flows = 10;
     fcg.allowlist_cache = true;
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
 
     FlowKey flow_key;
     flow_key.port_l = 1234;
@@ -1339,7 +1439,7 @@ TEST(flow_cache_allowlist_pruning, prune_one_memcap_in_allowlist)
     fcg.move_to_allowlist_on_excess = true;
     fcg.max_flows = 10;
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
 
     for (int i = 0; i < 11; i++)
     {
@@ -1389,7 +1489,7 @@ TEST(flow_cache_allowlist_pruning, prune_one_excess_regular_flow_moves_to_allowl
     fcg.allowlist_cache = true;
     fcg.move_to_allowlist_on_excess = true;
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
 
     FlowKey flow_key;
     flow_key.port_l = 1234;
@@ -1426,7 +1526,7 @@ TEST(flow_cache_allowlist_pruning, prune_multiple_allowlist_pruning)
     fcg.prune_flows = 5;
     fcg.allowlist_cache = true;
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
 
     for (int i = 0; i < 5; i++)
     {
@@ -1469,7 +1569,7 @@ TEST(flow_cache_allowlist_pruning, prune_excess_with_prioritization)
     fcg.allowlist_cache = true;
     fcg.move_to_allowlist_on_excess = true;
 
-    DummyCache* cache = new DummyCache(fcg);
+    FlowCache* cache = new FlowCache(fcg);
 
     for (int i = 0; i < 5; i++)
     {

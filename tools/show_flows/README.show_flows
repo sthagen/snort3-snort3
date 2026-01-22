@@ -1,0 +1,21 @@
+show_flows - Process binary output from dump_flows command
+--------------------------------------------
+
+About
+-----
+The show_flows utility reads a binary formatted file of flow data that is written by Snort
+and applies the filter provided, if any, and outputs the information for all the matching
+flows in a text based format one flow per row.
+
+Installation
+------------
+
+   show_flows is built and installed along with snort in the same bin directory.
+
+Usage
+-----
+
+   $ show_flows -f <filename> -t <protocol> -r <srcip> -t <dstip> -s <srcport> -d <dstport>
+
+
+

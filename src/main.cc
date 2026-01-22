@@ -811,7 +811,8 @@ int main_detach(lua_State* L)
 {
     ControlConn* ctrlcon = ControlConn::query_from_lua(L);
     send_response(ctrlcon, "== detaching\n");
-    ctrlcon->shutdown();
+    if (ctrlcon)
+        ctrlcon->remove();
     return 0;
 }
 

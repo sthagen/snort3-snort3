@@ -575,7 +575,7 @@ uint32_t SSL_decode(
         }
         /* Check if it's possibly a SSLv2 server-hello, in which case the version
          * is at byte 7 */
-        else if (size >= 8 && pkt[7] == 2)
+        else if (size >= 9 && pkt[7] == 2)
         {
             /* A version of '2' at byte 7 overlaps with TLS record-data length.
              * Check if a hypothetical TLS record-data length agrees with its

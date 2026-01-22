@@ -638,7 +638,7 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p,
                 }
                 asd.service_disco_state = APPID_DISCO_STATE_STATEFUL;
             }
-            else
+            else if (asd.is_midstream_svc_taking_too_much_time())
             {
                 asd.set_session_flags(APPID_SESSION_SERVICE_DETECTED);
                 asd.service_disco_state = APPID_DISCO_STATE_FINISHED;
@@ -647,12 +647,39 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p,
                     (asd.is_tp_appid_available() or asd.get_session_flags(APPID_SESSION_NO_TPI)))
                     asd.set_payload_id(APP_ID_UNKNOWN);
             }
+            else
+            {
+                asd.service_disco_state = APPID_DISCO_STATE_STATEFUL;
+                ++asd.srv_midstream_packet_inspected;
+            }
         }
         else
         {
             asd.service_disco_state = APPID_DISCO_STATE_STATEFUL;
         }
     }
+    else if ((p->flow->get_session_flags() & SSNFLAG_MIDSTREAM) and
+        asd.service_disco_state != APPID_DISCO_STATE_FINISHED and
+        !(asd.protocol == IpProtocol::TCP and (p->ptrs.sp == 21 or p->ptrs.dp == 21) and
+            !(p->ptrs.tcph->is_fin() or p->ptrs.tcph->is_rst())))
+    {
+        if (asd.is_midstream_svc_taking_too_much_time())
+        {
+            asd.set_session_flags(APPID_SESSION_SERVICE_DETECTED);
+            asd.service_disco_state = APPID_DISCO_STATE_FINISHED;
+
+            if ((asd.get_payload_id() == APP_ID_NONE) and
+                (asd.is_tp_appid_available() or asd.get_session_flags(APPID_SESSION_NO_TPI)))
+            {
+                asd.set_payload_id(APP_ID_UNKNOWN);
+            }
+        }
+        else
+        {
+            ++asd.srv_midstream_packet_inspected;
+        }
+    }
+    
 
     if (asd.is_encrypted_oportunistic_tls_session() and asd.encrypted.service_id > 0)
     {
@@ -680,6 +707,9 @@ bool ServiceDiscovery::do_service_discovery(AppIdSession& asd, Packet* p,
     {
         bool service_found = identify_service(asd, p, direction, change_bits) == APPID_SUCCESS;
         is_discovery_done = true;
+
+        if ((p->flow->get_session_flags() & SSNFLAG_MIDSTREAM) and service_found)
+            asd.srv_midstream_packet_inspected = 0;
 
         // Check to see if we want to stop any detectors for SIP/RTP.
         if (tp_app_id == APP_ID_SIP)

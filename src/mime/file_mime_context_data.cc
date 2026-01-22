@@ -52,21 +52,21 @@ void MimeDecodeContextData::init()
 
 uint8_t* MimeDecodeContextData::get_decode_buf()
 {
-    MimeDecodeContextData* data = IpsContextData::get<MimeDecodeContextData>(mime_ips_id);
+    const MimeDecodeContextData* data = IpsContextData::get<MimeDecodeContextData>(mime_ips_id);
 
     return data->decode_buf;
 }
 
 uint8_t* MimeDecodeContextData::get_decompress_buf()
 {
-    MimeDecodeContextData* data = IpsContextData::get<MimeDecodeContextData>(mime_ips_id);
+    const MimeDecodeContextData* data = IpsContextData::get<MimeDecodeContextData>(mime_ips_id);
 
     return data->decompress_buf;
 }
 
 uint32_t MimeDecodeContextData::get_decompress_buf_size()
 {
-    MimeDecodeContextData* data = IpsContextData::get<MimeDecodeContextData>(mime_ips_id);
+    const MimeDecodeContextData* data = IpsContextData::get<MimeDecodeContextData>(mime_ips_id);
 
     return data->decompress_buf_size;
 }

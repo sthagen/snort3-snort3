@@ -15,22 +15,38 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+// dump_flows_serializer.h author davis mcpherson <davmcphe@cisco.com>
 
-#ifndef FILTER_FLOW_CRITERIA_H
-#define FILTER_FLOW_CRITERIA_H
+#ifndef DUMP_FLOWS_SERIALIZER_H
+#define DUMP_FLOWS_SERIALIZER_H
 
-#include <string>
-#include "sfip/sf_ip.h"
-#include <framework/decode_data.h>
+#include <fstream>
 
-struct FilterFlowCriteria
+#include "dump_flows_descriptor.h"
+
+namespace snort
 {
-	PktType pkt_type;
-    snort::SfIp source_sfip;
-    snort::SfIp destination_sfip;
-	uint16_t source_port = 0;
-	uint16_t destination_port = 0;
-    snort::SfIp source_subnet_sfip;
-    snort::SfIp destination_subnet_sfip;
+class Flow;
+}
+
+struct timeval;
+
+class DumpFlowsSerializer
+{
+public:
+    DumpFlowsSerializer() {}
+    ~DumpFlowsSerializer() {}
+
+    void initialize(const snort::Flow&, const struct timeval&);
+    void write(std::fstream&) const;
+    void print(std::fstream& ofile) const
+    {
+        dfd.print(ofile);
+    }
+
+private:
+    DumpFlowsDescriptor dfd;
 };
+
 #endif
+

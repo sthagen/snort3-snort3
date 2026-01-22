@@ -728,6 +728,11 @@ void AppIdSession::set_client_appid_data(AppId id, char* version, bool published
     if (id <= APP_ID_NONE or id == APP_ID_HTTP)
         return;
 
+    if (id == APP_ID_SSL_CLIENT and api.service.get_id() == APP_ID_QUIC)
+    {
+        id = APP_ID_QUIC;
+    }
+
     AppId cur_id = api.client.get_id();
     if (id != cur_id)
     {
@@ -787,6 +792,11 @@ bool AppIdSession::is_svc_taking_too_much_time() const
     return (init_pkts_without_reply > odp_ctxt.max_packet_service_fail_ignore_bytes or
         (init_pkts_without_reply > odp_ctxt.max_packet_before_service_fail and
         init_bytes_without_reply > odp_ctxt.max_bytes_before_service_fail));
+}
+
+bool AppIdSession::is_midstream_svc_taking_too_much_time() const
+{
+    return srv_midstream_packet_inspected >= odp_ctxt.max_midstream_packet_before_service_fail;
 }
 
 void AppIdSession::delete_session_data()

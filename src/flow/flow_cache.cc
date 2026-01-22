@@ -22,7 +22,7 @@
 #include "config.h"
 #endif
 
-#include "flow/flow_cache.h"
+#include "flow_cache.h"
 
 #include <numeric>
 #include <sstream>
@@ -60,223 +60,6 @@ static const unsigned ALLOWED_FLOWS_ONLY = 1;
 static const unsigned OFFLOADED_FLOWS_TOO = 2;
 static const unsigned ALL_FLOWS = 3;
 static const unsigned WDT_MASK = 7; // kick watchdog once for every 8 flows deleted
-
-
-DumpFlowsBase::DumpFlowsBase(ControlConn *conn)
-    : snort::AnalyzerCommand(conn)
-{}
-
-void DumpFlowsBase::cidr2mask(const uint32_t cidr, uint32_t* mask) const
-{
-    size_t i;
-
-    for (i = cidr; i > 0;)
-    {
-        --i;
-        mask[i / 32] |= 0x00000001 << (i % 32);
-    }
-}
-
-bool DumpFlowsBase::set_ip(std::string filter_ip, snort::SfIp &ip, snort::SfIp &subnet) const
-{
-    size_t slash_pos = filter_ip.find('/');
-    if (slash_pos != std::string::npos)
-    {
-        std::string ip_part = filter_ip.substr(0, slash_pos);
-        std::string subnet_part = filter_ip.substr(slash_pos+1);
-
-        if (ip_part.find(':') != std::string::npos)
-        {
-            //filter is IPV6
-            if (ip.pton(AF_INET6, ip_part.c_str()) != SFIP_SUCCESS)
-                return false;
-
-            if (subnet_part.find(':') == std::string::npos)
-            {
-                //IPV6 cidr
-                uint32_t cidr = std::stoi(subnet_part);
-                if (cidr > 128)
-                    return false;
-                uint32_t mask_v6[4]={0};
-                cidr2mask(std::stoi(subnet_part), mask_v6);
-                if (subnet.set(&mask_v6, AF_INET6) != SFIP_SUCCESS)
-                    return false;
-            }
-            else if (subnet_part.empty() || (subnet.pton(AF_INET6, subnet_part.c_str()) != SFIP_SUCCESS))
-                return false;
-            return true;
-        }
-        else if (ip_part.find('.') != std::string::npos)
-        {
-            //filter is  IPV4
-            if (ip.pton(AF_INET, ip_part.c_str()) != SFIP_SUCCESS)
-                return false;
-
-            if (subnet_part.find('.') == std::string::npos)
-            {
-                //IPV4 cidr
-                uint32_t cidr = std::stoi(subnet_part);
-                if (cidr > 32)
-                    return false;
-                uint32_t mask_v4[1]={0};
-                cidr2mask(std::stoi(subnet_part), mask_v4);
-                if (subnet.set(&mask_v4, AF_INET) != SFIP_SUCCESS)
-                    return false;
-            }
-            else if (subnet_part.empty())
-                return false;
-            else
-            {
-                //IPV4 netmask
-                if (subnet.pton(AF_INET, subnet_part.c_str()) != SFIP_SUCCESS)
-                    return false;
-            }
-            return true;
-        }
-        return false;
-    }
-    else
-    {
-        //No mask
-        if (filter_ip.find(':') != std::string::npos)
-        {
-            return ip.pton(AF_INET6, filter_ip.c_str()) == SFIP_SUCCESS;
-        }
-        else if (filter_ip.find('.') != std::string::npos)
-        {
-            return ip.pton(AF_INET, filter_ip.c_str()) == SFIP_SUCCESS;
-        }
-        else if (filter_ip.empty())
-            return true;
-    }
-    return false;
-}
-
-uint8_t DumpFlows::dump_code = 0;
-
-#ifndef REG_TEST
-DumpFlows::DumpFlows(unsigned count,  ControlConn* conn)
-#else
-DumpFlows::DumpFlows(unsigned count, ControlConn* conn, int resume)
-#endif
-    : DumpFlowsBase(conn), dump_count(count)
-#ifdef REG_TEST
-    , resume(resume)
-#endif
-{
-    next.resize(ThreadConfig::get_instance_max());
-    ++dump_code;
-}
-
-bool DumpFlows::open_files(const std::string& base_name)
-{
-    const auto id_offset = SnortConfig::get_conf()->id_offset;
-    dump_stream.resize(ThreadConfig::get_instance_max());
-    for (unsigned i = 0; i < ThreadConfig::get_instance_max(); ++i)
-    {
-        std::string file_name = base_name + std::to_string(i + id_offset);
-        dump_stream[i].open(file_name, std::fstream::out | std::fstream::trunc);
-        if (0 != (dump_stream[i].rdstate() & std::fstream::failbit))
-        {
-            LogRespond(ctrlcon, "Dump flows failed to open %s\n", file_name.c_str());
-            return false;
-        }
-    }
-    return true;
-}
-
-bool DumpFlows::execute(Analyzer&, void**)
-{
-    if (!flow_con)
-        return true;
-    unsigned id = get_instance_id();
-#ifdef REG_TEST
-    if (!next[id] && -1 != resume)
-        Analyzer::get_local_analyzer()->resume(resume);
-#endif
-    bool first = !next[id];
-    next[id] = 1;
-    return flow_con->dump_flows(dump_stream[id], dump_count, ffc, first, dump_code);
-}
-
-DumpFlowsSummary::DumpFlowsSummary(ControlConn* conn)
-    : DumpFlowsBase(conn)
-{
-    flows_summaries.resize(ThreadConfig::get_instance_max());
-}
-
-DumpFlowsSummary::~DumpFlowsSummary()
-{
-    FlowsTypeSummary type_summary{};
-    FlowsStateSummary state_summary{};
-    unsigned total_pkts = 0;
-
-    for (const auto& flows_sum : flows_summaries)
-    {
-        for (unsigned i = 0; i < type_summary.size(); ++i)
-        {
-            type_summary[i] += flows_sum.type_summary[i];
-            total_pkts += flows_sum.type_summary[i];
-        }
-        for (unsigned i = 0; i < state_summary.size(); ++i)
-        {
-            state_summary[i] += flows_sum.state_summary[i];
-        }
-    }
-
-    LogRespond(ctrlcon, "Total: %u\n", total_pkts);
-    for (unsigned i = 0; i < type_summary.size(); ++i)
-    {
-        PktType proto = static_cast<PktType>(i);
-
-        switch (proto)
-        {
-            case PktType::IP:
-                LogRespond(ctrlcon, "IP: %u\n", type_summary[i]);
-                break;
-            case PktType::ICMP:
-                LogRespond(ctrlcon, "ICMP: %u\n", type_summary[i]);
-                break;
-            case PktType::TCP:
-                LogRespond(ctrlcon, "TCP: %u\n", type_summary[i]);
-                break;
-            case PktType::UDP:
-                LogRespond(ctrlcon, "UDP: %u\n", type_summary[i]);
-                break;                                            
-            default:
-                break;
-        }
-    }
-
-    unsigned pending = 0;
-    for (unsigned i = 0; i < state_summary.size(); ++i)
-    {
-        snort::Flow::FlowState state = static_cast<snort::Flow::FlowState>(i);
-
-        switch (state)
-        {
-            case snort::Flow::FlowState::ALLOW:
-                LogRespond(ctrlcon, "Allowed: %u\n", state_summary[i]);
-                break;
-            case snort::Flow::FlowState::BLOCK:
-                LogRespond(ctrlcon, "Blocked: %u\n", state_summary[i]);
-                break; 
-            default:
-                pending += state_summary[i];
-                break;
-        }
-    }
-    LogRespond(ctrlcon, "Pending: %u\n", pending);
-}
-
-bool DumpFlowsSummary::execute(Analyzer &, void **)
-{
-    if (!flow_con)
-        return true;
-    unsigned id = get_instance_id();
-
-    return flow_con->dump_flows_summary(flows_summaries[id], ffc);
-}
 
 //-------------------------------------------------------------------------
 // FlowCache stuff
@@ -741,7 +524,7 @@ unsigned FlowCache::timeout(unsigned num_flows, time_t thetime)
     if ( hash_table->get_node_count(allowlist_lru_index) > 0 )
     {
         uint64_t allowlist_timeout_count = 0;
-        auto flow = static_cast<Flow*>(hash_table->lru_first(allowlist_lru_index));
+        const Flow* flow = static_cast<Flow*>(hash_table->lru_first(allowlist_lru_index));
         while ( flow )
         {
             if ( flow->last_data_seen + flow->idle_timeout > thetime )
@@ -956,85 +739,28 @@ bool FlowCache::handle_allowlist_pruning(snort::Flow* flow, PruneReason reason, 
     return false;
 }
 
-std::string FlowCache::timeout_to_str(time_t t)
+static std::string timeout_to_str(time_t t)
 {
     std::stringstream out;
     time_t hours = t / (60 * 60);
+
     if (hours)
     {
         out << hours << "h";
         t -= hours * (60 * 60);
     }
+
     time_t minutes = t / 60;
     if (minutes || hours)
     {
         out << minutes << "m";
         t -= minutes * 60;
     }
+
     if (t || !hours)
         out << t << "s";
+
     return out.str();
-}
-
-bool FlowCache::is_ip_match(const SfIp& flow_sfip, const SfIp& filter_sfip, const SfIp& filter_subnet_sfip) const
-{
-    //if address is empty
-    if (!filter_sfip.is_set())
-        return true;
-
-    //if no subnet mask
-    if (!filter_subnet_sfip.is_set())
-    {
-        return filter_sfip.fast_equals_raw(flow_sfip);
-    }
-    else
-    {
-        if (filter_sfip.get_family() != flow_sfip.get_family())
-            return false;
-        const uint64_t* filter_ptr = filter_sfip.get_ip64_ptr();
-        const uint64_t* flow_ptr = flow_sfip.get_ip64_ptr();
-        const uint64_t* subnet_sfip = filter_subnet_sfip.get_ip64_ptr();
-        return (filter_ptr[0] & subnet_sfip[0]) == (flow_ptr[0] & subnet_sfip[0]) && (filter_ptr[1] & subnet_sfip[1]) == (flow_ptr[1] & subnet_sfip[1]);
-    }
-}
-
-bool FlowCache::filter_flows(const Flow& flow, const FilterFlowCriteria& ffc) const
-{
-    if ( ffc.pkt_type != PktType::NONE and flow.pkt_type != ffc.pkt_type )
-        return false;
-
-    if ( ffc.source_port != 0 )
-    {
-        uint16_t flow_src_port = flow.flags.key_is_reversed ? flow.key->port_h : flow.key->port_l;
-        if (ffc.source_port != flow_src_port)
-            return false;
-    }
-
-    if ( ffc.destination_port != 0 )
-    {
-        uint16_t flow_dst_port = flow.flags.key_is_reversed ? flow.key->port_l : flow.key->port_h;
-        if (ffc.destination_port != flow_dst_port)
-            return false;
-    }
-
-    if ( !ffc.source_sfip.is_set() and !ffc.destination_sfip.is_set() )
-        return true;
-
-    if ( ffc.source_sfip.is_set() )
-    {
-        const SfIp& flow_srcip = flow.flags.client_initiated ? flow.client_ip : flow.server_ip;
-        if ( !is_ip_match(flow_srcip, ffc.source_sfip, ffc.source_subnet_sfip) )
-            return false;
-    }
-
-    if ( ffc.destination_sfip.is_set() )
-    {
-        const SfIp& flow_dstip = flow.flags.client_initiated ? flow.server_ip : flow.client_ip;
-        if ( !is_ip_match(flow_dstip, ffc.destination_sfip, ffc.destination_subnet_sfip) )
-            return false;
-    }
-
-    return true;
 }
 
 template<typename StreamType>
@@ -1116,93 +842,6 @@ void FlowCache::output_flow(StreamType& stream, const Flow& flow, const struct t
     stream << out.str() << proto.str() << allow_s << std::endl;
 }
 
-bool FlowCache::dump_flows(std::fstream& stream, unsigned count, const FilterFlowCriteria& ffc, bool first, uint8_t code) const
-{
-    struct timeval now;
-    packet_gettimeofday(&now);
-    Flow* walk_flow = nullptr;
-    bool has_more_flows = false;
-
-    // Fast path: check if all filter fields are empty to avoid expensive filter_flows calls
-    bool all_flows = ( ffc.pkt_type == PktType::NONE and 
-                     !ffc.source_sfip.is_set() and
-                     !ffc.destination_sfip.is_set() and 
-                     ffc.source_port == 0 and
-                     ffc.destination_port == 0 );
-
-    for (uint8_t proto_id = to_utype(PktType::NONE) + 1; proto_id < total_lru_count; ++proto_id)
-    {
-        if ( proto_id == to_utype(PktType::USER) or
-             proto_id == to_utype(PktType::FILE) or 
-             proto_id == to_utype(PktType::PDU) )
-            continue;
-
-        unsigned i = 0;
-
-        if ( first )
-            walk_flow = static_cast<Flow*>(hash_table->get_walk_user_data(proto_id));
-        else
-            walk_flow = static_cast<Flow*>(hash_table->get_next_walk_user_data(proto_id));
-
-        while ( walk_flow && i < count )
-        {
-            if  ( walk_flow->dump_code != code )
-            {
-                walk_flow->dump_code = code;
-                if( all_flows or filter_flows(*walk_flow, ffc) )
-                    output_flow(stream, *walk_flow, now);
-                ++i;
-            }
-            if (i < count)
-                walk_flow = static_cast<Flow*>(hash_table->get_next_walk_user_data(proto_id));
-        }
-
-        if ( walk_flow )
-            has_more_flows = true;
-    }
-
-    return !has_more_flows;
-}
-
-bool FlowCache::dump_flows_summary(FlowsSummary& flows_summary, const FilterFlowCriteria& ffc) const
-{
-    Flow* walk_flow = nullptr;
-    uint32_t processed_count = 0;
-
-    // Fast path: check if all filter fields are empty to avoid expensive filter_flows calls
-    bool all_flows = ( ffc.pkt_type == PktType::NONE and 
-                     !ffc.source_sfip.is_set() and
-                     !ffc.destination_sfip.is_set() and 
-                     ffc.source_port == 0 and
-                     ffc.destination_port == 0 );
-    
-    for (uint8_t proto_id = to_utype(PktType::NONE) + 1; proto_id < total_lru_count; ++proto_id)
-    {
-        if ( proto_id == to_utype(PktType::USER) or
-             proto_id == to_utype(PktType::FILE) or 
-             proto_id == to_utype(PktType::PDU) )
-            continue;
-
-
-        walk_flow = static_cast<Flow*>(hash_table->get_walk_user_data(proto_id));
-
-        while ( walk_flow )
-        {
-            if( all_flows or filter_flows(*walk_flow, ffc) )
-            {
-                flows_summary.type_summary[to_utype(walk_flow->key->pkt_type)]++;
-                flows_summary.state_summary[to_utype(walk_flow->flow_state)]++;
-            }
-
-            walk_flow = static_cast<Flow*>(hash_table->get_next_walk_user_data(proto_id));
-
-            if ( (++processed_count & WDT_MASK) == 0 )
-                ThreadConfig::preemptive_kick();
-        }
-    }
-
-    return true;
-}
 size_t FlowCache::uni_flows_size() const
 {
     return uni_flows ? uni_flows->get_count() : 0;
@@ -1237,7 +876,7 @@ bool FlowCache::move_to_allowlist(snort::Flow* f)
 size_t FlowCache::count_flows_in_lru(uint8_t lru_index) const
 {
     size_t count = 0;
-    Flow* flow = static_cast<Flow*>(hash_table->get_walk_user_data(lru_index));
+    const Flow* flow = static_cast<Flow*>(hash_table->get_walk_user_data(lru_index));
     while (flow)
     {
         ++count;

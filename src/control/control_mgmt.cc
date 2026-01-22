@@ -33,6 +33,7 @@
 #include <cassert>
 #include <chrono>
 #include <unordered_map>
+#include <vector>
 
 #include "log/messages.h"
 #include "main.h"
@@ -323,14 +324,22 @@ static bool accept_conn()
 static void delete_control(const std::unordered_map<int, ControlConn*>::const_iterator& iter)
 {
     ControlConn* ctrlcon = iter->second;
-    unregister_control_fd(iter->first, ctrlcon->get_fd());
+
+    int fd = ctrlcon->get_fd();
+    if (ctrlcon->is_registered())
+    {
+        unregister_control_fd(iter->first, fd);
+        ctrlcon->mark_unregistered();
+    }
 
     if (ctrlcon->is_blocked())
     {
         ctrlcon->remove();
+        return;
     }
     else
     {
+        ctrlcon->shutdown();
         delete ctrlcon;
     }
 
@@ -391,7 +400,7 @@ static bool process_control_commands(int fd)
 
     int executed = execute_control_commands(ctrlcon);
 
-    if (ctrlcon->is_closed())
+    if (ctrlcon->is_removed())
         delete_control(iter);
 
     return (executed > 0);
@@ -402,26 +411,74 @@ static void clear_controls()
     for (const auto& p : controls)
     {
         ControlConn* ctrlcon = p.second;
-        unregister_control_fd(p.first, ctrlcon->get_fd());
+
+        if (ctrlcon->is_registered())
+        {
+            unregister_control_fd(p.first, ctrlcon->get_fd());
+            ctrlcon->mark_unregistered();
+        }
+
         delete ctrlcon;
     }
     controls.clear();
 }
 
-static void delete_expired_controls()
+static bool is_fd_valid(int fd)
 {
-    int fds[MAX_CONTROL_FDS], n=0;
-    time_t curr_time = time(nullptr);
+    if (fd < 0)
+        return false;
+
+    if (fcntl(fd, F_GETFD) == -1)
+        return errno != EBADF;
+
+    return true;
+}
+
+static void remove_broken_controls()
+{
+    std::vector<int> fds;
+    fds.reserve(controls.size());
     for (const auto& p : controls)
     {
         ControlConn* ctrlcon = p.second;
-        if (!ctrlcon->is_local() and (curr_time - ctrlcon->get_touched()) >= MAX_CONTROL_IDLE_TIME)
-            fds[n++] = p.first;
+        if (ctrlcon && !is_fd_valid(ctrlcon->get_fd()))
+            fds.push_back(p.first);
     }
-    for(int i=0; i<n; i++)
+
+    for (int fd : fds)
+        delete_control(fd);
+}
+
+static void reap_removed_controls()
+{
+    std::vector<int> fds;
+    fds.reserve(controls.size());
+    for (const auto& p : controls)
     {
-        LogMessage("Control: closing fd=%d that was idle for more than %d seconds.\n", fds[i], MAX_CONTROL_IDLE_TIME);
-        delete_control(fds[i]);
+        ControlConn* ctrlcon = p.second;
+        if (ctrlcon && ctrlcon->is_removed())
+            fds.push_back(p.first);
+    }
+
+    for (int fd : fds)
+        delete_control(fd);
+}
+
+static void delete_expired_controls()
+{
+    std::vector<int> fds;
+    fds.reserve(controls.size());
+    time_t curr_time = time(nullptr);
+    for (const auto& p : controls)
+    {
+        const ControlConn* ctrlcon = p.second;
+        if (!ctrlcon->is_local() and (curr_time - ctrlcon->get_touched()) >= MAX_CONTROL_IDLE_TIME)
+            fds.push_back(p.first);
+    }
+    for (int fd : fds)
+    {
+        LogMessage("Control: closing fd=%d that was idle for more than %d seconds.\n", fd, MAX_CONTROL_IDLE_TIME);
+        delete_control(fd);
     }
 }
 
@@ -434,8 +491,13 @@ bool ControlMgmt::add_control(int fd, bool local)
     auto i = controls.find(fd);
     if (i != controls.cend())
     {
-        if (i->second->is_closed())
+        if (i->second->is_removed() || !is_fd_valid(i->second->get_fd()))
         {
+            if (i->second->is_blocked())
+            {
+                WarningMessage("Blocked control channel still present for fd = %d\n", fd);
+                return false;
+            }
             delete_control(i);
         }
         else
@@ -595,7 +657,11 @@ bool ControlMgmt::service_users()
     static FdEvents event[MAX_CONTROL_FDS];
     unsigned nevent;
 
+    reap_removed_controls();
+
     process_pending_control_commands();
+
+    remove_broken_controls();
 
     if (!poll_control_fds(event, nevent))
         return false;
@@ -645,12 +711,14 @@ class ACExample : public AnalyzerCommand
 
 TEST_CASE("Do not delete ctrlcon if its in use by another ACShellCmd")
 {
+    init_controls();
     int pipefd[2];
     pipe(pipefd);
 
     ControlConn* ctrlcon = new ControlConn(pipefd[1], false);
 
     auto iter = controls.insert({pipefd[1], ctrlcon});
+    CHECK(true == register_control_fd(pipefd[1]));
 
     ACShellCmd* acshell1 = new ACShellCmd(ctrlcon, new ACExample());
     ACShellCmd* acshell2 = new ACShellCmd(ctrlcon, new ACExample());
@@ -659,43 +727,120 @@ TEST_CASE("Do not delete ctrlcon if its in use by another ACShellCmd")
 
     delete acshell1;
 
-    CHECK((ctrlcon->is_blocked() == true));
-    CHECK((ctrlcon->is_closed() == false));
+    CHECK(true == ctrlcon->is_blocked());
+    CHECK(true == ctrlcon->is_removed());
+    CHECK(controls.find(pipefd[1]) != controls.end());
 
     delete acshell2;
 
-    close(pipefd[0]);
-    close(pipefd[1]);
+    reap_removed_controls();
+    CHECK(controls.find(pipefd[1]) == controls.end());
 
+    close(pipefd[0]);
+    term_controls();
 };
 
 TEST_CASE("Do not unblock ctrlcon if its in use by another ACShellCmd")
 {
+    init_controls();
     int pipefd[2];
     pipe(pipefd);
 
     ControlConn* ctrlcon = new ControlConn(pipefd[1], false);
 
     auto iter = controls.insert({pipefd[1], ctrlcon});
+    CHECK(true == register_control_fd(pipefd[1]));
 
     ACShellCmd* acshell1 = new ACShellCmd(ctrlcon, new ACExample());
     ACShellCmd* acshell2 = new ACShellCmd(ctrlcon, new ACExample());
 
-    CHECK((ctrlcon->is_blocked() == true));
+    CHECK(true == ctrlcon->is_blocked());
 
     delete acshell1;
 
-    CHECK((ctrlcon->is_blocked() == true));
+    CHECK(true == ctrlcon->is_blocked());
 
     delete acshell2;
 
-    CHECK((ctrlcon->is_blocked() == false));
+    CHECK(false == ctrlcon->is_blocked());
 
     delete_control(iter.first);
 
     close(pipefd[0]);
-    close(pipefd[1]);
-
+    term_controls();
 };
+
+TEST_CASE("reap_removed_controls deletes unblocked removed controls")
+{
+    init_controls();
+    int pipefd[2];
+    pipe(pipefd);
+
+    ControlConn* ctrlcon = new ControlConn(pipefd[1], false);
+    controls.insert({pipefd[1], ctrlcon});
+    CHECK(true == register_control_fd(pipefd[1]));
+
+    ctrlcon->remove();
+    reap_removed_controls();
+
+    CHECK(controls.find(pipefd[1]) == controls.end());
+    close(pipefd[0]);
+    term_controls();
+}
+
+TEST_CASE("reap_removed_controls defers blocked controls deletion until unblocked")
+{
+    init_controls();
+    int pipefd[2];
+    pipe(pipefd);
+
+    ControlConn* ctrlcon = new ControlConn(pipefd[1], false);
+    controls.insert({pipefd[1], ctrlcon});
+    CHECK(true == register_control_fd(pipefd[1]));
+
+    ACShellCmd* acshell = new ACShellCmd(ctrlcon, new ACExample());
+    ctrlcon->remove();
+
+    reap_removed_controls();
+
+    CHECK(controls.find(pipefd[1]) != controls.end());
+    CHECK(true == ctrlcon->is_removed());
+    CHECK(true == ctrlcon->is_blocked());
+
+    delete acshell;
+    CHECK(false == ctrlcon->is_blocked());
+
+    reap_removed_controls();
+    CHECK(controls.find(pipefd[1]) == controls.end());
+
+    close(pipefd[0]);
+    term_controls();
+}
+
+TEST_CASE("blocked control keeps fd open until command completes")
+{
+    init_controls();
+    int pipefd[2];
+    pipe(pipefd);
+
+    ControlConn* ctrlcon = new ControlConn(pipefd[1], false);
+    auto iter = controls.insert({pipefd[1], ctrlcon});
+    CHECK(true == register_control_fd(pipefd[1]));
+
+    ACShellCmd* acshell = new ACShellCmd(ctrlcon, new ACExample());
+    delete_control(iter.first);
+
+    CHECK(true == ctrlcon->is_blocked());
+    CHECK(true == ctrlcon->is_removed());
+    CHECK(write(pipefd[1], "x", 1) == 1);
+
+    delete acshell;
+    reap_removed_controls();
+    CHECK(write(pipefd[1], "x", 1) == -1);
+    CHECK(errno == EBADF);
+
+    close(pipefd[0]);
+    term_controls();
+}
 
 #endif

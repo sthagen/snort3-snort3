@@ -154,11 +154,9 @@ int BootpServiceDetector::validate(AppIdDiscoveryArgs& args)
                 int option53 = 0;
                 for (i=sizeof(ServiceBOOTPHeader)+sizeof(uint32_t); i<size; )
                 {
-                    op = (const ServiceDHCPOption*)&data[i];
-                    if (op->option == 0xff)
+                    if (data[i] == 0xff)
                     {
                         const eth::EtherHdr* eh = layer::get_eth_layer(pkt);
-
                         if (!eh)
                             goto fail;
 
@@ -168,10 +166,13 @@ int BootpServiceDetector::validate(AppIdDiscoveryArgs& args)
                         }
                         goto inprocess;
                     }
-                    i += sizeof(ServiceDHCPOption);
-                    if (i >= size)
+                    if (i + sizeof(ServiceDHCPOption) > size)
                         goto not_compatible;
-                    if (op->option == 53 && op->len == 1 && i + 1 < size && data[i] == 3)
+                    op = (const ServiceDHCPOption*)(&data[i]);
+                    i += sizeof(ServiceDHCPOption);
+                    if (i + op->len > size)
+                        goto not_compatible;
+                    if (op->option == 53 && op->len == 1 && data[i] == 3)
                     {
                         option53 = 1;
                     }
@@ -223,11 +224,9 @@ int BootpServiceDetector::validate(AppIdDiscoveryArgs& args)
                 i<size;
                 )
             {
-                op = (const ServiceDHCPOption*)&data[i];
-                if (op->option == 0xff)
+                if (data[i] == 0xff)
                 {
                     const eth::EtherHdr* eh = layer::get_eth_layer(pkt);
-
                     if (!eh)
                         goto fail;
 
@@ -237,6 +236,9 @@ int BootpServiceDetector::validate(AppIdDiscoveryArgs& args)
                             router);
                     goto success;
                 }
+                if (i + sizeof(ServiceDHCPOption) > size)
+                    goto fail;
+                op = (const ServiceDHCPOption*)(&data[i]);
                 i += sizeof(ServiceDHCPOption);
                 if (i + op->len > size)
                     goto fail;

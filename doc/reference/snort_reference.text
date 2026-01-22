@@ -8,7 +8,7 @@ Snort 3 Reference Manual
 The Snort Team
 
 Revision History
-Revision 3.10.1.0 2026-01-11 17:51:32 EST TST
+Revision 3.10.2.0 2026-01-21 15:52:22 EST TST
 
 ---------------------------------------------------------------------
 
@@ -1023,6 +1023,9 @@ Peg counts:
     (sum)
   * ips_actions.react: number of packets that matched an IPS react
     rule (sum)
+  * ips_actions.non_supported_react: number of packets that matched
+    an IPS react rule but could not be processed because the protocol
+    is not supported (sum)
   * ips_actions.reject: number of packets that matched an IPS reject
     rule (sum)
   * ips_actions.rewrite: number of packets that matched an IPS
@@ -6028,8 +6031,9 @@ Configuration:
 
 Commands:
 
-  * stream.dump_flows(): dump the flow table
-  * stream.dump_flows_summary(): dump the flow summaries
+  * stream.dump_flows(): dump the flow table in text format
+  * stream.dump_flows_binary(): dump the flow table in binary format
+  * stream.dump_flows_summary(): dump flow table summary
 
 Rules:
 
@@ -12652,6 +12656,9 @@ libraries see the Getting Started section of the manual.
     file_id rule (sum)
   * ips_actions.log: number of packets that matched an IPS log rule
     (sum)
+  * ips_actions.non_supported_react: number of packets that matched
+    an IPS react rule but could not be processed because the protocol
+    is not supported (sum)
   * ips_actions.pass: number of packets that matched an IPS pass rule
     (sum)
   * ips_actions.react: number of packets that matched an IPS react
@@ -16879,8 +16886,9 @@ alert is raised by the enhanced JavaScript normalizer.
   * snort.detach(): detach from control shell (without shutting down)
   * snort.quit(): shutdown and dump-stats
   * snort.help(): this output
-  * stream.dump_flows(): dump the flow table
-  * stream.dump_flows_summary(): dump the flow summaries
+  * stream.dump_flows(): dump the flow table in text format
+  * stream.dump_flows_binary(): dump the flow table in binary format
+  * stream.dump_flows_summary(): dump flow table summary
   * trace.set(modules, constraints, ntuple, timestamp): set modules
     traces, constraints, ntuple and timestamp options
   * trace.clear(): clear modules traces and constraints

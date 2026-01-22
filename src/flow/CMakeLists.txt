@@ -1,5 +1,8 @@
 set (FLOW_INCLUDES
     deferred_trust.h
+    dump_flows.h
+    dump_flows_descriptor.h
+    dump_flows_serializer.h
     expect_flow.h
     flow.h
     flow_data.h
@@ -14,6 +17,8 @@ set (FLOW_INCLUDES
 add_library (flow OBJECT
     ${FLOW_INCLUDES}
     deferred_trust.cc
+    dump_flows.cc
+    dump_flows_serializer.cc
     expect_cache.cc
     flow.cc
     flow_cache.cc
@@ -31,7 +36,6 @@ add_library (flow OBJECT
     ha_module.cc
     ha_module.h
     prune_stats.h
-    filter_flow_critera.h
 )
 
 install(FILES ${FLOW_INCLUDES}

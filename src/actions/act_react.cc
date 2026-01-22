@@ -134,11 +134,14 @@ private:
 static THREAD_LOCAL struct ReactStats
 {
     PegCount react;
+    PegCount non_supported_react;
 } react_stats;
 
 const PegInfo react_pegs[] =
 {
     { CountType::SUM, "react", "number of packets that matched an IPS react rule" },
+    { CountType::SUM, "non_supported_react", "number of packets that matched an IPS react rule"
+      " but could not be processed because the protocol is not supported" },
     { CountType::END, nullptr, nullptr }
 };
 
@@ -224,6 +227,13 @@ void ReactAction::exec(Packet* p, const ActInfo& ai)
 {
     p->active->drop_packet(p);
     p->active->set_drop_reason("ips");
+
+    if ( p->context->wire_packet and
+         !p->active->is_reset_candidate(p->context->wire_packet) )
+    {
+        p->active->block_session(p);
+        ++react_stats.non_supported_react;
+    }    
 
     alert(p, ai);
     ++react_stats.react;

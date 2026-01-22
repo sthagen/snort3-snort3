@@ -25,7 +25,6 @@
 // there is a FlowCache instance for each protocol.
 // Flows are stored in a ZHash instance by FlowKey.
 
-#include <array>
 #include <ctime>
 #include <fstream>
 #include <mutex>
@@ -33,7 +32,6 @@
 #include <vector>
 #include <memory>
 
-#include "filter_flow_critera.h"
 #include "framework/counts.h"
 #include "flow_config.h"
 #include "flow.h"
@@ -46,76 +44,13 @@ constexpr uint8_t total_lru_count = max_protocols + 1;
 constexpr uint64_t all_lru_mask = (1ULL << max_protocols) - 1;
 constexpr uint8_t first_proto = to_utype(PktType::NONE) + 1;
 
-typedef std::array<unsigned, to_utype(PktType::MAX)> FlowsTypeSummary;
-typedef std::array<unsigned, to_utype(snort::Flow::FlowState::ALLOW) + 1> FlowsStateSummary;
-
-struct FlowsSummary
-{
-    FlowsTypeSummary type_summary{};
-    FlowsStateSummary state_summary{};
-};
-
 namespace snort
 {
 class Flow;
 struct FlowKey;
 }
 
-class DumpFlowsBase : public snort::AnalyzerCommand
-{
-public:
-    DumpFlowsBase(ControlConn*);
-    virtual ~DumpFlowsBase() override= default;
-    void cidr2mask(const uint32_t cidr, uint32_t* mask) const;
-    bool set_ip(std::string filter_ip, snort::SfIp& ip, snort::SfIp& subnet) const;
-    bool execute(Analyzer&, void**) override = 0;
-    const char* stringify() override = 0;
-    void set_filter_criteria(const FilterFlowCriteria& filter_criteria)
-    {ffc = filter_criteria;}
-
-protected:
-    FilterFlowCriteria ffc;
-};
-
-class DumpFlows : public DumpFlowsBase
-{
-public:
-#ifndef REG_TEST
-    DumpFlows(unsigned count, ControlConn*);
-#else
-    DumpFlows(unsigned count, ControlConn*, int resume);
-#endif
-    ~DumpFlows() override = default;
-    bool open_files(const std::string& base_name);
-    bool execute(Analyzer&, void**) override;
-    const char* stringify() override
-    { return "DumpFlows"; }
-
-private:
-    //dump_code is to track if the flow is dumped only once per dump_flow command.
-    static uint8_t dump_code;
-    std::vector<std::fstream> dump_stream;
-    std::vector<unsigned> next;
-    unsigned dump_count;
-#ifdef REG_TEST
-    int resume = -1;
-#endif
-};
-
-class DumpFlowsSummary : public DumpFlowsBase
-{
-public:
-    DumpFlowsSummary(ControlConn*);
-
-    ~DumpFlowsSummary() override;
-    bool execute(Analyzer&, void**) override;
-    const char* stringify() override
-    { return "DumpFlowsSummary"; }
-
-private:
-    std::vector<FlowsSummary> flows_summaries;
-};
-
+class ZHash;
 class FlowUniList;
 
 class FlowCache
@@ -126,6 +61,9 @@ public:
 
     FlowCache(const FlowCache&) = delete;
     FlowCache& operator=(const FlowCache&) = delete;
+
+    ZHash* get_flow_table() const
+    { return hash_table; }
 
     snort::Flow* find(const snort::FlowKey*);
     snort::Flow* allocate(const snort::FlowKey*);
@@ -138,9 +76,6 @@ public:
     unsigned timeout(unsigned num_flows, time_t cur_time);
     unsigned delete_flows(unsigned num_to_delete);
     unsigned prune_multiple(PruneReason, bool do_cleanup);
-    bool dump_flows(std::fstream&, unsigned count, const FilterFlowCriteria& ffc, bool first, uint8_t code) const;
-    bool dump_flows_summary(FlowsSummary&, const FilterFlowCriteria& ffc) const;
-
 
     unsigned purge();
     unsigned get_count();
@@ -179,12 +114,10 @@ public:
 
     bool move_to_allowlist(snort::Flow* f);
 
-    virtual bool filter_flows(const snort::Flow&, const FilterFlowCriteria&) const;
     template<typename StreamType>
     void output_flow(StreamType&, const snort::Flow&, const struct timeval&) const;
 
     unsigned get_flows_allocated() const;
-
     size_t uni_flows_size() const;
     size_t uni_ip_flows_size() const;
     size_t flows_size() const;
@@ -206,9 +139,7 @@ private:
     bool handle_allowlist_pruning(snort::Flow*, PruneReason, uint8_t, bool&);
 
     unsigned delete_active_flows(unsigned mode, unsigned num_to_delete, unsigned &deleted);
-    static std::string timeout_to_str(time_t);
-    bool is_ip_match(const snort::SfIp& flow_ip, const snort::SfIp& filter_ip, const snort::SfIp& subnet) const;
-
+ 
     inline bool is_allowlist_on_excess() const
     { return config.allowlist_cache and config.move_to_allowlist_on_excess; }
 
@@ -238,7 +169,7 @@ private:
     FlowCacheConfig config;
     uint32_t flags;
 
-    class ZHash* hash_table;
+    ZHash* hash_table;
     FlowUniList* uni_flows;
     FlowUniList* uni_ip_flows;
 

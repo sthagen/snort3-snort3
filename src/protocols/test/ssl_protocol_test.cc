@@ -126,7 +126,7 @@ TEST(ssl_protocol_tests, parse_server_key_exchange_invalid_curve_type)
     uint8_t test_data[3] = { 0x02, 0xFF, 0xFF }; // Invalid curve type
     auto result = parse_server_key_exchange(test_data, sizeof(test_data), &tls_params);
     CHECK_EQUAL(false, result);
-    CHECK_EQUAL(0, tls_params.curve);
+    CHECK_EQUAL(-1, tls_params.curve);
 }
 
 TEST(ssl_protocol_tests, parse_server_key_exchange_invalid_len)
@@ -135,7 +135,7 @@ TEST(ssl_protocol_tests, parse_server_key_exchange_invalid_len)
     uint8_t test_data[2] = { 0x03, 0xFF }; // Invalid length, should be at least 3 bytes
     auto result = parse_server_key_exchange(test_data, sizeof(test_data), &tls_params);
     CHECK_EQUAL(false, result);
-    CHECK_EQUAL(0, tls_params.curve);
+    CHECK_EQUAL(-1, tls_params.curve);
 }
 
 TEST(ssl_protocol_tests, parse_server_hello_tls_1_3)
@@ -261,6 +261,21 @@ TEST(ssl_protocol_tests, ssl_cert_common_name_parsing)
     delete server_cert;
     
     CHECK(true);
+}
+
+TEST(ssl_protocol_tests, ssl_decode_v2_server_hello_size_8)
+{
+    uint8_t test_data[8] = {
+        0x16,                       // Content Type
+        0x03, 0x03,             // Version: TLS 1.2
+        0x00, 0x03,             // Length
+        0x00, 0x00, 0x02    // pkt[7]==2 triggers SSLv2 server hello check
+    };
+
+    uint32_t result = SSL_decode(test_data, sizeof(test_data), 0, 0,
+        nullptr, nullptr, 0, nullptr, nullptr, nullptr, nullptr);
+
+    CHECK(result != SSL_ARG_ERROR_FLAG);
 }
 
 int main(int argc, char** argv)

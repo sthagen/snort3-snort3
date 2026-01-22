@@ -26,7 +26,6 @@
 
 #include "file_mime_log.h"
 
-#include "file_api/file_flows.h"
 #include "utils/safec.h"
 #include "utils/util.h"
 
@@ -54,7 +53,7 @@ int MailLogState::log_file_name(const uint8_t* start, int length)
     int sep = (*alt_len > 0) ? 1 : 0;
     int log_avail = alt_size - *alt_len - sep;
 
-    if (!alt_buf || log_avail <= 0)
+    if (log_avail <= 0)
         return -1;
 
     length = std::min(length, log_avail - 1);

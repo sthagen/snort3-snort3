@@ -901,11 +901,11 @@ void FileContext::find_file_type_from_ips(Packet* pkt, const uint8_t* file_data,
         }
     }
     fp_eval_service_group(p, conf->snort_protocol_id);
-    if (set_file_context)
-        files->set_current_file_context(nullptr);
     /* Check whether file transfer is done or type depth is reached */
     if ((position == SNORT_FILE_END) || (position == SNORT_FILE_FULL) || depth_exhausted)
         finalize_file_type();
+    if (set_file_context)
+        files->set_current_file_context(nullptr);
 }
 
 void FileContext::process_file_type(Packet* pkt,const uint8_t* file_data, int data_size,

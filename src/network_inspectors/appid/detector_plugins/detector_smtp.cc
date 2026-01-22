@@ -711,7 +711,7 @@ static inline int smtp_validate_reply(const uint8_t* data, uint16_t* offset, uin
         {
             (*offset)++;
             if (*offset >= size)
-                return -1;
+                return 0;  
             if (data[*offset] != 0x0A)
                 return -1;
         }

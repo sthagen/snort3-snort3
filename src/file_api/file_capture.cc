@@ -481,19 +481,11 @@ void FileCapture::store_file()
 
     const std::string& file_full_name = file_info->get_file_name();
 
-    /*Check whether the file exists*/
-    struct stat buffer;
-    if (stat (file_full_name.c_str(), &buffer) == 0)
+    FILE* fh = fopen(file_full_name.c_str(), "wx");
+    if (!fh)        
     {
         return;
     }
-
-    FILE* fh = fopen(file_full_name.c_str(), "w");
-    if (!fh )
-    {
-        return;
-    }
-
     // Check the file buffer
     uint8_t* buff = nullptr;
     int size = 0;

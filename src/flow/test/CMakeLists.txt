@@ -18,6 +18,8 @@ add_cpputest( flow_control_test
 
 add_cpputest( flow_cache_test
     SOURCES
+        ../dump_flows.cc
+        ../dump_flows_serializer.cc
         ../flow_cache.cc
         ../flow_control.cc
         ../flow_key.cc

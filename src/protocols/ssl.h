@@ -250,9 +250,9 @@ struct SO_PUBLIC SSLV3ServerCertData
 
 struct SO_PUBLIC TLSConnectionParams
 {
-    uint16_t curve = 0;
-    uint16_t cipher = 0;
-    uint16_t selected_tls_version = 0;
+    int32_t curve = -1;
+    int32_t cipher = -1;
+    int32_t selected_tls_version = -1;
 };
 
 struct SO_PUBLIC TLSConnectionData

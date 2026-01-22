@@ -35,9 +35,9 @@ public:
     virtual ~SslMetadataEvent() override
     { }
 
-    uint16_t get_version() const override;
-    uint16_t get_curve() const override;
-    uint16_t get_cipher() const override;
+    int32_t get_version() const override;
+    int32_t get_curve() const override;
+    int32_t get_cipher() const override;
     const std::string& get_server_name_identifier() const override;
     const std::string& get_subject() const override;
     const std::string& get_issuer() const override;

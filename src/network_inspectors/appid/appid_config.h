@@ -69,6 +69,11 @@
 #define MIN_BRUTE_FORCE_INPROCESS_STATE_THRESHOLD 1
 #define MAX_BRUTE_FORCE_INPROCESS_STATE_THRESHOLD 50
 
+#define MIDSTREAM_SERVICE_INSPECTION_OFF 0
+#define DEFAULT_MIDSTREAM_PKTS_BEFORE_SERVICE_FAIL 2
+#define MIN_MIDSTREAM_PKTS_BEFORE_SERVICE_FAIL 2
+#define MAX_MIDSTREAM_PKTS_BEFORE_SERVICE_FAIL 10
+
 
 enum SnortProtoIdIndex
 {
@@ -153,6 +158,7 @@ public:
     uint8_t brute_force_inprocess_threshold = DEFAULT_BRUTE_FORCE_INPROCESS_STATE_THRESHOLD;
     uint16_t max_packet_before_service_fail = DEFAULT_MAX_PKTS_BEFORE_SERVICE_FAIL;
     uint16_t max_packet_service_fail_ignore_bytes = DEFAULT_MAX_PKT_BEFORE_SERVICE_FAIL_IGNORE_BYTES;
+    uint16_t max_midstream_packet_before_service_fail = DEFAULT_MIDSTREAM_PKTS_BEFORE_SERVICE_FAIL;
     uint32_t chp_body_collection_max = 0;
     uint32_t rtmp_max_packets = 15;
     uint32_t max_tp_flow_depth = 5;

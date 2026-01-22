@@ -108,7 +108,7 @@ private:
 
 const std::string Ssl::s_name = "ssl";
 
-uint16_t SslMetadataEvent::get_version() const
+int32_t SslMetadataEvent::get_version() const
 {
     return tls_connection_data.tls_params.selected_tls_version;
 }
@@ -118,12 +118,12 @@ const std::string& SslMetadataEvent::get_server_name_identifier() const
     return tls_connection_data.server_name_identifier;
 }
 
-uint16_t SslMetadataEvent::get_curve() const
+int32_t SslMetadataEvent::get_curve() const
 {
     return tls_connection_data.tls_params.curve;
 }
 
-uint16_t SslMetadataEvent::get_cipher() const
+int32_t SslMetadataEvent::get_cipher() const
 {
     return tls_connection_data.tls_params.cipher;
 }
@@ -401,6 +401,11 @@ static void snort_ssl(SSL_PROTO_CONF* config, Packet* p)
     if (client_hello_data.host_name != nullptr)
     {
         SslClientHelloEvent event(client_hello_data.host_name, p);
+        DataBus::publish(pub_id, SslEventIds::CHELLO_SERVER_NAME, event);
+    }
+    else if (SSL_IS_CHELLO(new_flags))
+    {
+        SslClientHelloEvent event("", p);
         DataBus::publish(pub_id, SslEventIds::CHELLO_SERVER_NAME, event);
     }
 

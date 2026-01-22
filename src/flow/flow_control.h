@@ -74,10 +74,6 @@ public:
     unsigned prune_multiple(PruneReason, bool do_cleanup);
     bool move_to_allowlist(snort::Flow*);
 
-    bool dump_flows(std::fstream&, unsigned count, const FilterFlowCriteria& ffc, bool first, uint8_t code) const;
-    bool dump_flows_summary(FlowsSummary&, const FilterFlowCriteria& ffc) const;
-
-
     int add_expected_ignore(
         const snort::Packet* ctrlPkt, PktType, IpProtocol,
         const snort::SfIp *srcIP, uint16_t srcPort,
@@ -88,6 +84,9 @@ public:
         uint16_t srcPort, const snort::SfIp *dstIP, uint16_t dstPort, SnortProtocolId snort_protocol_id,
         snort::FlowData*, bool swap_app_direction = false, bool expect_multi = false,
         bool bidirectional = false, bool expect_persist = false);
+
+    FlowCache* get_flow_cache()
+    { return cache; }
 
     class ExpectCache* get_exp_cache()
     { return exp_cache; }

@@ -27,6 +27,7 @@
 #include "log/messages.h"
 #include "main.h"
 #include "main/shell.h"
+#include "main/thread.h"
 #include "managers/module_manager.h"
 #include "utils/util.h"
 
@@ -53,10 +54,10 @@ ControlConn* ControlConn::query_from_lua(const lua_State* L)
 
 ControlConn::ControlConn(int fd, bool local) : fd(fd), local(local)
 {
-    touch();
     shell = new Shell;
     configure();
-    show_prompt();
+    if (show_prompt())
+        touch();
 }
 
 ControlConn::~ControlConn()
@@ -67,11 +68,11 @@ ControlConn::~ControlConn()
 
 void ControlConn::shutdown()
 {
-    if (is_closed())
+    if (closed)
         return;
     if (!local)
         close(fd);
-    fd = -1;
+    closed = true;
 }
 
 void ControlConn::configure() const
@@ -166,17 +167,17 @@ void ControlConn::set_user_network_policy()
 int ControlConn::execute_commands()
 {
     int executed = 0;
-    while (!is_closed() && !blocked && !pending_commands.empty())
+    while (!is_removed() && !blocked && !pending_commands.empty())
     {
         const std::string& command = pending_commands.front();
         if (pending_cmds_count && !ModuleManager::is_parallel_cmd(command))
             break;
         std::string rsp;
         shell->execute(command.c_str(), rsp);
-        if (!rsp.empty())
-            respond("%s", rsp.c_str());
-        if (!blocked)
-            show_prompt();
+        if (!rsp.empty() && respond("%s", rsp.c_str()))
+            touch();
+        if (!blocked && show_prompt())
+            touch();
         pending_commands.pop();
         executed++;
     }
@@ -196,12 +197,12 @@ void ControlConn::remove()
 
 void ControlConn::touch()
 {
-    touched.store(time(nullptr), std::memory_order_relaxed);
+    touched = time(nullptr);
 }
 
 time_t ControlConn::get_touched() const
 {
-    return touched.load(std::memory_order_relaxed);
+    return touched;
 }
 
 void ControlConn::unblock()
@@ -211,21 +212,20 @@ void ControlConn::unblock()
         blocked--;
         execute_commands();
         if (!blocked && !show_prompt())
-            shutdown();
+            remove();
     }
 }
 
 // FIXIT-L would like to flush prompt w/o \n
 bool ControlConn::show_prompt()
 {
-    return respond("%s\n", get_prompt());
+    return is_removed() or respond("%s\n", get_prompt());
 }
 
 bool ControlConn::respond(const char* format, va_list& ap)
 {
-    if (is_closed() or is_removed())
+    if (in_main_thread() && write_failed_main)
         return false;
-
     char buf[STD_BUF];
     int response_len = vsnprintf(buf, sizeof(buf), format, ap);
 
@@ -242,12 +242,14 @@ bool ControlConn::respond(const char* format, va_list& ap)
     while (bytes_written < response_len)
     {
         ssize_t n = write(fd, buf + bytes_written, response_len - bytes_written);
+
         if (n < 0)
         {
             if (errno != EAGAIN && errno != EINTR)
             {
-                shutdown();
-                ErrorMessage("ControlConn: Error in writing response, closing the connection: %s, buf: %s\n", get_error(errno), buf);
+                if (in_main_thread())
+                    write_failed_main = true;
+                ErrorMessage("ControlConn: Error in writing response: %s, buf: %s\n", get_error(errno), buf);
                 return false;
             }
         }
@@ -255,15 +257,11 @@ bool ControlConn::respond(const char* format, va_list& ap)
             bytes_written += n;
     }
 
-    touch();
     return true;
 }
 
 bool ControlConn::respond(const char* format, ...)
 {
-    if (is_closed() or is_removed())
-        return false;
-
     va_list ap;
     va_start(ap, format);
     bool ret = respond(format, ap);

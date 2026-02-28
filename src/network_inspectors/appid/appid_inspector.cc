@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -37,6 +37,7 @@
 #include "pub_sub/appid_event_ids.h"
 #include "pub_sub/dns_events.h"
 #include "pub_sub/intrinsic_event_ids.h"
+#include "pub_sub/shadowtraffic_aggregator.h"
 
 #include "appid_cip_event_handler.h"
 #include "appid_data_decrypt_event_handler.h"
@@ -70,6 +71,7 @@ THREAD_LOCAL OdpPacketThreadContext* odp_thread_local_ctxt = nullptr;
 THREAD_LOCAL OdpContext* pkt_thread_odp_ctxt = nullptr;
 
 unsigned AppIdInspector::cached_global_pub_id = 0;
+unsigned AppIdInspector::cached_shadowtraffic_pub_id = 0;
 static THREAD_LOCAL unsigned appid_pub_id = 0;
 
 static THREAD_LOCAL PacketTracer::TracerMute appid_mute;
@@ -110,6 +112,11 @@ AppIdInspector::~AppIdInspector()
 unsigned AppIdInspector::get_pub_id()
 {
     return appid_pub_id;
+}
+
+unsigned AppIdInspector::get_shadowtraffic_pub_id()
+{
+    return cached_shadowtraffic_pub_id;
 }
 
 bool AppIdInspector::configure(SnortConfig* sc)
@@ -170,6 +177,9 @@ bool AppIdInspector::configure(SnortConfig* sc)
 
     if (!cached_global_pub_id)
         cached_global_pub_id = DataBus::get_id(appid_pub_key);
+
+    if (!cached_shadowtraffic_pub_id)
+        cached_shadowtraffic_pub_id = DataBus::get_id(shadowtraffic_pub_key);
 
     appid_pub_id = cached_global_pub_id;
     return true;
@@ -276,6 +286,7 @@ static void mod_dtor(Module* m)
 static void appid_inspector_pinit()
 {
     AppIdSession::init();
+    SshEventFlowData::init();
     TPLibHandler::get();
     AppIdPegCounts::init_peg_info();
 }

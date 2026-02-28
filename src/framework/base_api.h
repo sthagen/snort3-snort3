@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -38,7 +38,7 @@
 // depends on includes installed in framework/snort_api.h
 // see framework/plugins.h
 
-#define BASE_API_VERSION 22
+#define BASE_API_VERSION 23
 
 // set the reserved field to this to be future proof
 #define API_RESERVED 0
@@ -55,6 +55,7 @@ enum PlugType
     PT_CONNECTOR,
     PT_POLICY_SELECTOR,
     PT_MP_TRANSPORT,
+    PT_TRACE,
     PT_MAX
 };
 

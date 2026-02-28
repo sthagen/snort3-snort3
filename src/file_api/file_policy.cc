@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -194,7 +194,17 @@ FileVerdict FilePolicy::signature_lookup(Packet*, FileInfo* file)
         FileCapture* captured = nullptr;
 
         if (file->reserve_file(captured) == FILE_CAPTURE_SUCCESS)
-            captured->store_file_async();
+        {
+            std::string extracted_name = captured->store_file_async();
+            file->set_extracted_name(extracted_name);
+            if (extracted_name.empty())
+            {
+                file->set_extracted_size(0);
+                delete captured;
+            }
+            else
+                file->set_extracted_cutoff(false);
+        }
         else
             delete captured;
 

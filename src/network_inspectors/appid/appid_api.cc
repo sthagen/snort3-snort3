@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -269,9 +269,9 @@ void AppIdApi::reset_appid_cpu_profiler_stats()
     odp_ctxt.get_appid_cpu_profiler_mgr().cleanup_appid_cpu_profiler_table();
 }
 
-void AppIdApi::update_shadow_traffic_status(bool status)
+void AppIdApi::update_shadow_traffic_status(bool status, const SnortConfig* sc)
 {
-   AppIdInspector* inspector = (AppIdInspector*) InspectorManager::get_inspector(MOD_NAME);
+    AppIdInspector* inspector = (AppIdInspector*) InspectorManager::get_inspector(MOD_NAME, true, sc);
     if (!inspector)
         return;
     const AppIdContext& ctxt = inspector->get_ctxt();

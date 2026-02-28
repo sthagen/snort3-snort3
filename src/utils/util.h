@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -118,6 +118,7 @@ namespace snort
 SO_PUBLIC const char* get_error(int errnum);
 SO_PUBLIC char* snort_strdup(const char*);
 SO_PUBLIC char* snort_strndup(const char*, size_t);
+SO_PUBLIC void* snort_memrchr(const void* s, int c, size_t n);
 SO_PUBLIC void ts_print(const struct timeval*, char*, bool yyyymmdd = false);
 void uint8_to_printable_str(const uint8_t* buff, unsigned len, std::string& print_str);
 SO_PUBLIC void str_to_int_vector(const std::string& s, char delim, std::vector<uint32_t>& elems);

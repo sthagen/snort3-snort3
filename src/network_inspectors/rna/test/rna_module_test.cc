@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -41,6 +41,7 @@ void set_tcp_fp_processor(TcpFpProcessor*) { }
 void set_ua_fp_processor(UaFpProcessor*) { }
 void set_udp_fp_processor(UdpFpProcessor*) { }
 void set_smb_fp_processor(SmbFpProcessor*) { }
+void set_deviceinfo_fp_processor(DeviceInfoFpProcessor*) { }
 
 namespace snort
 {

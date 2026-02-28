@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -533,24 +533,6 @@ TEST(unixdomain_connector_tinit_tterm_call, alloc_transmit)
     s_send_ret_other = len;
     CHECK(unixdomainc->transmit_message(msg) == true);
     CHECK(unixdomainc->transmit_message(std::move(msg)) == true);
-}
-
-TEST(unixdomain_connector_tinit_tterm_call, alloc_transmit_header_fail)
-{
-    const uint32_t len = 40;
-    const uint8_t* data = new uint8_t[len];
-    UnixDomainConnector* unixdomainc = (UnixDomainConnector*)connector;
-    set_normal_status();
-
-    ConnectorMsg msg(data, len, true);
-
-    CHECK(msg.get_length() == len);
-    CHECK(msg.get_data() == data);
-
-    s_send_ret_header = sizeof(UnixDomainConnectorMsgHdr)-1;
-    s_send_ret_other = len;
-    CHECK(unixdomainc->transmit_message(msg) == false);
-    CHECK(unixdomainc->transmit_message(std::move(msg)) == false);
 }
 
 TEST(unixdomain_connector_tinit_tterm_call, alloc_transmit_body_fail)

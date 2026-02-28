@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -32,6 +32,7 @@ extern const BaseApi* sin_file[];
 extern const BaseApi* sin_http[];
 extern const BaseApi* sin_http2[];
 extern const BaseApi* sin_sip[];
+extern const BaseApi* sin_socks[];
 
 #ifdef STATIC_INSPECTORS
 extern const BaseApi* sin_bo;
@@ -90,6 +91,7 @@ void load_service_inspectors()
     PluginManager::load_plugins(sin_http);
     PluginManager::load_plugins(sin_http2);
     PluginManager::load_plugins(sin_sip);
+    PluginManager::load_plugins(sin_socks);
 
 #ifdef STATIC_INSPECTORS
     PluginManager::load_plugins(sin_cip);

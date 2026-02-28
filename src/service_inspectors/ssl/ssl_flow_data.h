@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -26,10 +26,12 @@
 
 #define GID_SSL 137
 
-#define     SSL_INVALID_CLIENT_HELLO               1
-#define     SSL_INVALID_SERVER_HELLO               2
-#define     SSL_ALERT_HB_REQUEST                   3
-#define     SSL_ALERT_HB_RESPONSE                  4
+#define     SSL_INVALID_CLIENT_HELLO          1
+#define     SSL_INVALID_SERVER_HELLO          2
+#define     SSL_ALERT_HB_REQUEST              3
+#define     SSL_ALERT_HB_RESPONSE             4
+#define     SSL_ALERT_CHELLO_MULTI_RECORDS    5
+#define     SSL_ALERT_CERT_MULTI_RECORDS      6
 
 struct SSLData
 {
@@ -41,12 +43,13 @@ struct SSLData
 namespace snort
 {
     class Flow;
+    class Inspector;
 }
 
 class SO_PUBLIC SslBaseFlowData : public snort::FlowData
 {
 public:
-    SslBaseFlowData() : snort::FlowData(inspector_id) {}
+    SslBaseFlowData(snort::Inspector* handler = nullptr) : snort::FlowData(inspector_id, handler) {}
 
     virtual SSLData& get_session() = 0;
 
@@ -55,7 +58,11 @@ public:
     static unsigned get_ssl_inspector_id() { return inspector_id; }
 
 protected:
-    static void assign_ssl_inspector_id(unsigned u) { inspector_id = u; }
+    static void assign_ssl_inspector_id(unsigned u)
+    {
+        if (!inspector_id)
+            inspector_id = u;
+    }
 
 private:
     static unsigned inspector_id;

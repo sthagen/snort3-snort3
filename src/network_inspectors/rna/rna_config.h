@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -29,6 +29,7 @@ class TcpFpProcessor;
 class UaFpProcessor;
 class UdpFpProcessor;
 class SmbFpProcessor;
+class DeviceInfoFpProcessor;
 }
 
 struct RnaModuleConfig
@@ -40,6 +41,7 @@ struct RnaModuleConfig
     snort::UaFpProcessor* ua_processor = nullptr;
     snort::UdpFpProcessor* udp_processor = nullptr;
     snort::SmbFpProcessor* smb_processor = nullptr;
+    snort::DeviceInfoFpProcessor* deviceinfo_processor = nullptr;
 };
 
 // Give default values so that RNA can work even if rna_conf_path is not provided

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -177,6 +177,15 @@ class RnaNetFlowEventHandler : public snort::DataHandler
 {
 public:
     RnaNetFlowEventHandler(RnaPnd& nd) : DataHandler(RNA_NAME), pnd(nd) { }
+    void handle(snort::DataEvent&, snort::Flow*) override;
+private:
+    RnaPnd& pnd;
+};
+
+class RnaDeviceInfoEventHandler : public snort::DataHandler
+{
+public:
+    RnaDeviceInfoEventHandler(RnaPnd& nd) : DataHandler(RNA_NAME), pnd(nd) { }
     void handle(snort::DataEvent&, snort::Flow*) override;
 private:
     RnaPnd& pnd;

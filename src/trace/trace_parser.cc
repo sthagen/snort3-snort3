@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -25,6 +25,7 @@
 
 #include "framework/module.h"
 #include "managers/module_manager.h"
+#include "managers/trace_logger_manager.h"
 #include "utils/util.h"
 
 #include "trace_config.h"
@@ -140,6 +141,17 @@ void TraceParser::finalize_constraints()
 {
     if (!parsed_constraints.match or parsed_constraints.set_bits)
         trace_config.constraints = new PacketConstraints(parsed_constraints);
+}
+
+void TraceParser::set_output_trace(std::string output_trace)
+{
+    trace_config.output_traces.push_back(std::move(output_trace));
+}
+
+void TraceParser::set_output(std::string output_trace)
+{
+    trace_config.has_multi_trace = true;
+    trace_config.output_traces.push_back(std::move(output_trace));
 }
 
 void TraceParser::clear_traces()

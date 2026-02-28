@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -51,6 +51,12 @@ const uint8_t* HttpEvent::get_header(unsigned id, uint64_t sub_id, int32_t& leng
 const uint8_t* HttpEvent::get_all_raw_headers(int32_t& length)
 {
     return get_header(HttpEnums::HTTP_BUFFER_RAW_HEADER, 0, length);
+}
+
+const uint8_t* HttpEvent::get_content_length(int32_t& length)
+{
+    return get_header(HttpEnums::HTTP_BUFFER_HEADER,
+        HttpEnums::HEAD_CONTENT_LENGTH, length);
 }
 
 const uint8_t* HttpEvent::get_content_type(int32_t& length)

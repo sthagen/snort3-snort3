@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -513,7 +513,7 @@ public:  // FIXIT-M privatize if possible
     unsigned reload_id = 0;
     uint32_t default_session_timeout = 0;
     uint32_t idle_timeout = 0;
-
+    uint32_t flow_id = 0;           // Flow ID value provided from the DAQ module or underlying hardware.
     struct
     {
         bool client_initiated : 1;  // Set if the first packet on the flow was from the side that is

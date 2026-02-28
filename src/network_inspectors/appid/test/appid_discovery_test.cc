@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2018-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2018-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -250,7 +250,7 @@ void AppIdSession::publish_appid_event(AppidChangeBits& change_bits, const Packe
 
 void AppIdSession::publish_shadow_traffic_event(const uint32_t &shadow_traffic_bits, snort::Flow *)
 {
-    ShadowTrafficEvent shadow_event(shadow_traffic_bits, "", "", nullptr);
+    ShadowTrafficEvent shadow_event(shadow_traffic_bits, "", "", nullptr, ShadowTrafficDetectionSource::APPID);
     DataBus::publish(0, ShadowTrafficEventIds::SHADOWTRAFFIC_FLOW_DETECTED, shadow_event, flow); 
 }
 
@@ -262,6 +262,7 @@ void ServiceDiscovery::reload() {}
 void ServiceDiscovery::finalize_service_patterns() {}
 void ServiceDiscovery::match_by_pattern(AppIdSession&, const Packet*, IpProtocol) {}
 void ServiceDiscovery::get_port_based_services(IpProtocol, uint16_t, AppIdSession&) {}
+void ServiceDiscovery::get_port_based_services(IpProtocol, uint16_t, uint16_t, AppIdSession&) {}
 void ServiceDiscovery::get_next_service(const Packet*, const AppidSessionDirection, AppIdSession&) {}
 int ServiceDiscovery::identify_service(AppIdSession&, Packet*, AppidSessionDirection,
     AppidChangeBits&) { return 0; }

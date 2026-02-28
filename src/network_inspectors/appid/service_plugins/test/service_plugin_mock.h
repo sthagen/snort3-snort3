@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -97,8 +97,10 @@ void ClientDiscovery::initialize(AppIdInspector&) {}
 void ClientDiscovery::reload() {}
 
 int AppIdDetector::initialize(AppIdInspector&){return 0;}
+#if !defined(RSYNC_UNIT_TEST)
 int AppIdDetector::data_add(AppIdSession&, AppIdFlowData*){return 0;}
-#if !defined(FTP_UNIT_TEST) && !defined(TFTP_UNIT_TEST)
+#endif
+#if !defined(FTP_UNIT_TEST) && !defined(TFTP_UNIT_TEST) && !defined(RSYNC_UNIT_TEST)
 AppIdFlowData* AppIdDetector::data_get(const AppIdSession&) {return nullptr;}
 #endif
 void AppIdDetector::add_user(AppIdSession&, const char*, AppId, bool, AppidChangeBits&){}

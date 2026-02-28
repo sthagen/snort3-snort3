@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -429,6 +429,20 @@ void TcpStreamTracker::set_splitter(const Flow* flow)
         set_splitter(ins->get_splitter(!client_tracker));
     else
         set_splitter(new AtomSplitter(!client_tracker));
+}
+
+uint32_t TcpStreamTracker::get_paf_position() const
+{
+    if ( reassembler )
+        return reassembler->get_paf_position();
+    return 0;
+}
+
+void TcpStreamTracker::set_splitter_with_rescan(StreamSplitter* ss, uint32_t seq)
+{
+    set_splitter(ss);
+    if ( reassembler )
+        reassembler->reinitialize_paf(seq);
 }
 
 static inline bool both_splitters_aborted(Flow* flow)
@@ -935,7 +949,7 @@ uint32_t TcpStreamTracker::perform_partial_flush()
 
 bool TcpStreamTracker::is_retransmit_of_held_packet(Packet* cp)
 {
-    if ( !is_holding_packet() )
+    if ( !is_holding_packet() or !cp->ptrs.tcph )
         return false;
 
     if ( cp->daq_msg == held_packet->get_daq_msg() )

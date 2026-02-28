@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -362,6 +362,49 @@ void HttpUri::normalize()
         default:
             return;
     }
+}
+
+Field* HttpUri::create_decoded_uri(Field*& decoded_path_out)
+{
+    if ((uri_type != URI_ORIGIN && uri_type != URI_ABSOLUTE) ||
+        !(*infractions & INF_URI_NEED_NORM_PATH) ||
+        path.length() <= 0)
+    {
+        decoded_path_out = new Field(path_norm.length(), path_norm.start());
+        return new Field(classic_norm.length(), classic_norm.start());
+    }
+
+    // Create a new buffer containing the normalized URI by normalizing each individual piece.
+    int total_length = path.length() + UriNormalizer::URI_NORM_EXPANSION;
+    total_length += (query_norm.length() >= 0) ? query_norm.length() + 1 : 0;
+    total_length += (fragment_norm.length() >= 0) ? fragment_norm.length() + 1 : 0;
+    uint8_t* const new_buf = new uint8_t[total_length];
+    uint8_t* current = new_buf;
+
+    HttpInfractions dummy_infractions;
+    static HttpEventGen dummy_events(std::bitset<HttpEnums::EVENT__MAX_VALUE>().set());
+    decoded_path_out = new Field();
+    
+    UriNormalizer::normalize(path, *decoded_path_out, false, current, uri_param,
+        &dummy_infractions, &dummy_events);
+    current += decoded_path_out->length();
+    if (query_norm.length() >= 0)
+    {
+        memcpy(current, "?", 1);
+        current += 1;
+        memcpy(current, query_norm.start(), query_norm.length());
+        current += query_norm.length();
+    }
+    if (fragment_norm.length() >= 0)
+    {
+        memcpy(current, "#", 1);
+        current += 1;
+        memcpy(current, fragment_norm.start(), fragment_norm.length());
+        current += fragment_norm.length();
+    }
+
+    assert(current - new_buf <= total_length);
+    return new Field(current - new_buf, new_buf, true);
 }
 
 const Field& HttpUri::get_norm_scheme()

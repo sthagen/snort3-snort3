@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -83,7 +83,6 @@ public:
 protected:
     virtual bool is_segment_retransmit(TcpOverlapState&, bool*);
     virtual void drop_old_segment(TcpOverlapState&);
-    virtual bool zwp_data_mismatch(TcpOverlapState&, TcpSegmentDescriptor&, uint32_t);
 
     virtual void left_overlap_keep_first(TcpOverlapState&);
     virtual void left_overlap_trim_first(TcpOverlapState&);

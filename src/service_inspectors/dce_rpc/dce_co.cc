@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -688,7 +688,7 @@ static inline void DCE2_CoEraseCtxIds(DCE2_CoTracker* cot)
 
 static DCE2_CoCtxIdNode* dce_co_process_ctx_id(DCE2_SsnData* sd,DCE2_CoTracker* cot,
     const DceRpcCoHdr* co_hdr,DCE2_Policy policy,
-    const uint8_t*& frag_ptr, uint16_t frag_len)
+    const uint8_t*& frag_ptr, uint16_t& frag_len)
 {
     DCE2_CoCtxIdNode* ctx_node;
     DCE2_Ret status;

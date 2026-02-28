@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -140,7 +140,7 @@ public:
     bool dns_host_reporting = true;
     bool referred_appId_disabled = false;
     bool mdns_user_reporting = true;
-    bool mdns_deviceinfo = false;
+    bool mdns_deviceinfo = true;
     bool chp_userid_disabled = false;
     bool is_host_port_app_cache_runtime = false;
     bool check_host_port_app_cache = false;
@@ -155,6 +155,7 @@ public:
     bool eve_http_client = true;
     bool appid_cpu_profiler = true;
     bool inspect_ooo_flows = true;
+    bool kerberos_check_failed_login = false;
     uint8_t brute_force_inprocess_threshold = DEFAULT_BRUTE_FORCE_INPROCESS_STATE_THRESHOLD;
     uint16_t max_packet_before_service_fail = DEFAULT_MAX_PKTS_BEFORE_SERVICE_FAIL;
     uint16_t max_packet_service_fail_ignore_bytes = DEFAULT_MAX_PKT_BEFORE_SERVICE_FAIL_IGNORE_BYTES;

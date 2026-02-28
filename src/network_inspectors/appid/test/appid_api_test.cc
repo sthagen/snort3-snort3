@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -396,10 +396,10 @@ TEST(appid_api, ssl_app_group_id_lookup_zero_len_data)
         test_zero_tls_data, test_zero_tls_data, true, service, client, payload);
 
     CHECK_TRUE(val);
-    CHECK_EQUAL(mock_session->tsession->get_tls_sni(), nullptr);
-    CHECK_EQUAL(mock_session->tsession->get_tls_first_alt_name(), nullptr);
-    CHECK_EQUAL(mock_session->tsession->get_tls_cname(), nullptr);
-    CHECK_EQUAL(mock_session->tsession->get_tls_org_unit(), nullptr);
+    POINTERS_EQUAL(mock_session->tsession->get_tls_sni(), nullptr);
+    POINTERS_EQUAL(mock_session->tsession->get_tls_first_alt_name(), nullptr);
+    POINTERS_EQUAL(mock_session->tsession->get_tls_cname(), nullptr);
+    POINTERS_EQUAL(mock_session->tsession->get_tls_org_unit(), nullptr);
     mock().checkExpectations();
 }
 

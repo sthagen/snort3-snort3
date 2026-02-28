@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2004-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -268,7 +268,7 @@ static void CopyField(
     char* buf, const char* tok, int max, const char* end, char delim
     )
 {
-    int len = end - tok + 1;
+    int len = end - tok;
     char* s;
 
     if ( len >= max )
@@ -1053,6 +1053,15 @@ int initialize_ftp(FTP_SESSION* session, Packet* p, int iMode)
     else
         return FTPP_INVALID_ARG;
 
+    req->cmd_line = nullptr;
+    req->cmd_line_size = 0;
+    req->cmd_begin = nullptr;
+    req->cmd_end = nullptr;
+    req->cmd_size = 0;
+    req->param_begin = nullptr;
+    req->param_end = nullptr;
+    req->param_size = 0;
+
     /* Set the beginning of the pipeline to the start of the
      * (normalized) buffer */
     req->pipeline_req = (const char*)read_ptr;
@@ -1644,8 +1653,13 @@ int check_ftp(FTP_SESSION* ftpssn, Packet* p, int iMode)
                         req->cmd_begin = nullptr;
                         req->cmd_end = nullptr;
                         req->cmd_size = 0;
-                        if (*read_ptr != SP && read_ptr != p->data)
+                        
+                        // Track actual buffer boundaries
+                        const uint8_t* buffer_start = (buf.len) ? buf.data : p->data;
+                        
+                        if (*read_ptr != SP && read_ptr > buffer_start)
                             read_ptr--;
+                            
                         state = FTP_RESPONSE_CONT;
                     }
                 }

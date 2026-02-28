@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -30,6 +30,7 @@
 #include "flow/flow_stash.h"
 #include "flow/stream_flow.h"
 #include "main/snort_config.h"
+#include "packet_io/packet_tracer.h"
 #include "managers/inspector_manager.h"
 #include "profiler/profiler.h"
 #include "protocols/packet.h"
@@ -1333,7 +1334,6 @@ void AppIdSession::publish_shadow_traffic_event(const uint32_t& shadow_traffic_b
         return;
 
     const char* app_name;
-    unsigned shadow_traffic_pub_id = 0;
     std::string str_print;
     Packet* curr_packet = nullptr;
 
@@ -1365,12 +1365,18 @@ void AppIdSession::publish_shadow_traffic_event(const uint32_t& shadow_traffic_b
         }
     }
 
-    shadow_traffic_pub_id = DataBus::get_id(shadowtraffic_pub_key);
+    ShadowTrafficEvent shadow_event(shadow_traffic_bits, "", "", app_name, ShadowTrafficDetectionSource::APPID);
+    DataBus::publish(AppIdInspector::get_shadowtraffic_pub_id(), ShadowTrafficEventIds::SHADOWTRAFFIC_FLOW_DETECTED, shadow_event, flow);
 
-    ShadowTrafficEvent shadow_event(shadow_traffic_bits, "", "", app_name);
-    DataBus::publish(shadow_traffic_pub_id, ShadowTrafficEventIds::SHADOWTRAFFIC_FLOW_DETECTED, shadow_event, flow);
+    if (PacketTracer::is_active())
+    {
+        change_shadow_traffic_bits_to_string(shadow_traffic_bits, str_print);
+        PacketTracer::log("ShadowTraffic: AppID published shadow traffic event, tag_type=0x%x (%s), "
+            "application_name=%s\n",
+            shadow_traffic_bits, str_print.c_str(), app_name);
+    }
 
-    if (appidDebug and appidDebug->is_active())
+    if (appidDebug and appidDebug->is_active() and str_print.empty())
         change_shadow_traffic_bits_to_string(shadow_traffic_bits, str_print);
 
     APPID_LOG(curr_packet, TRACE_DEBUG_LEVEL,

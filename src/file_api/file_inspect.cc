@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2012-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -71,8 +71,8 @@ bool FileInspect::configure(SnortConfig* sc)
         MPSerializeFunc serialize_func = serialize_file_event;
         MPDeserializeFunc deserialize_func = deserialize_file_event;
 
-        MPDataBus::register_event_helpers(file_pub_key, FileMPEvents::FILE_SHARE_SYNC, serialize_func, deserialize_func);
-        MPDataBus::subscribe(file_pub_key, FileMPEvents::FILE_SHARE_SYNC, new FileCacheShare());
+        MPDataBus::register_event_helpers(file_mp_pub_key, FileMPEvents::FILE_SHARE_SYNC, serialize_func, deserialize_func);
+        MPDataBus::subscribe(file_mp_pub_key, FileMPEvents::FILE_SHARE_SYNC, new FileCacheShare());
     }
     return true;
 }

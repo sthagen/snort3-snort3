@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -83,6 +83,7 @@ const InspectApi HttpApi::http_api =
 
 extern const BaseApi* ips_http_client_body;
 extern const BaseApi* ips_http_cookie;
+extern const BaseApi* ips_http_decoded_uri;
 extern const BaseApi* ips_http_header;
 extern const BaseApi* ips_http_header_test;
 extern const BaseApi* ips_http_max_header_line;
@@ -117,6 +118,7 @@ const BaseApi* sin_http[] =
     &HttpApi::http_api.base,
     ips_http_client_body,
     ips_http_cookie,
+    ips_http_decoded_uri,
     ips_http_header,
     ips_http_header_test,
     ips_http_max_header_line,

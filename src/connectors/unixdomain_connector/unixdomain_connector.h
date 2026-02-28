@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -60,6 +60,8 @@ class UnixDomainConnector :  public snort::Connector
 public:
     UnixDomainConnector(const UnixDomainConnectorConfig& config, int sfd, size_t idx, UnixDomainConnectorReconnectHelper* reconnect_helper = nullptr);
     ~UnixDomainConnector() override;
+
+    snort::ConnectorMsg allocate_connector_message(uint32_t length) override;
 
     bool transmit_message(const snort::ConnectorMsg&, const ID& = null) override;
     bool transmit_message(const snort::ConnectorMsg&&, const ID& = null) override;

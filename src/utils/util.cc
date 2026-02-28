@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -122,6 +122,18 @@ char* snort_strdup(const char* str)
     char* p = (char*)snort_alloc(n);
     memcpy(p, str, n);
     return p;
+}
+
+void* snort_memrchr(const void* s, int c, size_t n)
+{
+    const unsigned char* p = (const unsigned char*)s + n;
+    while (p != (const unsigned char*)s)
+    {
+        --p;
+        if (*p == (unsigned char)c)
+            return (void*)p;
+    }
+    return nullptr;
 }
 
 void ts_print(const struct timeval* tvp, char* timebuf, bool yyyymmdd)

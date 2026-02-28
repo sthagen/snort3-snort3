@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -53,11 +53,13 @@ public:
     { return *config; }
 
     static unsigned get_pub_id();
+    static unsigned get_shadowtraffic_pub_id();
 
 private:
     AppIdConfig* config = nullptr;
     AppIdContext ctxt;
     static unsigned cached_global_pub_id;
+    static unsigned cached_shadowtraffic_pub_id;
     void third_party_tinit();
     void third_party_tfini();
 };

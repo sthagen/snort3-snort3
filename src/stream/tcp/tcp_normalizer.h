@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -74,7 +74,6 @@ public:
 
     virtual NormStatus apply_normalizations(
         State&, TcpSegmentDescriptor&, uint32_t seq, bool stream_is_inorder);
-    virtual void session_blocker(State&, TcpSegmentDescriptor&);
     virtual bool packet_dropper(State&, TcpSegmentDescriptor&, NormFlags);
     virtual bool trim_syn_payload(State&, TcpSegmentDescriptor&, uint32_t max = 0);
     virtual void trim_rst_payload(State&, TcpSegmentDescriptor&, uint32_t max = 0);

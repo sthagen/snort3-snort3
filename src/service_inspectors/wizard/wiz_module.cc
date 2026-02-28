@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -96,7 +96,7 @@ static const Parameter s_params[] =
     { "spells", Parameter::PT_LIST, wizard_spells_params, nullptr,
       "criteria for text service identification" },
 
-    { "curses", Parameter::PT_MULTI, "dce_smb | dce_udp | dce_tcp | mms | opcua | s7commplus | sslv2", nullptr,
+    { "curses", Parameter::PT_MULTI, "dce_smb | dce_udp | dce_tcp | mms | opcua | s7commplus | socks | sslv2", nullptr,
       "enable service identification based on internal algorithm" },
 
     { "max_search_depth", Parameter::PT_INT, "0:65535", "8192",

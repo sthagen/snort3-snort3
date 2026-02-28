@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -412,13 +412,13 @@ void RnaAppDiscovery::discover_netbios_name(const snort::Packet* p, DiscoveryFil
     if ( !rt )
         return;
 
-    if ( rt->set_netbios_name(nb_name) )
+    if ( rt->set_device_name(nb_name) )
     {
         const SfIp* src_ip = p->ptrs.ip_api.get_src();
         const struct in6_addr* src_ip_ptr = (const struct in6_addr*) src_ip->get_ip6_ptr();
         const uint8_t* src_mac = layer::get_eth_layer(p)->ether_src;
 
-        logger.log(RNA_EVENT_CHANGE, CHANGE_NETBIOS_NAME, src_ip_ptr, src_mac,
+        logger.log(RNA_EVENT_CHANGE, CHANGE_DEVICE_NAME, src_ip_ptr, src_mac,
             rt, p, packet_time(), 0, nullptr, nullptr, nullptr, nullptr, nullptr,
             nullptr, APP_ID_NONE, nullptr, false, 0, 0, nullptr, nb_name);
     }

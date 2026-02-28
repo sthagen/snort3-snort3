@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -80,7 +80,6 @@ public:
     bool execute(Analyzer&, void**) override;
     const char* stringify() override
     { return "DumpFlows"; }
-
 
  protected:
     //dump_code is to track if the flow is dumped only once per dump_flow command.

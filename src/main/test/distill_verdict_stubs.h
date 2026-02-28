@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -40,6 +40,7 @@
 #include "managers/inspector_manager.h"
 #include "managers/ips_manager.h"
 #include "managers/module_manager.h"
+#include "managers/trace_logger_manager.h"
 #include "main.h"
 #include "main/analyzer.h"
 #include "main/oops_handler.h"
@@ -198,6 +199,8 @@ bool PacketTracer::is_active() { return false; }
 bool PacketTracer::is_daq_activated() { return false; }
 void TraceApi::thread_init(const TraceConfig*) { }
 void TraceApi::thread_term() { }
+void TraceLoggerManager::thread_init() { }
+void TraceLoggerManager::thread_term() { }
 void TraceApi::thread_reinit(const TraceConfig*) { }
 void PacketManager::thread_init() { }
 void PacketManager::decode(

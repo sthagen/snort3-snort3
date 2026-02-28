@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -22,6 +22,24 @@
 #ifndef SERVICE_DCERPC_H
 #define SERVICE_DCERPC_H
 #include "service_detector.h"
+
+#define DCERPC_LE_FLAG  0x10
+
+#pragma pack(1)
+
+struct DCERPCHeader
+{
+    uint8_t version;
+    uint8_t minor_version;
+    uint8_t type;
+    uint8_t flags;
+    uint8_t drep[4];
+    uint16_t frag_length;
+    uint16_t auth_length;
+    uint32_t id;
+};
+
+#pragma pack()
 
 class AppIdSession;
 class ServiceDiscovery;

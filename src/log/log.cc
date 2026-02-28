@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2002-2013 Sourcefire, Inc.
 // Copyright (C) 1998-2002 Martin Roesch <roesch@sourcefire.com>
 //
@@ -118,12 +118,16 @@ static TextLog* text_log = nullptr;
 
 void OpenLogger()
 {
+    // Called during single-threaded startup before packet processing begins
+    // coverity[missing_lock]
     text_log = TextLog_Init("stdout", 300*1024);
 }
 
 void CloseLogger()
 {
+    // Called during single-threaded shutdown after packet processing ends
     BatchedLogger::BatchedLogManager::shutdown();
+    // coverity[missing_lock]
     TextLog_Term(text_log);
 }
 
@@ -175,7 +179,7 @@ void InitProtoNames()
 
     for ( int i = 0; i < NUM_IP_PROTOS; i++ )
     {
-        struct protoent* pt = getprotobynumber(i);  // main thread only
+        const struct protoent* pt = getprotobynumber(i);  // main thread only
 
         if (pt != nullptr)
         {

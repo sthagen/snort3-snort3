@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2022-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2022-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -40,13 +40,26 @@ enum MMS_State
     MMS_STATE__OSI_SESSION_SPDU_CN_LEN,
     MMS_STATE__OSI_SESSION_SPDU_AC_LEN,
     MMS_STATE__OSI_SESSION_SPDU_PARAMS,
+    MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE,
+    MMS_STATE__OSI_SESSION_SPDU_PARAM_LEN,
+    MMS_STATE__OSI_SESSION_SPDU_PARAM_DATA,
     MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN,
     MMS_STATE__OSI_PRES_CP_CPA,
     MMS_STATE__OSI_PRES_CP_CPA_USER_DATA_ACSE_LOCATE,
     MMS_STATE__OSI_PRES_USER_DATA,
+    MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG,
+    MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN,
+    MMS_STATE__OSI_PRES_CTX_SEARCH_ENCODED_DATA_TAG,
+    MMS_STATE__OSI_PRES_CTX_SKIP_ENCODED_DATA_LEN,
+    MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_TAG,
+    MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_LEN,
+    MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_CONTEXT,
     MMS_STATE__OSI_ACSE,
     MMS_STATE__OSI_ACSE_TYPE,
     MMS_STATE__OSI_ACSE_DATA,
+    MMS_STATE__OSI_ACSE_DATA_FIND_TAG,
+    MMS_STATE__OSI_ACSE_DATA_CHECK_LEN,
+    MMS_STATE__OSI_ACSE_DATA_CHECK_CONTEXT,
     MMS_STATE__MMS,
     MMS_STATE__MMS_CONFIRMED_REQUEST,
     MMS_STATE__FOUND,
@@ -88,6 +101,7 @@ public:
     MMS_State last_state = MMS_State::MMS_STATE__TPKT_VER;
     bool connect_accept_item_likely = false;
     bool session_requirement_likely = false;
+    unsigned state_remain = 0; // used to track remaining bytes in current state
 };
 
 #endif

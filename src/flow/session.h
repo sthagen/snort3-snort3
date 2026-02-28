@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -66,6 +66,8 @@ public:
     virtual void flush_listener(snort::Packet*, bool /*final_flush */ = false) { }
 
     virtual void set_splitter(bool /*c2s*/, snort::StreamSplitter*) { assert(false); }
+    virtual void set_splitter_with_rescan(bool /*c2s*/, snort::StreamSplitter*, uint32_t /*seq*/) { assert(false); }
+    virtual uint32_t get_paf_position(bool /*c2s*/) const { return 0; }
     virtual snort::StreamSplitter* get_splitter(bool /*c2s*/) { return nullptr; }
 
     virtual void set_extra_data(snort::Packet*, uint32_t /*flag*/) { }

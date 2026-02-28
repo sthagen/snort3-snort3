@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -53,6 +53,10 @@ struct Packet;
 #define STREAM_DEFAULT_CONSEC_SMALL_SEGS 0     /* disabled */
 
 #define SLAM_MAX 4
+
+#define MAX_TCP_WINDOW_SCALED 0x40000000  // 1GB - max window with 14-bit scaling (65535 << 14)
+#define MAX_TCP_SEQ_DISTANCE  (0xFFFFFFFF - MAX_TCP_WINDOW_SCALED)  // ~3GB
+#define TCP_SEQ_MIDPOINT      0x80000000  // 2GB - midpoint of 32-bit TCP sequence space
 
 #define MAX_ZERO_WIN_PROBE_LEN 1
 #define MAX_KEEP_ALIVE_PROBE_LEN 1

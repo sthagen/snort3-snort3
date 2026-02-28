@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -145,6 +145,7 @@ protected:
 
 private:
     const Field& get_tmp_buffer(const HttpBufferInfo& buf);
+    Field* compute_http_decoded_uri(const HttpBufferInfo& buf);
     Field* compute_http_method_str(const HttpBufferInfo& buf);
     Field* compute_http_request_size(const HttpBufferInfo& buf);
     Field* compute_http_response_size(const HttpBufferInfo& buf);

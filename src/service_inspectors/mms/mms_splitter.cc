@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -149,6 +149,9 @@ MmsSplitter::MmsSplitter(bool b) :
 StreamSplitter::Status MmsSplitter::scan(Packet* p, const uint8_t* data, uint32_t len,
     uint32_t /*flags*/, uint32_t* fp)
 {
+    if (!p->flow)
+        return StreamSplitter::ABORT;
+
     // create TPKT flow data and add it to the packet
     TpktFlowData* tpktfd = (TpktFlowData*)p->flow->get_flow_data(TpktFlowData::inspector_id);
 

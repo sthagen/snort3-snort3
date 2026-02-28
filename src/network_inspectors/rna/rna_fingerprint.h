@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -58,7 +58,8 @@ public:
         FP_TYPE_DHCP6 = 12,
         FP_TYPE_USERAGENT = 13,
         FP_TYPE_CPE = 14,
-        MAX_FP_TYPES = 15
+        FP_TYPE_DEVICEINFO = 15,
+        MAX_FP_TYPES = 16
     };
 
     uint32_t fpid = 0;

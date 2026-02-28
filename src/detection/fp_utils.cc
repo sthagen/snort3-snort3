@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -183,6 +183,9 @@ static const char* guess_service(const char* opt)
 
     if ( !strncmp(opt, "sip_", 4) )
         return "sip";
+
+    if ( !strncmp(opt, "socks_", 6) )
+        return "socks";
 
     if ( !strncmp(opt, "ssl_", 4) )
         return "ssl";

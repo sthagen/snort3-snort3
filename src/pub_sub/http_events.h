@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -38,6 +38,7 @@ public:
         http_msg_header(http_msg_header_), is_httpx(httpx), httpx_stream_id(stream_id) { }
 
     const uint8_t* get_all_raw_headers(int32_t &length); // Returns all HTTP headers plus cookies.
+    const uint8_t* get_content_length(int32_t &length);
     const uint8_t* get_content_type(int32_t &length);
     const uint8_t* get_cookie(int32_t &length);
     const uint8_t* get_authority(int32_t &length);

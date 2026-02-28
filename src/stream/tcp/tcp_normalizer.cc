@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -167,17 +167,6 @@ bool TcpNormalizer::strip_tcp_timestamp(
     }
 
     return false;
-}
-
-void TcpNormalizer::session_blocker(
-    TcpNormalizerState&, TcpSegmentDescriptor& tsd)
-{
-    Packet *p = tsd.get_pkt();
-    DetectionEngine::disable_all(p);
-    p->active->block_session(p, true);
-    p->active->set_drop_reason("stream");
-    if (PacketTracer::is_active())
-        PacketTracer::log("stream_tcp: TCP normalizer - Zero Window Probe byte data mismatch\n");
 }
 
 bool TcpNormalizer::packet_dropper(

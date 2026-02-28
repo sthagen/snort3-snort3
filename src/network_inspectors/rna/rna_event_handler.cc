@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -24,6 +24,7 @@
 
 #include "rna_event_handler.h"
 #include "pub_sub/dhcp_events.h"
+#include "pub_sub/deviceinfo_events.h"
 #include "pub_sub/smb_events.h"
 
 using namespace snort;
@@ -169,4 +170,13 @@ void RnaNetFlowEventHandler::handle(DataEvent& event, Flow*)
     ++rna_stats.netflow_record;
     update_rna_pkt_stats(event);
     pnd.analyze_netflow(event);
+}
+
+void RnaDeviceInfoEventHandler::handle(DataEvent& event, Flow*)
+{
+    // cppcheck-suppress unreadVariable
+    Profile profile(rna_perf_stats);
+    ++rna_stats.deviceinfo;
+    update_rna_pkt_stats(event);
+    pnd.analyze_deviceinfo(event);
 }

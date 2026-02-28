@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -335,13 +335,6 @@ void TcpOverlapResolver::full_right_overlap_truncate_new(TcpOverlapState& tos)
     if ( tos.tcp_ips_data == NORM_MODE_ON )
     {
         unsigned offset = tos.right->start_seq() - tos.tsd->get_seq();
-        if ( !offset && zwp_data_mismatch(tos, *tos.tsd, tos.right->length))
-        {
-            tos.seglist.tracker->normalizer.session_blocker(*tos.tsd);
-            tos.keep_segment = false;
-            return;
-        }
-
         tos.tsd->rewrite_payload(offset, tos.right->payload(), tos.right->length);
     }
 
@@ -433,18 +426,6 @@ void TcpOverlapResolver::full_right_overlap_os4(TcpOverlapState& tos)
 void TcpOverlapResolver::full_right_overlap_os5(TcpOverlapState& tos)
 {
     full_right_overlap_truncate_new(tos);
-}
-
-bool TcpOverlapResolver::zwp_data_mismatch(TcpOverlapState& tos, TcpSegmentDescriptor& tsd, uint32_t overlap)
-{
-    if ( overlap == MAX_ZERO_WIN_PROBE_LEN
-        and tos.right->start_seq() == tos.seglist.tracker->normalizer.get_zwp_seq()
-        and (tos.right->data[0] != tsd.get_pkt()->data[0]) )
-    {
-        return tsd.is_nap_policy_inline();
-    }
-
-    return false;
 }
 
 class TcpOverlapResolverFirst : public TcpOverlapResolver

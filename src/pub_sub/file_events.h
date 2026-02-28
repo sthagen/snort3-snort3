@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2022-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2022-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -16,12 +16,12 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-// http_event_ids.h author Shilpa Nagpal <shinagpa@cisco.com>
+// file_events.h author Shilpa Nagpal <shinagpa@cisco.com>
 
 // File events published by File Service for MP snort support.
 
-#ifndef FILE_MP_EVENTS_H
-#define FILE_MP_EVENTS_H
+#ifndef FILE_EVENTS_H
+#define FILE_EVENTS_H
 
 #include "file_api/file_cache.h"
 #include "file_events_ids.h"
@@ -121,6 +121,29 @@ private:
     FileHashKey hashkey;
     FileInfo file_ctx;
     uint16_t len;
+};
+
+class SO_PUBLIC FileEvent : public DataEvent
+{
+public:
+    FileEvent(const FileContext& data) : file_ctx(data) { }
+
+    std::string get_fuid() const;
+    const std::string& get_source() const;
+    const std::string get_mime_type() const;
+    const std::string& get_filename() const;
+    double get_duration() const;  // Returns duration in seconds (fractional)
+    bool get_is_orig() const;
+    uint64_t get_seen_bytes() const;
+    uint64_t get_total_bytes() const;
+    bool get_timedout() const;
+    const std::string get_sha256() const;
+    const std::string get_extracted_name() const;
+    bool get_extracted_cutoff() const;
+    uint64_t get_extracted_size() const;
+
+private:
+    const FileContext& file_ctx;
 };
 
 }

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -1097,6 +1097,9 @@ int TcpSession::process(Packet* p)
         init_tcp_packet_analysis(ma_tsd);
         process_tcp_packet(ma_tsd, p);
         tcpStats.meta_acks++;
+
+        pkt_action_mask = ACTION_NOTHING;
+        tel.clear_tcp_events();
     }
 
     if ( p->context->conf->is_address_anomaly_check_enabled() )
@@ -1359,6 +1362,19 @@ void TcpSession::set_splitter(bool to_server, StreamSplitter* ss)
     TcpStreamTracker& trk = ( to_server ) ? server : client;
 
     trk.set_splitter(ss);
+}
+
+uint32_t TcpSession::get_paf_position(bool to_server) const
+{
+    const TcpStreamTracker& trk = ( to_server ) ? server : client;
+    return trk.get_paf_position();
+}
+
+void TcpSession::set_splitter_with_rescan(bool to_server, StreamSplitter* ss, uint32_t seq)
+{
+    TcpStreamTracker& trk = ( to_server ) ? server : client;
+
+    trk.set_splitter_with_rescan(ss, seq);
 }
 
 uint16_t TcpSession::get_mss(bool to_server) const

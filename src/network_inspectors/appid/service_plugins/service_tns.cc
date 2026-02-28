@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -27,8 +27,6 @@
 
 #include "app_info_table.h"
 
-// FIXIT-M should we use 'tns' or 'oracle' as the name for this service?
-//static const char svc_name[] = "oracle";
 static const uint8_t TNS_BANNER[]  = "\000\000";
 
 #define TNS_BANNER_LEN    (sizeof(TNS_BANNER)-1)

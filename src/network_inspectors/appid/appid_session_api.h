@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -94,14 +94,15 @@ namespace snort
 #define APPID_SESSION_OPPORTUNISTIC_TLS     (1ULL << 44)
 #define APPID_SESSION_FIRST_PKT_CACHE_MATCHED    (1ULL << 45)
 #define APPID_SESSION_DO_NOT_DECRYPT        (1ULL << 46)
-#define APPID_SESSION_WAIT_FOR_EXTERNAL       (1ULL << 47)
+#define APPID_SESSION_WAIT_FOR_EXTERNAL     (1ULL << 47)
 #define APPID_SESSION_IGNORE_ID_FLAGS \
     (APPID_SESSION_FUTURE_FLOW | \
     APPID_SESSION_NOT_A_SERVICE | \
     APPID_SESSION_NO_TPI | \
     APPID_SESSION_SERVICE_DETECTED | \
     APPID_SESSION_PORT_SERVICE_DONE)
-const uint64_t APPID_SESSION_ALL_FLAGS = 0xFFFFFFFFFFFFFFFFULL;
+
+#define APPID_SESSION_ALL_FLAGS 0xFFFFFFFFFFFFFFFFULL
 
 class SO_PUBLIC AppIdSessionApi : public StashGenericObject
 {

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2016-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2016-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -343,7 +343,7 @@ void FileCache::publish_file_cache_event(Flow* flow, FileInfo* file, int64_t tim
 
 
         std::shared_ptr<FileMPEvent> fe = std::make_shared<FileMPEvent>(hashkey, timeout, *file);
-        unsigned file_pub_id = MPDataBus::get_id(file_pub_key);
+        unsigned file_pub_id = MPDataBus::get_id(file_mp_pub_key);
         MPDataBus::publish(file_pub_id, FileMPEvents::FILE_SHARE_SYNC, fe);
 
         FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, GET_CURRENT_PACKET,
@@ -427,6 +427,12 @@ bool FileCache::apply_verdict(Packet* p, FileContext* file_ctx, FileVerdict verd
         // can't block session inside a session
         FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p,
             "apply_verdict:FILE_VERDICT_BLOCK with action block\n");
+
+        if (PacketTracer::is_active())
+        {
+            PacketTracer::log("File: FILE_VERDICT_BLOCK with action block\n");
+        }
+
         act->set_delayed_action(Active::ACT_BLOCK, true);
         act->set_drop_reason("file");
         break;
@@ -435,6 +441,12 @@ bool FileCache::apply_verdict(Packet* p, FileContext* file_ctx, FileVerdict verd
         // can't reset session inside a session
         FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p,
             "apply_verdict:FILE_VERDICT_REJECT with action reset\n");
+
+        if (PacketTracer::is_active())
+        {
+            PacketTracer::log("File: FILE_VERDICT_REJECT with action reset\n");
+        }
+
         act->set_delayed_action(Active::ACT_RESET, true);
         act->set_drop_reason("file");
         break;
@@ -456,8 +468,16 @@ bool FileCache::apply_verdict(Packet* p, FileContext* file_ctx, FileVerdict verd
             {
                 FILE_DEBUG(file_trace, DEFAULT_TRACE_OPTION_ID, TRACE_DEBUG_LEVEL, p,
                     "apply_verdict:FILE_VERDICT_PENDING with action reset\n");
+
+                if (PacketTracer::is_active())
+                {
+                    PacketTracer::log("File: FILE_VERDICT_PENDING with action reset due to timeout\n");
+                }
+
                 act->set_delayed_action(Active::ACT_RESET, true);
             }
+
+            file_ctx->set_timedout();
 
             if (resume)
                 policy->log_file_action(flow, file_ctx, FILE_RESUME_BLOCK);

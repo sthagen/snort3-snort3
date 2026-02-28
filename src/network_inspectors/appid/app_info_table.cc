@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -408,6 +408,10 @@ void AppInfoManager::load_odp_config(OdpContext& odp_ctxt, const char* path)
                 {
                     odp_ctxt.mdns_deviceinfo = true;
                 }
+                else if (!(strcasecmp(conf_val, "disabled")))
+                {
+                    odp_ctxt.mdns_deviceinfo = false;
+                }
             }
             else if (!(strcasecmp(conf_key, "bittorrent_aggressiveness")))
             {
@@ -722,6 +726,10 @@ void AppInfoManager::load_odp_config(OdpContext& odp_ctxt, const char* path)
             else if (!(strcasecmp(conf_key, "eve_http_client")))
             {
                 odp_ctxt.eve_http_client = atoi(conf_val) ? true : false;
+            }
+            else if (!(strcasecmp(conf_key, "kerberos_check_failed_login")))
+            {
+                odp_ctxt.kerberos_check_failed_login = atoi(conf_val) ? true : false;
             }
             else if (!(strcasecmp(conf_key, "appid_cpu_profiling")))
             {

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -185,6 +185,22 @@ TEST(pub_sub_http_event_test, get_all_raw_headers)
     header_start = event.get_all_raw_headers(discovered_length);
     CHECK(discovered_length == header_length);
     CHECK(memcmp(header_start, headers, header_length) == 0);
+}
+
+TEST(pub_sub_http_event_test, get_content_length)
+{
+    const char* content_length = "20000";
+    const int32_t content_length_len = strlen(content_length);
+    const uint8_t* retrieved_content_length;
+    int32_t retrieved_length;
+
+    mock().expectOneCall("get_classic_buffer").withParameter("buffer_type", HttpEnums::HTTP_BUFFER_HEADER);
+    Field input(content_length_len, (const uint8_t*) content_length);
+    mock().setDataObject("output", "Field", &input);
+    HttpEvent event(nullptr, false, 0);
+    retrieved_content_length = event.get_content_length(retrieved_length);
+    CHECK(content_length_len == retrieved_length);
+    CHECK(memcmp(retrieved_content_length, content_length, content_length_len) == 0);
 }
 
 int main(int argc, char** argv)

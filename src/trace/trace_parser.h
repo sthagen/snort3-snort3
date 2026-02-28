@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -40,6 +40,8 @@ public:
 
     bool set_traces(const std::string& option_name, const snort::Value& val);
     bool set_constraints(const snort::Value& val);
+    void set_output_trace(std::string output_trace);
+    void set_output(std::string output_trace);
 
     void finalize_constraints();
     void clear_traces();

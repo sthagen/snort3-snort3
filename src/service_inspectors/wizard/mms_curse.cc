@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2023-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2023-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -107,73 +107,100 @@ static uint32_t search_for_osi_session_spdu( MmsTracker& mms, const uint8_t* dat
 
 static uint32_t search_for_pres_ctx( MmsTracker& mms, const uint8_t* data, unsigned len, uint32_t idx )
 {
-    // define some constants for search windows
-    constexpr uint32_t fully_encoded_data_window = 3;
-    constexpr uint32_t pres_ctx_window = 3;
-    constexpr uint32_t max_depth_idx = fully_encoded_data_window + pres_ctx_window;
+    assert( data );
 
-    // try to determine if the ACSE layer exists
-    // len reduction is to allow space for the forward looking checks
-    bool ctx_likely = false;
-    for ( uint32_t init_byte = idx; ( init_byte < len - max_depth_idx ) && !ctx_likely; init_byte++)
+    // Maximum length bytes to skip before resetting pattern search
+    constexpr uint32_t MAX_SKIP_BYTES = 2;
+
+    enum
     {
-        // require the user-data fully encoded data tag ( | 61 | )
-        if ( data[init_byte] != 0x61 )
-        {
-            continue;
-        }
+        USER_DATA_TAG = 0x61,
+        ENCODED_DATA_TAG = 0x30,
+        PRES_CTX_TAG = 0x02,
+        PRES_CTX_LEN = 0x01,
+    };
 
-        // make sure there is still enough space left in the buffer for the forward search
-        // allow up to two bytes for the fully encoded data field
-        if ( !verify_search_depth_idx( len, init_byte, max_depth_idx ) )
+    while ( idx < len )
+    {
+        switch ( mms.state )
         {
-            // not enough data to process
-            assert( !ctx_likely );
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG:
+            if ( data[idx] == USER_DATA_TAG )
+            {
+                mms.state = MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN;
+                mms.state_remain = 0;
+            }
+            break;
+
+        case MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN:
+            if ( data[idx] == ENCODED_DATA_TAG )
+            {
+                mms.state = MMS_STATE__OSI_PRES_CTX_SKIP_ENCODED_DATA_LEN;
+                mms.state_remain = 0;
+            }
+            else if ( data[idx] == USER_DATA_TAG )
+            {
+                mms.state = MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN;
+                mms.state_remain = 0;
+            }
+            else if ( ++mms.state_remain > MAX_SKIP_BYTES )
+                mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+            break;
+
+        case MMS_STATE__OSI_PRES_CTX_SKIP_ENCODED_DATA_LEN:
+            if ( data[idx] == PRES_CTX_TAG )
+            {
+                mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_LEN;
+                mms.state_remain = 0;
+            }
+            else if ( data[idx] == USER_DATA_TAG )
+            {
+                mms.state = MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN;
+                mms.state_remain = 0;
+            }
+            else if ( ++mms.state_remain > MAX_SKIP_BYTES )
+                mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+            break;
+
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_TAG:
+            if ( data[idx] == PRES_CTX_TAG )
+                mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_LEN;
+            else
+                mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+            break;
+
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_LEN:
+            if ( data[idx] == PRES_CTX_LEN )
+                mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_CONTEXT;
+            else
+                mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+            break;
+
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_CONTEXT:
+            switch ( data[idx] )
+            {
+            case PresCtx::PRES_CTX_ACSE:
+                mms.state = MMS_STATE__OSI_ACSE;
+                return idx;
+
+            case PresCtx::PRES_CTX_MMS:
+                mms.state = MMS_STATE__MMS;
+                return idx;
+
+            default:
+                mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+                break;
+            }
+            break;
+
+        default:
+            assert( false );
             break;
         }
 
-        for ( uint32_t encode_tag_shift = 1; ( encode_tag_shift < fully_encoded_data_window ) && !ctx_likely; encode_tag_shift++ )
-        {
-            uint32_t encode_tag_byte = init_byte + encode_tag_shift;
-            // look for the ' fully encoded data ' user data tag ( | 30 | );
-            if ( data[encode_tag_byte] != 0x30 )
-            {
-                continue;
-            }
-
-            for ( uint32_t pres_ctx_shift = 1; ( pres_ctx_shift < + pres_ctx_window ) && !ctx_likely; pres_ctx_shift++ )
-            {
-                // look for the presentation context tag and length ( | 02 01 | )
-                bool ctx_b1 = data[encode_tag_byte + pres_ctx_shift] == 0x02;
-                bool ctx_b2 = data[encode_tag_byte + pres_ctx_shift + 1] == 0x01;
-                if ( ctx_b1 && ctx_b2 )
-                {
-                    switch ( data[encode_tag_byte + pres_ctx_shift + 2] )
-                    {
-                    // set the state accordingly when the OSI ACSE presentation context ( | 01 | ) has been found
-                    case PresCtx::PRES_CTX_ACSE:
-                    {
-                        // place the index at the last byte of the presentation context
-                        idx = init_byte + encode_tag_shift + pres_ctx_shift + 2;
-                        mms.state = MMS_STATE__OSI_ACSE;
-                        ctx_likely = true;
-                        break;
-                    }
-                    // set the state accordingly when the MMS presentation context ( | 03 | ) has been found
-                    case PresCtx::PRES_CTX_MMS:
-                    {
-                        // place the index at the last byte of the presentation context
-                        idx = init_byte + encode_tag_shift + pres_ctx_shift + 2;
-                        mms.state = MMS_STATE__MMS;
-                        ctx_likely = true;
-                        break;
-                    }
-                    // no default as we want to keep looking if an acceptable context is not found
-                    }
-                }
-            }
-        }
+        idx++;
     }
+
     return idx;
 }
 
@@ -186,54 +213,95 @@ static uint32_t search_for_osi_session_spdu_params( MmsTracker& mms, const uint8
         CN_SPDU_PARAM__SESSION_USER_DATA = 0xC1,
     };
 
-    // len reduction is to allow space for the forward looking checks
-    while ( idx < len - 3 )
+    assert( data );
+
+    while ( idx < len )
     {
-        // check for the possibility of a connect accept item
-        if ( data[idx] == CN_SPDU_PARAM__CONNECT_ACCEPT_ITEM )
+        switch ( mms.state )
         {
-            // track that the item was found
-            mms.connect_accept_item_likely = true;
-        }
-        // check for the possibility of a session requirement
-        else if ( data[idx] == CN_SPDU_PARAM__SESSION_REQUIREMENT )
+        case MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE:
         {
-            // track that the item was found
-            mms.session_requirement_likely = true;
-        }
-        // check for the possibility of a session user data item
-        else if ( data[idx] == CN_SPDU_PARAM__SESSION_USER_DATA )
-        {
-            // when this has been found and there is a good chance all of the other required items exist, move on to look for mms
-            if ( mms.connect_accept_item_likely &&
-                mms.session_requirement_likely )
+            // check for the possibility of a connect accept item
+            if ( data[idx] == CN_SPDU_PARAM__CONNECT_ACCEPT_ITEM )
             {
-                mms.state = MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN;
-                break;
+                // track that the item was found
+                mms.connect_accept_item_likely = true;
             }
-            // otherwise it is unlikely that this is mms
-            else
+            // check for the possibility of a session requirement
+            else if ( data[idx] == CN_SPDU_PARAM__SESSION_REQUIREMENT )
             {
-                mms.state = MMS_STATE__NOT_FOUND;
-                break;
+                // track that the item was found
+                mms.session_requirement_likely = true;
             }
-        }
-        // no else case as we want to allow for the possibility of non-standard items
+            // check for the possibility of a session user data item
+            else if ( data[idx] == CN_SPDU_PARAM__SESSION_USER_DATA )
+            {
+                // when this has been found and there is a good chance all of the other required items exist, move on to look for mms
+                if ( mms.connect_accept_item_likely &&
+                    mms.session_requirement_likely )
+                {
+                    mms.state = MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN;
+                    mms.state_remain = 0;
+                    return idx;
+                }
+                // otherwise it is unlikely that this is mms
+                else
+                {
+                    mms.state = MMS_STATE__NOT_FOUND;
+                    mms.state_remain = 0;
+                    return idx;
+                }
+            }
 
-        // increment the index to look at the item length field
-        idx++;
-        // increment the index to the end of the item data
-        idx += data[idx];
-        // increment the index to the start of the next item
-        idx++;
+            mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_LEN;
+            mms.state_remain = 1;
 
-        // if the index has gotten larger than the available buffer, bail
-        if ( idx >= len )
-        {
-            mms.state = MMS_STATE__NOT_FOUND;
             break;
         }
+
+        case MMS_STATE__OSI_SESSION_SPDU_PARAM_LEN:
+        {
+            mms.state_remain = data[idx];
+
+            if ( mms.state_remain > 0 )
+                mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_DATA;
+            else
+            {
+                // no data for this parameter; move on to the next parameter type.
+                mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+                mms.state_remain = 1;
+            }
+
+            break;
+        }
+
+        case MMS_STATE__OSI_SESSION_SPDU_PARAM_DATA:
+        {
+            uint32_t advance_len = std::min<uint32_t>(
+                static_cast<uint32_t>( mms.state_remain ), len - idx );
+
+            // move to the end of data, adjusting for the upcoming idx++ at the end of the loop
+            idx += advance_len - 1;
+
+            mms.state_remain -= advance_len;
+
+            if ( mms.state_remain == 0 )
+            {
+                mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+                mms.state_remain = 1;
+            }
+
+            break;
+        }
+
+        default:
+            assert( false );
+            break;
+        }
+
+        idx++;
     }
+
     return idx;
 }
 
@@ -266,19 +334,57 @@ static uint32_t search_for_osi_acse_type( MmsTracker& mms, const uint8_t* data, 
 
 static uint32_t search_for_osi_acse_data( MmsTracker& mms, const uint8_t* data, unsigned len, uint32_t idx )
 {
-    // this will likely be a good distance from the current position
-    // minus three is to give space for the forward checks for the direct and indirect reference
-    for ( uint32_t k = 0; idx+k < len-3; k++ )
+    assert( data );
+
+    enum
     {
-        // look for the MMS presentation context ( | 02 01 03 | )
-        if ( data[idx+k] == 0x02 && data[idx+k+1] == 0x01 && data[idx+k+2] == 0x03 )
+        ACSE_CONTEXT_TAG = 0x02,
+        ACSE_CONTEXT_LEN = 0x01,
+        ACSE_MMS_CONTEXT = 0x03,
+        ACSE_ACSE_CONTEXT = 0x01,
+    };
+
+    while ( idx < len )
+    {
+        switch ( mms.state )
         {
-            mms.state = MMS_STATE__MMS;
-            // increment the index to the end of the mms context id reference
-            idx += k+2;
+        case MMS_STATE__OSI_ACSE_DATA_FIND_TAG:
+            if ( data[idx] == ACSE_CONTEXT_TAG )
+                mms.state = MMS_STATE__OSI_ACSE_DATA_CHECK_LEN;
+            break;
+
+        case MMS_STATE__OSI_ACSE_DATA_CHECK_LEN:
+            if ( data[idx] == ACSE_CONTEXT_LEN )
+                mms.state = MMS_STATE__OSI_ACSE_DATA_CHECK_CONTEXT;
+            else
+                mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+            break;
+
+        case MMS_STATE__OSI_ACSE_DATA_CHECK_CONTEXT:
+            switch ( data[idx] )
+            {
+            case ACSE_MMS_CONTEXT:
+                mms.state = MMS_STATE__MMS;
+                return idx;
+
+            case ACSE_ACSE_CONTEXT:
+                mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+                break;
+
+            default:
+                mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+            }
+            break;
+
+        default:
+            mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+            assert( false );
             break;
         }
+
+        idx++;
     }
+
     return idx;
 }
 
@@ -571,8 +677,9 @@ bool CurseBook::mms_curse( const uint8_t* data, unsigned len, CurseTracker* trac
         // process the User Data Presentation type
         case MMS_STATE__OSI_PRES_USER_DATA:
         {
-            idx = search_for_pres_ctx(mms, data, len, idx);
-            break;
+            mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+            // Avoid processing current byte twice
+            continue;
         }
 
 
@@ -583,19 +690,21 @@ bool CurseBook::mms_curse( const uint8_t* data, unsigned len, CurseTracker* trac
         // skip the CN SPDU length field
         case MMS_STATE__OSI_SESSION_SPDU_CN_LEN:
         {
-            mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAMS;
+            mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
             break;
         }
 
         // skip the AC SPDU length field
         case MMS_STATE__OSI_SESSION_SPDU_AC_LEN:
         {
-            mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAMS;
+            mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
             break;
         }
 
         // check the parameters
-        case MMS_STATE__OSI_SESSION_SPDU_PARAMS:
+        case MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE:    // fallthrough intentional
+        case MMS_STATE__OSI_SESSION_SPDU_PARAM_LEN:     // fallthrough intentional
+        case MMS_STATE__OSI_SESSION_SPDU_PARAM_DATA:
         {
             idx = search_for_osi_session_spdu_params(mms, data, len, idx);
             break;
@@ -622,8 +731,21 @@ bool CurseBook::mms_curse( const uint8_t* data, unsigned len, CurseTracker* trac
             break;
         }
 
-        //
+        // Initialize presentation context search
         case MMS_STATE__OSI_PRES_CP_CPA_USER_DATA_ACSE_LOCATE:
+        {
+            mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+            continue;
+        }
+
+        // Presentation context search states
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG:      // fallthrough intentional
+        case MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN:        // fallthrough intentional
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_ENCODED_DATA_TAG:   // fallthrough intentional
+        case MMS_STATE__OSI_PRES_CTX_SKIP_ENCODED_DATA_LEN:     // fallthrough intentional
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_TAG:       // fallthrough intentional
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_LEN:       // fallthrough intentional
+        case MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_CONTEXT:
         {
             idx = search_for_pres_ctx(mms, data, len, idx);
             break;
@@ -652,6 +774,15 @@ bool CurseBook::mms_curse( const uint8_t* data, unsigned len, CurseTracker* trac
 
         //
         case MMS_STATE__OSI_ACSE_DATA:
+        {
+            mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+            continue;
+        }
+
+        // ACSE data search states
+        case MMS_STATE__OSI_ACSE_DATA_FIND_TAG:
+        case MMS_STATE__OSI_ACSE_DATA_CHECK_LEN:
+        case MMS_STATE__OSI_ACSE_DATA_CHECK_CONTEXT:
         {
             idx = search_for_osi_acse_data(mms, data, len, idx);
             break;
@@ -705,3 +836,1022 @@ bool CurseBook::mms_curse( const uint8_t* data, unsigned len, CurseTracker* trac
 
     return false;
 }
+
+
+//--------------------------------------------------------------------------
+// unit tests
+//--------------------------------------------------------------------------
+
+#ifdef UNIT_TEST
+
+#include "catch/snort_catch.h"
+
+TEST_CASE("search_for_osi_session_spdu_params user data success", "[mms]")
+{
+    const uint8_t data[] = { 0xC1 };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+    mms.connect_accept_item_likely = true;
+    mms.session_requirement_likely = true;
+
+    const uint32_t r = search_for_osi_session_spdu_params(mms, data, sizeof(data), 0);
+
+    CHECK(r == 0);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN);
+    CHECK(mms.state_remain == 0);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params user data missing prerequisite", "[mms]")
+{
+    const uint8_t data[] = { 0xC1 };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    const uint32_t r = search_for_osi_session_spdu_params(mms, data, sizeof(data), 0);
+
+    CHECK(r == 0);
+    CHECK(mms.state == MMS_STATE__NOT_FOUND);
+    CHECK(mms.state_remain == 0);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params zero length parameters", "[mms]")
+{
+    const uint8_t data[] = {
+        0x05, 0x00,
+        0x14, 0x00,
+        0xC1
+    };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    const uint32_t r = search_for_osi_session_spdu_params(mms, data, sizeof(data), 0);
+
+    CHECK(r == 4);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN);
+    CHECK(mms.connect_accept_item_likely);
+    CHECK(mms.session_requirement_likely);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params data in same buffer", "[mms]")
+{
+    const uint8_t data[] = {
+        0x05, 0x01, 0xAA,
+        0x14, 0x01, 0xBB,
+        0xC1
+    };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    const uint32_t r = search_for_osi_session_spdu_params(mms, data, sizeof(data), 0);
+
+    CHECK(r == 6);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN);
+    CHECK(mms.connect_accept_item_likely);
+    CHECK(mms.session_requirement_likely);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params unknown tag skip", "[mms]")
+{
+    const uint8_t data[] = {
+        0xEE, 0x02, 0xAA, 0xBB,
+        0x05, 0x00,
+        0x14, 0x00,
+        0xC1
+    };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    const uint32_t r = search_for_osi_session_spdu_params(mms, data, sizeof(data), 0);
+
+    CHECK(r == 8);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN);
+    CHECK(mms.connect_accept_item_likely);
+    CHECK(mms.session_requirement_likely);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params split type and len", "[mms]")
+{
+    const uint8_t data1[] = { 0x05 };
+    const uint8_t data2[] = { 0x01, 0x00, 0x14, 0x01, 0x00, 0xC1 };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    uint32_t r = search_for_osi_session_spdu_params(mms, data1, sizeof(data1), 0);
+    CHECK(r == 1);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_PARAM_LEN);
+    CHECK(mms.state_remain == 1);
+    CHECK(mms.connect_accept_item_likely);
+
+    r = search_for_osi_session_spdu_params(mms, data2, sizeof(data2), 0);
+    CHECK(r == 5);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN);
+    CHECK(mms.session_requirement_likely);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params split len and data", "[mms]")
+{
+    const uint8_t data1[] = { 0x05, 0x02 };
+    const uint8_t data2[] = { 0xAA, 0xBB, 0x14, 0x01, 0x00, 0xC1 };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    uint32_t r = search_for_osi_session_spdu_params(mms, data1, sizeof(data1), 0);
+    CHECK(r == 2);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_PARAM_DATA);
+    CHECK(mms.state_remain == 2);
+    CHECK(mms.connect_accept_item_likely);
+
+    r = search_for_osi_session_spdu_params(mms, data2, sizeof(data2), 0);
+    CHECK(r == 5);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN);
+    CHECK(mms.session_requirement_likely);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params split midway through data", "[mms]")
+{
+    const uint8_t data1[] = { 0x05, 0x03, 0xAA };
+    const uint8_t data2[] = { 0xBB, 0xCC, 0x14, 0x01, 0x00, 0xC1 };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    uint32_t r = search_for_osi_session_spdu_params(mms, data1, sizeof(data1), 0);
+    CHECK(r == 3);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_PARAM_DATA);
+    CHECK(mms.state_remain == 2);
+    CHECK(mms.connect_accept_item_likely);
+
+    r = search_for_osi_session_spdu_params(mms, data2, sizeof(data2), 0);
+    CHECK(r == 5);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN);
+    CHECK(mms.session_requirement_likely);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params split at data end", "[mms]")
+{
+    const uint8_t data1[] = { 0x05, 0x01, 0xAA };
+    const uint8_t data2[] = { 0x14, 0x01, 0x00, 0xC1 };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    uint32_t r = search_for_osi_session_spdu_params(mms, data1, sizeof(data1), 0);
+    CHECK(r == 3);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE);
+    CHECK(mms.state_remain == 1);
+    CHECK(mms.connect_accept_item_likely);
+
+    r = search_for_osi_session_spdu_params(mms, data2, sizeof(data2), 0);
+    CHECK(r == 3);
+    CHECK(mms.state == MMS_STATE__OSI_SESSION_SPDU_USER_DATA_LEN);
+    CHECK(mms.session_requirement_likely);
+}
+
+TEST_CASE("search_for_osi_session_spdu_params OOB index", "[mms]")
+{
+    const uint8_t data[] = { 1, 2, 3, 4, 5, 6 };
+
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_SESSION_SPDU_PARAM_TYPE;
+
+    const uint32_t r = search_for_osi_session_spdu_params(mms, data, sizeof(data), UINT32_MAX);
+    CHECK(r == UINT32_MAX);
+}
+
+TEST_CASE("search_for_osi_acse_data: pattern found", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 2);
+}
+
+TEST_CASE("search_for_osi_acse_data: pattern not found", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0x01, 0x02, 0x03, 0x04 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_FIND_TAG);
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_osi_acse_data: pattern at offset", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0xFF, 0xAA, 0x02, 0x01, 0x03, 0x00 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 4);
+}
+
+TEST_CASE("search_for_osi_acse_data: wrong length byte", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0x02, 0x02, 0x03 }; // Wrong length (0x02 instead of 0x01)
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_FIND_TAG);
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_osi_acse_data: ACSE context found continues search", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    // First ACSE context (02 01 01), then MMS context (02 01 03)
+    uint8_t data[] = { 0x02, 0x01, 0x01, 0xAA, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 6);
+}
+
+TEST_CASE("search_for_osi_acse_data: partial match at buffer end", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0xAA, 0xBB, 0x02 }; // Tag found at end
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    // Should be in CHECK_LEN state waiting for next byte
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_CHECK_LEN);
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_osi_acse_data: resume from CHECK_LEN state", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_CHECK_LEN;
+
+    uint8_t data[] = { 0x01, 0x03 }; // Length and context
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 1);
+}
+
+TEST_CASE("search_for_osi_acse_data: resume from CHECK_CONTEXT state", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_CHECK_CONTEXT;
+
+    uint8_t data[] = { 0x03 }; // MMS context
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 0);
+}
+
+TEST_CASE("search_for_osi_acse_data: empty buffer", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[1] = { };
+    unsigned len = 0;
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_FIND_TAG);
+    CHECK(result == 0);
+}
+
+TEST_CASE("search_for_osi_acse_data: multiple patterns only first found", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0x02, 0x01, 0x03, 0xFF, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 2); // Stops at first match
+}
+
+TEST_CASE("search_for_osi_acse_data: unknown context resets", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0x02, 0x01, 0x05, 0xAA, 0x02, 0x01, 0x03 }; // Unknown context 0x05
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 6); // Found second pattern after reset
+}
+
+TEST_CASE("search_for_osi_acse_data: pattern at start of buffer", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0x02, 0x01, 0x03, 0xFF };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 2);
+}
+
+TEST_CASE("search_for_osi_acse_data: long search with pattern at end", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0xFF, 0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 8);
+}
+
+TEST_CASE("search_for_osi_acse_data: fragmented across packets", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    // First packet: tag found
+    uint8_t data1[] = { 0xAA, 0x02 };
+    uint32_t result1 = search_for_osi_acse_data(mms, data1, sizeof(data1), 0);
+
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_CHECK_LEN);
+    CHECK(result1 == sizeof(data1));
+
+    // Second packet: length and context
+    uint8_t data2[] = { 0x01, 0x03 };
+    uint32_t result2 = search_for_osi_acse_data(mms, data2, sizeof(data2), 0);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result2 == 1);
+}
+
+TEST_CASE("search_for_osi_acse_data: wrong length resets and finds next", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    uint8_t data[] = { 0x02, 0x03, 0xAA, 0x02, 0x01, 0x03 }; // Wrong len, then correct
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 5);
+}
+
+TEST_CASE("search_for_osi_acse_data: buffer boundary tag and length only", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    // Buffer ends after tag and length, no context byte
+    uint8_t data[] = { 0x02, 0x01 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    // Should be waiting for context byte in next packet
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_CHECK_CONTEXT);
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_osi_acse_data: buffer boundary tag only", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    // Buffer ends after tag only
+    uint8_t data[] = { 0x02 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    // Should be waiting for length byte in next packet
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_CHECK_LEN);
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_osi_acse_data: buffer boundary with junk then tag", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    // Buffer with junk data, then tag at very end
+    uint8_t data[] = { 0xFF, 0xAA, 0xBB, 0x02 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    // Should find tag at end and wait for length
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_CHECK_LEN);
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_osi_acse_data: buffer boundary complete pattern at end", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    // Complete pattern exactly at buffer end
+    uint8_t data[] = { 0xFF, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_osi_acse_data(mms, data, len, idx);
+
+    // Should find complete pattern
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result == 3); // Points to last byte of pattern
+}
+
+TEST_CASE("search_for_osi_acse_data: three packet fragmentation", "[mms][acse]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+
+    // First packet: ends with tag
+    uint8_t data1[] = { 0xFF, 0x02 };
+    uint32_t result1 = search_for_osi_acse_data(mms, data1, sizeof(data1), 0);
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_CHECK_LEN);
+    CHECK(result1 == sizeof(data1));
+
+    // Second packet: only length
+    uint8_t data2[] = { 0x01 };
+    uint32_t result2 = search_for_osi_acse_data(mms, data2, sizeof(data2), 0);
+    CHECK(mms.state == MMS_STATE__OSI_ACSE_DATA_CHECK_CONTEXT);
+    CHECK(result2 == sizeof(data2));
+
+    // Third packet: context
+    uint8_t data3[] = { 0x03 };
+    uint32_t result3 = search_for_osi_acse_data(mms, data3, sizeof(data3), 0);
+    CHECK(mms.state == MMS_STATE__MMS);
+    CHECK(result3 == 0);
+}
+
+TEST_CASE("search_for_osi_acse_data: single byte buffer at each state", "[mms][acse]")
+{
+    // Test each state with minimal single-byte buffers
+
+    // State 1: FIND_TAG with single byte
+    MmsTracker mms1;
+    mms1.state = MMS_STATE__OSI_ACSE_DATA_FIND_TAG;
+    uint8_t data1[] = { 0xFF };
+    uint32_t result1 = search_for_osi_acse_data(mms1, data1, sizeof(data1), 0);
+    CHECK(mms1.state == MMS_STATE__OSI_ACSE_DATA_FIND_TAG);
+    CHECK(result1 == 1);
+
+    // State 2: CHECK_LEN with wrong byte
+    MmsTracker mms2;
+    mms2.state = MMS_STATE__OSI_ACSE_DATA_CHECK_LEN;
+    uint8_t data2[] = { 0xFF };
+    uint32_t result2 = search_for_osi_acse_data(mms2, data2, sizeof(data2), 0);
+    CHECK(mms2.state == MMS_STATE__OSI_ACSE_DATA_FIND_TAG);
+    CHECK(result2 == 1);
+
+    // State 3: CHECK_CONTEXT with unknown context
+    MmsTracker mms3;
+    mms3.state = MMS_STATE__OSI_ACSE_DATA_CHECK_CONTEXT;
+    uint8_t data3[] = { 0xFF };
+    uint32_t result3 = search_for_osi_acse_data(mms3, data3, sizeof(data3), 0);
+    CHECK(mms3.state == MMS_STATE__OSI_ACSE_DATA_FIND_TAG);
+    CHECK(result3 == 1);
+}
+
+TEST_CASE("search_for_pres_ctx: complete pattern found", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 4);
+}
+
+TEST_CASE("search_for_pres_ctx: ACSE context found", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0x02, 0x01, 0x01 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_ACSE));
+    CHECK(result == 4);
+}
+
+TEST_CASE("search_for_pres_ctx: small payload no pattern", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0xFF };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: small payload partial match", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: buffer without 0x61 byte", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x62, 0x63, 0x64, 0x65, 0x66, 0x67, 0x68, 0x69 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: buffer boundary protection", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0x02 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_LEN));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: pattern with offset", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0xFF, 0xAA, 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 6);
+}
+
+TEST_CASE("search_for_pres_ctx: wrong encoded data tag resets", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0xFF, 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 6);
+}
+
+TEST_CASE("search_for_pres_ctx: wrong pres_ctx tag resets", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0xFF, 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 7);
+}
+
+TEST_CASE("search_for_pres_ctx: wrong length resets", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0x02, 0xFF, 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 8);
+}
+
+TEST_CASE("search_for_pres_ctx: unknown context value resets", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0x02, 0x01, 0xFF, 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 9);
+}
+
+TEST_CASE("search_for_pres_ctx: single byte at buffer end", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0xFF, 0xAA, 0x61 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: empty buffer", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[1] = { };
+    unsigned len = 0;
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG));
+    CHECK(result == 0);
+}
+
+TEST_CASE("search_for_pres_ctx: resume from skip_user_data_len state", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 3);
+}
+
+TEST_CASE("search_for_pres_ctx: resume with wrong byte resets", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0xFF, 0xFF, 0xFF, 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 7);
+}
+
+TEST_CASE("search_for_pres_ctx: pattern at exact buffer end", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 4);
+}
+
+TEST_CASE("search_for_pres_ctx: multiple false starts", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0xFF, 0x61, 0x30, 0xFF, 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 9);
+}
+
+TEST_CASE("search_for_pres_ctx: fragmented across packets", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data1[] = { 0x61, 0x30 };
+    uint32_t result1 = search_for_pres_ctx(mms, data1, sizeof(data1), 0);
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SKIP_ENCODED_DATA_LEN));
+    CHECK(result1 == sizeof(data1));
+
+    uint8_t data2[] = { 0x02, 0x01 };
+    uint32_t result2 = search_for_pres_ctx(mms, data2, sizeof(data2), 0);
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_CONTEXT));
+    CHECK(result2 == sizeof(data2));
+
+    uint8_t data3[] = { 0x03 };
+    uint32_t result3 = search_for_pres_ctx(mms, data3, sizeof(data3), 0);
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result3 == 0);
+}
+
+TEST_CASE("search_for_pres_ctx: OOB protection with partial match", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0x02, 0x01 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_CONTEXT));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: ASN.1 with length bytes", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x14, 0x30, 0x12, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 6);
+}
+
+TEST_CASE("search_for_pres_ctx: max skip bytes boundary exactly 2 bytes", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0xFF, 0xAA, 0xBB, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: skip encoded data len exceeds max skip bytes", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x30, 0xFF, 0xAA, 0xBB, 0x61, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 9);
+}
+
+TEST_CASE("search_for_pres_ctx: fragmented in length field", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data1[] = { 0x61, 0x14 };
+    uint32_t result1 = search_for_pres_ctx(mms, data1, sizeof(data1), 0);
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SKIP_USER_DATA_LEN));
+    CHECK(result1 == sizeof(data1));
+
+    uint8_t data2[] = { 0x30, 0x12, 0x02, 0x01 };
+    uint32_t result2 = search_for_pres_ctx(mms, data2, sizeof(data2), 0);
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_CONTEXT));
+    CHECK(result2 == sizeof(data2));
+
+    uint8_t data3[] = { 0x03 };
+    uint32_t result3 = search_for_pres_ctx(mms, data3, sizeof(data3), 0);
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result3 == 0);
+}
+
+TEST_CASE("search_for_pres_ctx: 2-byte ASN.1 length encoding", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x82, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 5);
+}
+
+TEST_CASE("search_for_pres_ctx: state_remain resets correctly", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0x14, 0x30, 0x12, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__MMS));
+    CHECK(result == 6);
+}
+
+TEST_CASE("search_for_pres_ctx: exactly at max skip bytes then tag found", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x61, 0xFF, 0xAA, 0xBB, 0x30, 0x02, 0x01, 0x03 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: OOB read protection small payload", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x62, 0x63 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: resume from pres_ctx state", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0x02 };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_LEN));
+    CHECK(result == len);
+}
+
+TEST_CASE("search_for_pres_ctx: resume from pres_ctx wrong tag resets", "[mms][pres_ctx]")
+{
+    MmsTracker mms;
+    mms.state = MMS_STATE__OSI_PRES_CTX_SEARCH_PRES_CTX_TAG;
+    mms.state_remain = 0;
+
+    uint8_t data[] = { 0xFF };
+    unsigned len = sizeof(data);
+    uint32_t idx = 0;
+
+    uint32_t result = search_for_pres_ctx(mms, data, len, idx);
+
+    CHECK((mms.state == MMS_STATE__OSI_PRES_CTX_SEARCH_USER_DATA_TAG));
+    CHECK(result == len);
+}
+
+#endif

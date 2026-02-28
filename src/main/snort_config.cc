@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -64,6 +64,7 @@
 #include "managers/plugin_manager.h"
 #include "managers/so_manager.h"
 #include "managers/mp_transport_manager.h"
+#include "managers/trace_logger_manager.h"
 #include "memory/memory_config.h"
 #include "packet_io/sfdaq.h"
 #include "packet_io/sfdaq_config.h"
@@ -1140,6 +1141,7 @@ void SnortConfig::cleanup_fatal_error()
         IpsManager::release_plugins();
         InspectorManager::release_plugins();
         ConnectorManager::release_plugins();
+        TraceLoggerManager::release_plugins();
         host_cache.term();
     }
 #endif

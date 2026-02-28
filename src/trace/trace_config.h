@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2020-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2020-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -21,11 +21,11 @@
 #define TRACE_CONFIG_H
 
 #include "trace.h"
+#include <vector>
 
 namespace snort
 {
 struct PacketConstraints;
-class TraceLoggerFactory;
 }
 
 class TraceConfig
@@ -38,17 +38,20 @@ public:
     void setup_module_trace() const;
     bool set_trace(const std::string& module_name,
         const std::string& trace_option_name, uint8_t trace_level);
+    void resolve_multi_trace();
 
     void clear();
     void clear_traces();
 
 public:
-    snort::TraceLoggerFactory* logger_factory = nullptr;
     snort::PacketConstraints* constraints = nullptr;
 
     bool ntuple = false;
     bool timestamp = false;
     bool initialized = false;
+    bool has_multi_trace = false;
+    
+    std::vector<std::string> output_traces;
 
 private:
     Traces traces;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2025-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2025-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -303,6 +303,9 @@ static void decode_nsec(const uint8_t* rdata, uint16_t rdlength, std::string& rd
     static const std::string nsec_prefix = "NSEC" + part_sep;
     static const unsigned RDATA_OFFSET = 10;
     const uint8_t* rr_domain_name_end = rdata - RDATA_OFFSET;
+    if (rr_domain_name == nullptr or rr_domain_name > rr_domain_name_end)
+       return;
+
     uint16_t rr_domain_name_len = rr_domain_name_end - rr_domain_name;
 
     rdata_str.append(nsec_prefix);

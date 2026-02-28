@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2021-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2021-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -209,7 +209,10 @@ TpktAppliSearchStateType tpkt_internal_search_from_osi_session_layer(Cursor* tpk
     const OsiSessionHdr* hdr = (const OsiSessionHdr*)tpkt_cur->start();
 
     // get the flow data
-    const Packet* p      = DetectionEngine::get_current_packet();
+    const Packet* p = DetectionEngine::get_current_packet();
+    if (!p || !p->flow)
+        return TPKT_APPLI_SEARCH_STATE__EXIT;
+
     TpktFlowData* tpktfd = (TpktFlowData*)p->flow->get_flow_data(TpktFlowData::inspector_id);
 
     bool checks_pass = false;

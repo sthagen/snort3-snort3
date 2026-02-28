@@ -1,5 +1,5 @@
 ---------------------------------------------------------------------------
--- Copyright (C) 2019-2025 Cisco and/or its affiliates. All rights reserved.
+-- Copyright (C) 2019-2026 Cisco and/or its affiliates. All rights reserved.
 --
 -- This program is free software; you can redistribute it and/or modify it
 -- under the terms of the GNU General Public License Version 2 as published
@@ -39,6 +39,8 @@ packets = { }
 process = { }
 search_engine = { }
 so_proxy = { }
+stdout_trace = { }
+syslog_trace = { }
 trace = { }
 
 -- exceptions:

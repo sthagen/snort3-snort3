@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2022-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2022-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -58,6 +58,7 @@ bool HttpBufferRuleOptModule::begin(const char*, int, SnortConfig*)
     case HTTP_BUFFER_STAT_CODE:
     case HTTP_BUFFER_STAT_MSG:
     case HTTP_BUFFER_COOKIE:
+    case HTTP_BUFFER_DECODED_URI:
     case HTTP_BUFFER_HEADER:
     case HTTP_BUFFER_METHOD:
     case HTTP_BUFFER_RAW_COOKIE:
@@ -144,6 +145,7 @@ IpsOption::EvalStatus HttpBufferIpsOption::eval(Cursor& c, Packet* p)
     {
         switch (idx)
         {
+        case BUFFER_PSI_DECODED_URI:
         case BUFFER_PSI_RAW_URI:
         case BUFFER_PSI_URI:
         case BUFFER_PSI_METHOD:
@@ -263,6 +265,63 @@ static const IpsApi cookie_api =
         IPS_OPT,
         IPS_HELP,
         cookie_mod_ctor,
+        HttpBufferRuleOptModule::mod_dtor
+    },
+    OPT_TYPE_DETECTION,
+    0, PROTO_BIT__TCP,
+    nullptr,
+    nullptr,
+    nullptr,
+    nullptr,
+    HttpBufferIpsOption::opt_ctor,
+    HttpBufferIpsOption::opt_dtor,
+    nullptr
+};
+
+//-------------------------------------------------------------------------
+// http_decoded_uri
+//-------------------------------------------------------------------------
+
+static const Parameter http_decoded_uri_params[] =
+{
+    { "scheme", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against scheme section of URI only" },
+    { "host", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against host section of URI only" },
+    { "port", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against port section of URI only" },
+    { "path", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against path section of URI only" },
+    { "query", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against query section of URI only" },
+    { "fragment", Parameter::PT_IMPLIED, nullptr, nullptr,
+        "match against fragment section of URI only" },
+    { nullptr, Parameter::PT_MAX, nullptr, nullptr, nullptr }
+};
+
+#undef IPS_OPT
+#define IPS_OPT "http_decoded_uri"
+#undef IPS_HELP
+#define IPS_HELP "rule option to set the detection cursor to URI of the request message without path simplification"
+
+static Module* decoded_uri_mod_ctor()
+{
+    return new HttpBufferRuleOptModule(IPS_OPT, IPS_HELP, HTTP_BUFFER_DECODED_URI, CAT_SET_FAST_PATTERN,
+        BUFFER_PSI_DECODED_URI, http_decoded_uri_params);
+}
+
+static const IpsApi decoded_uri_api =
+{
+    {
+        PT_IPS_OPTION,
+        sizeof(IpsApi),
+        IPSAPI_VERSION,
+        1,
+        API_RESERVED,
+        API_OPTIONS,
+        IPS_OPT,
+        IPS_HELP,
+        decoded_uri_mod_ctor,
         HttpBufferRuleOptModule::mod_dtor
     },
     OPT_TYPE_DETECTION,
@@ -1075,6 +1134,7 @@ static const IpsApi version_api =
 
 const BaseApi* ips_http_client_body = &client_body_api.base;
 const BaseApi* ips_http_cookie = &cookie_api.base;
+const BaseApi* ips_http_decoded_uri = &decoded_uri_api.base;
 const BaseApi* ips_http_header = &header_api.base;
 const BaseApi* ips_http_method = &method_api.base;
 const BaseApi* ips_http_raw_body = &raw_body_api.base;

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2005-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -494,6 +494,18 @@ void Stream::set_splitter(Flow* flow, bool to_server, StreamSplitter* ss)
     return flow->session->set_splitter(to_server, ss);
 }
 
+uint32_t Stream::get_paf_position(Flow* flow, bool to_server)
+{
+    assert(flow && flow->session);
+    return flow->session->get_paf_position(to_server);
+}
+
+void Stream::set_splitter_with_rescan(Flow* flow, bool to_server, StreamSplitter* ss, uint32_t seq)
+{
+    assert(flow && flow->session);
+    return flow->session->set_splitter_with_rescan(to_server, ss, seq);
+}
+
 StreamSplitter* Stream::get_splitter(Flow* flow, bool to_server)
 {
     assert(flow && flow->session);
@@ -511,6 +523,7 @@ void Stream::log_extra_data(
     // coverity[missing_lock]
     if ( mask && stream.extra_data_log )
     {
+        // coverity[missing_lock]
         stream.extra_data_log(
             flow, stream.extra_data_context, stream.xtradata_map,
             stream.xtradata_func_count, mask, alert_info);

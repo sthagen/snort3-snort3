@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -162,6 +162,12 @@ bool MPUnixDomainTransport::send_to_transport(MPEventInfo &event)
         for (auto &&sc_handler : this->side_channels)
         {
             auto msg = sc_handler->side_channel->alloc_transmit_message(sizeof(MPTransportMessageHeader) + transport_message.header.data_length);
+            if (!msg)
+            {
+                MPTransportLog("Failed to send message to side channel\n");
+                dynamic_transport_stats.send_errors++;
+                continue;
+            }
             memcpy(msg->content, &transport_message, sizeof(MPTransportMessageHeader));
             memcpy(msg->content + sizeof(MPTransportMessageHeader), transport_message.data, transport_message.header.data_length);
             auto send_result = sc_handler->side_channel->transmit_message(msg);

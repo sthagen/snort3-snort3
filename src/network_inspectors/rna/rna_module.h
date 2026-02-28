@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2019-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2019-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -28,6 +28,7 @@
 
 #include "rna_config.h"
 #include "rna_fingerprint.h"
+#include "rna_fingerprint_deviceinfo.h"
 #include "rna_mac_cache.h"
 #include "rna_name.h"
 
@@ -55,6 +56,7 @@ struct RnaStats
     PegCount dhcp_info;
     PegCount smb;
     PegCount netflow_record;
+    PegCount deviceinfo;
     PegCount total_events_in_interval;
     PegCount total_packets_in_interval;
     PegCount total_bytes_in_interval;
@@ -116,6 +118,7 @@ private:
     const char* dump_file = nullptr;
 
     RawFingerprint fingerprint;
+    snort::DeviceInfoRawFingerprint deviceinfo_fingerprint;
 
     bool is_valid_fqn(const char* fqn) const;
 };

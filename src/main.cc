@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -54,7 +54,6 @@
 #include "time/periodic.h"
 #include "trace/trace_api.h"
 #include "trace/trace_config.h"
-#include "trace/trace_logger.h"
 #include "utils/safec.h"
 #include "utils/stats.h"
 #include "utils/util.h"

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2023-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2023-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -38,6 +38,7 @@ vector<CurseDetails> CurseBook::curse_map =
     { "opcua"     , "opcua"      , CurseBook::opcua_curse     , true  },
     { "s7commplus", "s7commplus" , CurseBook::s7commplus_curse, true  },
     { "dce_smb"   , "netbios-ssn", CurseBook::dce_smb_curse   , true  },
+    { "socks"     , "socks"      , CurseBook::socks_curse     , true  },
     { "sslv2"     , "ssl"        , CurseBook::ssl_v2_curse    , true  }
 };
 

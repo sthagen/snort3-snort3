@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -53,6 +53,12 @@ void file_stats_init()
 void file_stats_term()
 {
     snort_free(file_stats);
+}
+
+void file_counts_update_buffers()
+{
+    file_counts.file_buffers_max = FileCapture::get_buffers_max();
+    file_counts.file_buffers_in_use = FileCapture::get_buffers_in_use();
 }
 
 void file_stats_sum()

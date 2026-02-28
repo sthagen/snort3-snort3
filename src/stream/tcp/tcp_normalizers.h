@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -50,9 +50,6 @@ public:
 
     TcpNormalizer::NormStatus apply_normalizations(TcpSegmentDescriptor& tsd, uint32_t seq, bool stream_is_inorder)
     { return norm->apply_normalizations(tns, tsd, seq, stream_is_inorder); }
-
-    void session_blocker(TcpSegmentDescriptor& tsd)
-    { norm->session_blocker(tns, tsd); }
 
     bool packet_dropper(TcpSegmentDescriptor& tsd, NormFlags nflags)
     { return norm->packet_dropper(tns, tsd, nflags); }

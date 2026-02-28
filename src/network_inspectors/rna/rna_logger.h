@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -51,7 +51,7 @@ public:
     // for cpe os info event
     void log(uint16_t type, uint16_t subtype, const snort::Packet* p, RnaTracker& ht,
         const struct in6_addr* src_ip, const uint8_t* src_mac, const snort::FpFingerprint* fp,
-        const std::vector<const char*>* cpeos, time_t event_time);
+        const std::vector<const char*>* cpeos, time_t event_time, const char* hardware);
 
     // for fingerprint
     void log(uint16_t type, uint16_t subtype, const snort::Packet* p, RnaTracker& ht,
@@ -80,6 +80,11 @@ public:
     void log(uint16_t type, uint16_t subtype, const snort::Packet* p, RnaTracker& ht,
         const struct in6_addr* src_ip, const uint8_t* src_mac, uint32_t lease, uint32_t netmask,
         const struct in6_addr* router);
+
+    // for device info
+    void log(uint16_t type, uint16_t subtype, const snort::Packet* p, RnaTracker& ht,
+        const struct in6_addr* src_ip, const uint8_t* src_mac, const snort::FpFingerprint* fp,
+        time_t event_time, const char* device_info, const char* nb_name);
 
     // for all
     bool log(uint16_t type, uint16_t subtype, const struct in6_addr* src_ip,

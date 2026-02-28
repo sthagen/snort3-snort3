@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -126,6 +126,7 @@ FileCapture::~FileCapture()
             file_counts.file_buffers_freed_total++;
         }
 
+        file_counts.file_buffers_in_use = get_buffers_in_use();
         file_block = next_block;
     }
 
@@ -139,6 +140,7 @@ void FileCapture::init(int64_t memcap, int64_t block_size)
 {
     capture_block_size = block_size;
     init_mempool(memcap, capture_block_size);
+    file_counts.file_buffers_max = get_buffers_max();
     file_storer = new std::thread(writer_thread);
 }
 
@@ -193,6 +195,8 @@ inline FileCaptureBlock* FileCapture::create_file_buffer()
         return nullptr;
 
     FileCaptureBlock* fileBlock = (FileCaptureBlock*)file_mempool->m_alloc();
+
+    file_counts.file_buffers_in_use = get_buffers_in_use();
 
     if (fileBlock == nullptr)
     {
@@ -509,15 +513,15 @@ void FileCapture::store_file()
 }
 
 // Queue files to be stored to disk
-void FileCapture::store_file_async()
+std::string FileCapture::store_file_async()
 {
     // send data to the writer thread
     if (!file_info)
-        return;
+        return std::string();
 
     uint8_t* sha = file_info->get_file_sig_sha256();
     if (!sha)
-        return;
+        return std::string();
 
     std::string file_name = file_info->sha_to_string(sha);
 
@@ -528,6 +532,7 @@ void FileCapture::store_file_async()
     std::lock_guard<std::mutex> lk(capture_mutex);
     files_waiting.push(this);
     capture_cv.notify_one();
+    return file_full_name;
 }
 
 /*Log file capture mempool usage*/
@@ -538,12 +543,26 @@ void FileCapture::print_mem_usage()
         int64_t block_size = get_block_size() + sizeof (FileCapture);
         if (block_size & 7)
             block_size += (8 - (block_size & 7));
-        LogCount("Max buffers can allocate", file_mempool->total_objects());
+        LogCount("Max file buffer capacity", file_mempool->total_objects());
         LogCount("Buffers in use", file_mempool->allocated());
         LogCount("Buffers in free list", file_mempool->freed());
         LogCount("Buffers in release list", file_mempool->released());
         LogCount("Memory usage in bytes", file_mempool->allocated() * block_size);
     }
+}
+
+int64_t FileCapture::get_buffers_max()
+{
+    if (file_mempool)
+        return file_mempool->total_objects();
+    return 0;
+}
+
+int64_t FileCapture::get_buffers_in_use()
+{
+    if (file_mempool)
+        return file_mempool->allocated();
+    return 0;
 }
 
 //--------------------------------------------------------------------------

@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2003-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -39,7 +39,7 @@
     #define CHANGE_HOST_UPDATE         15
     #define CHANGE_HOST_TYPE           16
     #define CHANGE_VLAN_TAG            18
-    #define CHANGE_NETBIOS_NAME        21
+    #define CHANGE_DEVICE_NAME         21
     #define CHANGE_BANNER_UPDATE       24
     #define CHANGE_CLIENT_APP_UPDATE   32
     #define CHANGE_FULL_DHCP_INFO      33

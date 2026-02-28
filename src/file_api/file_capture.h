@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2014-2026 Cisco and/or its affiliates. All rights reserved.
 // Copyright (C) 2013-2013 Sourcefire, Inc.
 //
 // This program is free software; you can redistribute it and/or modify it
@@ -78,7 +78,7 @@ public:
     void store_file();
 
     // Store file to disk asynchronously
-    void store_file_async();
+    std::string store_file_async();
 
     // Log file capture mempool usage
     static void print_mem_usage();
@@ -90,6 +90,8 @@ public:
     static FileCaptureState error_capture(FileCaptureState);
 
     static int64_t get_block_size() { return capture_block_size; }
+    static int64_t get_buffers_max();
+    static int64_t get_buffers_in_use();
 
     snort::FileInfo* get_file_info() { return file_info; }
 

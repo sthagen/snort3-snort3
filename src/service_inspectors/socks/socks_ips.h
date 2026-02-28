@@ -1,6 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2014-2025 Cisco and/or its affiliates. All rights reserved.
-// Copyright (C) 2005-2013 Sourcefire, Inc.
+// Copyright (C) 2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -16,15 +15,20 @@
 // with this program; if not, write to the Free Software Foundation, Inc.,
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
+// socks_ips.h author Raza Shafiq <rshafiq@cisco.com>
 
-// dcerpc.h author Sourcefire Inc.
+#ifndef SOCKS_IPS_H
+#define SOCKS_IPS_H
 
-#ifndef DCERPC_H
-#define DCERPC_H
+namespace snort
+{
+    struct SnortConfig;
+}
 
-#include <cstdint>
-
-int dcerpc_validate(const uint8_t* data, int size);
+void ips_socks_version_init();
+void ips_socks_command_init();
+void ips_socks_address_type_init();
+void ips_socks_remote_address_init();
+void ips_socks_remote_port_init();
 
 #endif
-

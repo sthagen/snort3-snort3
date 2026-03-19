@@ -45,8 +45,7 @@ using namespace HttpEnums;
 namespace snort
 {
 unsigned FlowData::flow_data_id = 0;
-FlowData::FlowData(unsigned, Inspector*) : handler(nullptr), id(0)
-{ }
+FlowData::FlowData(unsigned) : id(0) { }
 FlowData::~FlowData() = default;
 FlowData* FlowDataStore::get(uint32_t) const { return nullptr; }
 void FlowDataStore::set(FlowData*) { }
@@ -68,7 +67,12 @@ const StreamBuffer StreamSplitter::reassemble(snort::Flow*, unsigned int, unsign
     return buf;
 }
 unsigned StreamSplitter::max(snort::Flow*) { return 0; }
+uint8_t TraceApi::get_constraints_generation() { return 0; }
+void TraceApi::filter(const Packet&) { }
+void trace_vprintf(const char*, TraceLevel, const char*, const snort::Packet*, const char*, va_list) { }
 }
+
+THREAD_LOCAL const snort::Trace* http_trace = nullptr;
 
 HttpParaList::UriParam::UriParam() { }
 HttpParaList::JsNormParam::~JsNormParam() { }
@@ -98,7 +102,7 @@ bool HttpInspect::get_buf(snort::InspectionBuffer::Type, snort::Packet*, snort::
 const uint8_t* HttpInspect::adjust_log_packet(snort::Packet*, uint16_t&) { return nullptr; }
 StreamSplitter::Status HttpStreamSplitter::scan(snort::Packet*, const uint8_t*, uint32_t, uint32_t, uint32_t*)
 { return StreamSplitter::FLUSH; }
-StreamSplitter::Status HttpStreamSplitter::scan(snort::Flow*, const uint8_t*, uint32_t, uint32_t*)
+StreamSplitter::Status HttpStreamSplitter::scan(snort::Flow*, const uint8_t*, uint32_t, uint32_t*, snort::Packet*)
 { return StreamSplitter::FLUSH; }
 const snort::StreamBuffer HttpStreamSplitter::reassemble(snort::Flow*, unsigned, unsigned, const
     uint8_t*, unsigned, uint32_t, unsigned&)

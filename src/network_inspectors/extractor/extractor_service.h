@@ -107,6 +107,21 @@ private:
     static THREAD_LOCAL snort::Connector::ID log_id;
 };
 
+class SshExtractorService : public ExtractorService
+{
+public:
+    static const ServiceBlueprint blueprint;
+
+    SshExtractorService(uint32_t tenant, const std::vector<std::string>& fields,
+        const std::vector<std::string>& events, ServiceType, Extractor&);
+
+private:
+    const snort::Connector::ID& internal_tinit() override;
+    const snort::Connector::ID& get_log_id() override;
+
+    static THREAD_LOCAL snort::Connector::ID log_id;
+};
+
 class FtpExtractorService : public ExtractorService
 {
 public:
@@ -172,6 +187,21 @@ class QuicExtractorService : public ExtractorService
 public:
     static const ServiceBlueprint blueprint;
     QuicExtractorService(uint32_t tenant, const std::vector<std::string>& fields,
+        const std::vector<std::string>& events, ServiceType, Extractor&);
+
+private:
+    const snort::Connector::ID& internal_tinit() override;
+    const snort::Connector::ID& get_log_id() override;
+
+    static THREAD_LOCAL snort::Connector::ID log_id;
+};
+
+class FileExtractorService : public ExtractorService
+{
+public:
+    static const ServiceBlueprint blueprint;
+
+    FileExtractorService(uint32_t tenant, const std::vector<std::string>& fields,
         const std::vector<std::string>& events, ServiceType, Extractor&);
 
 private:

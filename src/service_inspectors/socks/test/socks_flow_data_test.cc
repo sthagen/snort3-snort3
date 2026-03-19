@@ -23,6 +23,7 @@
 #endif
 
 #include "service_inspectors/socks/socks_flow_data.h"
+#include "service_inspectors/socks/socks_module.h"
 
 #include <CppUTest/CommandLineTestRunner.h>
 #include <CppUTest/TestHarness.h>
@@ -37,37 +38,27 @@ using namespace snort;
 // Stubs for linking
 namespace snort
 {
-FlowData::FlowData(unsigned u, Inspector* h) : handler(h), id(u)
+FlowData::FlowData(unsigned u) : id(u)
 { }
+FlowData::~FlowData() = default;
 
 unsigned FlowData::flow_data_id = 0;
-
-FlowData::~FlowData() = default;
+unsigned FlowData::create_flow_data_id()
+{ return ++flow_data_id; }
 
 void* snort_alloc(size_t sz)
 { return malloc(sz); }
 
-char* snort_strdup(const char* str)
+char* snort_strdup(const char* s)
 {
-    size_t n = strlen(str) + 1;
-    auto* p = static_cast<char*>(snort_alloc(n));
-    memcpy(p, str, n);
-    return p;
+    size_t len = strlen(s) + 1;
+    char* dup = new char[len];
+    memcpy(dup, s, len);
+    return dup;
 }
 }
 
-// Mock for socks_stats - define struct locally to avoid header dependencies
-using PegCount = uint64_t;
-struct SocksStats
-{
-    PegCount sessions = 0;
-    PegCount concurrent_sessions = 0;
-    PegCount max_concurrent_sessions = 0;
-    PegCount auth_requests = 0;
-    PegCount auth_successes = 0;
-    PegCount failed_connections = 0;
-};
-THREAD_LOCAL SocksStats socks_stats;
+THREAD_LOCAL SocksStats socks_stats = {};
 
 //-------------------------------------------------------------------------
 // SocksAddress Tests

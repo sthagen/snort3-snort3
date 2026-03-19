@@ -113,9 +113,9 @@ int32_t SslMetadataEvent::get_version() const
     return tls_connection_data.tls_params.selected_tls_version;
 }
 
-const std::string& SslMetadataEvent::get_server_name_identifier() const
+const std::string& SslMetadataEvent::get_server_name() const
 {
-    return tls_connection_data.server_name_identifier;
+    return tls_connection_data.server_name;
 }
 
 int32_t SslMetadataEvent::get_curve() const
@@ -656,7 +656,7 @@ const InspectApi ssl_api =
         sizeof(InspectApi),
         INSAPI_VERSION,
         0,
-        API_RESERVED,
+        PLUGIN_SO_RELOAD,
         API_OPTIONS,
         SSL_NAME,
         SSL_HELP,

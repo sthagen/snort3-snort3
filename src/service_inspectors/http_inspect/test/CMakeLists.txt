@@ -1,3 +1,14 @@
+add_cpputest( http_decompression_test
+    SOURCES
+        ../http_compress_stream.cc
+        ../http_cutter.cc
+        ../http_flow_data.cc
+        ../http_tables.cc
+        ../http_test_input.cc
+        ../http_test_manager.cc
+    LIBS ${ZLIB_LIBRARIES}
+)
+
 add_cpputest( http_module_test
     SOURCES
         ../http_module.cc
@@ -13,6 +24,15 @@ add_cpputest( http_msg_head_shared_util_test
         ../http_msg_head_shared_util.cc
         ../http_field.cc
         ../http_str_to_code.cc
+        ../http_tables.cc
+)
+
+add_cpputest( http_msg_head_shared_find_next_header_test
+    SOURCES
+        ../http_field.cc
+        ../http_msg_head_shared.cc
+        ../http_str_to_code.cc
+        ../http_tables.cc
 )
 
 add_cpputest( http_normalizers_test
@@ -27,6 +47,7 @@ add_cpputest( http_transaction_test
         ../http_flow_data.cc
         ../http_test_manager.cc
         ../http_test_input.cc
+        ../http_compress_stream.cc
     LIBS ${ZLIB_LIBRARIES}
 )
 

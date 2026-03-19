@@ -148,10 +148,6 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
         header_start = http_event->get_referer(header_length);
         hsession->set_field(REQ_REFERER_FID, header_start, header_length, change_bits);
         hsession->set_is_webdav(http_event->contains_webdav_method());
-
-        // FIXIT-M: Should we get request body (may be expensive to copy)?
-        //      It is not currently set in callback in 2.9.x, only via
-        //      third-party.
     }
     else    // Response headers.
     {
@@ -174,11 +170,6 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
             if ( ret < sizeof(tmpstr) )
                 hsession->set_field(MISC_RESP_CODE_FID, (const uint8_t*)tmpstr, ret, change_bits);
         }
-
-        // FIXIT-M: Get Location header data.
-        // FIXIT-M: Should we get response body (may be expensive to copy)?
-        //      It is not currently set in callback in 2.9.x, only via
-        //      third-party.
     }
 
     header_start = http_event->get_x_working_with(header_length);
@@ -206,6 +197,9 @@ void HttpEventHandler::handle(DataEvent& event, Flow* flow)
             asd->pick_ss_referred_payload_app_id(), change_bits);
     else
         asd->set_application_ids_service(asd->get_service_id(), change_bits);
+
+    if (change_bits.test(APPID_SERVICE_BIT))
+        asd->sync_with_snort_protocol_id(asd->pick_service_app_id(), p, change_bits);
 
     asd->publish_appid_event(change_bits, *p, http_event->get_is_httpx(),
         asd->get_api().get_hsessions_size() - 1);

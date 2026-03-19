@@ -135,6 +135,7 @@ public:
     void process_sni_mismatch()
     {
         tls_host_mismatch = true;
+        tls_data_finished = false;
     }
 
     bool is_tls_host_mismatched() const { return tls_host_mismatch; }
@@ -260,6 +261,7 @@ public:
         bool swap_app_direction=false, bool bidirectional=false, bool expect_persist=false);
     void initialize_future_session(AppIdSession&, uint64_t);
 
+    AppIdInspector& inspector;
     snort::Flow* flow = nullptr;
     AppIdConfig& config;
     std::unordered_map<unsigned, AppIdFlowData*> flow_data;

@@ -1,3 +1,95 @@
+2026-03-17: 3.12.1.0
+
+* appid: address FIXIT comments related to http inspector
+* appid: add unit test to cover DNS payload handler null dsession
+* appid: fix app detection when sni is spoofed
+* appid: removing dead code in service ssl
+* appid: sync host attributes on http event service detection
+* decompress: fix tsan data race
+* decompress: fix tsan data race in decompress_buffer_size
+* dns: prevent unbounded TCP session vector growth
+* extractor: add FILE logging
+* extractor: add more details in SSH
+* extractor: add SSH direction field
+* extractor: add SSH version field
+* extractor: compute shared (selected) algorithm in SSH
+* extractor: log SSH events
+* extractor: move details under 'algorithm' event
+* extractor: refine code
+* extractor: rename ssl.server_name_identifier
+* file_api: change file_service termination order after MPDatabus
+* file_api: fix tsan datarace in circular buffer, file cache and file policy
+* file_inspect: fix reload error messages
+* file names: add unit tests for get_main_file and get_instance_file
+* framework: return original string if list is empty
+* hash: clamp max_size to entry_size minimum
+* http_inspect: decompress optimization
+* http_inspect: fix Out-Of-Bounds read in find_next_header
+* kerberos: fix race condition when reloading and setting failed_login
+* logs: do not add / to run prefix for main thread logs
+* main: fallback to specified process affinity if we can't satisfy process.lua
+* mime: partial header memory optimization using vectors to preallocate memory rather than allocating for every new chunk of header appended
+* opcua: buf size increase and service modifications
+* plugins: move trash pickup from analyzers to main
+* pub_sub: add content-length validation
+* snort: relax memory order for reload_id updates
+* snort: tweak config dtor so that tuners are released before their inspector
+* socks: remove block_udp_fragmentation configuration option
+* ssl: adding additional parser data fields checks
+* stream: pass opaque during IP fragment reassembly in FragRebuild
+* stream_tcp: make sure to check for bad seq only when ISS is initialized
+
+2026-03-03: 3.12.0.0
+
+* alert_syslog, snort, syslog_trace: refactor syslog calls
+* appid: add missing stub for ssh event handler test
+* appid: fix shadow traffic registration (configures are unordered)
+* appid: fix unit test
+* doc: update file_id inspector is now file_inspect
+* file_inspect: disallow external enable if not configured
+* file_inspect: fix file cache race condition with lookup timeout
+* file_inspect: update capture buffers upon summing
+* file_trace: refactor
+* file_trace, stdout_trace, syslog_trace: support dynamic build
+* file_trace, stdout_trace, syslog_trace, trace: simplify implementation
+* imap, pop, smtp: clear search tool pointers on delete
+* inspector_manager: accommodate acquire_file_inspector calls from non-packet thread.
+* inspector_manager: add dump_inspector_map command for serviceability
+* inspector_manager: always dump map with verbose output
+* inspector_manager: fix cppcheck issue
+* inspectors: clear service buffer map on reload
+* ips: coerce id = 1 when configured via -R
+* module_manager: clear static parameter map when reloading plugins
+* module_manager: remove redundant
+* modules: provide config for dump stats accumulation
+* mp_data_bus: fix unit test
+* opcua: enable so lib reloads
+* opcua: update unit test mocks
+* parser: change error counts to atomic
+* payload_injector: add support for payload injection on s2c packets for http and http2 traffic
+* plugin_manager: by default do not dlclose plugin libraries at shutdown
+* plugin_manager: do not unload plugins that are not reloadable
+* plugin_manager: make load_id atomic
+* plugin_manager: propagate contexts for non-reloadable plugins
+* plugins: bump API version for base and all types
+* quic: don't cache inspector pointer in extractor
+* snort: add list_plugins command for serviceability
+* snort: add reg test feature --exit-after-reload
+* snort: finalize so_fix
+* snort: fix coverity issue with unlocked reload_id update
+* snort: fix --exit-after-reload help
+* snort_ml: use new get_inspector args
+* snort: run --show-plugins in help mode
+* socks: fix unit test stubs
+* ssl: don't call OPENSSL_cleanup at shutdown to minimize reported leaks
+* test: exclude from coverage unexecuted unit test stubs
+* text log: capture file name to avoid rollover issues
+* trace: remove unstable unit test
+* trace: support reloading trace logger plugin libraries
+* trace: update command implementations
+* trace: update managaer to use the new plug interface
+* trace: update to new plug interface
+
 2026-02-26: 3.11.1.0
 
 * appid: address FIXIT comments in detector plugins

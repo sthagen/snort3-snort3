@@ -25,14 +25,16 @@
 
 #include "log/messages.h"
 
-#include "extractor.h"
 #include "extractor_conn.h"
 #include "extractor_detection.h"
 #include "extractor_dns.h"
+#include "extractor_file.h"
 #include "extractor_ftp.h"
 #include "extractor_http.h"
 #include "extractor_quic.h"
+#include "extractor_ssh.h"
 #include "extractor_ssl.h"
+#include "extractor.h"
 
 using namespace snort;
 
@@ -120,6 +122,10 @@ ExtractorService* ExtractorService::make_service(Extractor& ins, const ServiceCo
         srv = new HttpExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
         break;
 
+    case ServiceType::SSH:
+        srv = new SshExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
+        break;
+
     case ServiceType::FTP:
         srv = new FtpExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
         break;
@@ -138,6 +144,10 @@ ExtractorService* ExtractorService::make_service(Extractor& ins, const ServiceCo
 
     case ServiceType::QUIC:
         srv = new QuicExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
+        break;
+
+    case ServiceType::FILE:
+        srv = new FileExtractorService(cfg.tenant_id, cfg.fields, cfg.on_events, cfg.service, ins);
         break;
 
     case ServiceType::IPS_BUILTIN:
@@ -230,6 +240,11 @@ void ExtractorService::validate(const ServiceConfig& cfg)
         validate_fields(HttpExtractorService::blueprint, cfg.fields);
         break;
 
+    case ServiceType::SSH:
+        validate_events(SshExtractorService::blueprint, cfg.on_events);
+        validate_fields(SshExtractorService::blueprint, cfg.fields);
+        break;
+
     case ServiceType::FTP:
         validate_events(FtpExtractorService::blueprint, cfg.on_events);
         validate_fields(FtpExtractorService::blueprint, cfg.fields);
@@ -253,6 +268,11 @@ void ExtractorService::validate(const ServiceConfig& cfg)
     case ServiceType::QUIC:
         validate_events(QuicExtractorService::blueprint, cfg.on_events);
         validate_fields(QuicExtractorService::blueprint, cfg.fields);
+        break;
+
+    case ServiceType::FILE:
+        validate_events(FileExtractorService::blueprint, cfg.on_events);
+        validate_fields(FileExtractorService::blueprint, cfg.fields);
         break;
 
     case ServiceType::IPS_BUILTIN:
@@ -325,6 +345,68 @@ const snort::Connector::ID& HttpExtractorService::get_log_id()
 { return log_id; }
 
 //-------------------------------------------------------------------------
+//  SshExtractorService
+//-------------------------------------------------------------------------
+
+const ServiceBlueprint SshExtractorService::blueprint =
+{
+    // events
+    {
+        "algorithm",
+        "exchange"
+    },
+    // fields
+    {
+        "version",
+        "direction",
+        "client.version",
+        "client.kex_alg",
+        "client.host_key_alg",
+        "client.cipher_c2s_alg",
+        "client.cipher_s2c_alg",
+        "client.mac_c2s_alg",
+        "client.mac_s2c_alg",
+        "client.compression_c2s_alg",
+        "client.compression_s2c_alg",
+        "server.version",
+        "server.kex_alg",
+        "server.host_key_alg",
+        "server.cipher_c2s_alg",
+        "server.cipher_s2c_alg",
+        "server.mac_c2s_alg",
+        "server.mac_s2c_alg",
+        "server.compression_c2s_alg",
+        "server.compression_s2c_alg",
+        "kex_alg",
+        "host_key_alg",
+        "cipher_alg",
+        "mac_alg",
+        "compression_alg"
+    },
+};
+
+THREAD_LOCAL Connector::ID SshExtractorService::log_id;
+
+SshExtractorService::SshExtractorService(uint32_t tenant, const std::vector<std::string>& srv_fields,
+    const std::vector<std::string>& srv_events, ServiceType s_type, Extractor& ins)
+    : ExtractorService(tenant, srv_fields, srv_events, blueprint, s_type, ins)
+{
+    for (const auto& event : get_events())
+    {
+        if (!strcmp("exchange", event.c_str()))
+            handlers.push_back(new SshExtractor(ins, tenant_id, get_fields(), false));
+        else if (!strcmp("algorithm", event.c_str()))
+            handlers.push_back(new SshExtractor(ins, tenant_id, get_fields(), true));
+    }
+}
+
+const snort::Connector::ID& SshExtractorService::internal_tinit()
+{ return log_id = logger->get_id(type.c_str()); }
+
+const snort::Connector::ID& SshExtractorService::get_log_id()
+{ return log_id; }
+
+//-------------------------------------------------------------------------
 //  FtpExtractorService
 //-------------------------------------------------------------------------
 
@@ -387,7 +469,7 @@ const ServiceBlueprint SslExtractorService::blueprint =
     // fields
     {
         "version",
-        "server_name_identifier",
+        "server_name",
         "curve",
         "cipher",
         "subject",
@@ -554,6 +636,54 @@ const snort::Connector::ID& QuicExtractorService::get_log_id()
 { return log_id; }
 
 //-------------------------------------------------------------------------
+//  FileExtractorService
+//-------------------------------------------------------------------------
+
+const ServiceBlueprint FileExtractorService::blueprint =
+{
+    // events
+    {
+        "eof",
+    },
+    // fields
+    {
+        "fuid",
+        "source",
+        "analyzers",
+        "mime_type",
+        "filename",
+        "is_orig",
+        "seen_bytes",
+        "total_bytes",
+        "duration",
+        "timedout",
+        "extracted",
+        "extracted_cutoff",
+        "extracted_size",
+        "sha256"
+    },
+};
+
+THREAD_LOCAL Connector::ID FileExtractorService::log_id;
+
+FileExtractorService::FileExtractorService(uint32_t tenant, const std::vector<std::string>& srv_fields,
+    const std::vector<std::string>& srv_events, ServiceType s_type, Extractor& ins)
+    : ExtractorService(tenant, srv_fields, srv_events, blueprint, s_type, ins)
+{
+    for (const auto& event : get_events())
+    {
+        if (!strcmp("eof", event.c_str()))
+            handlers.push_back(new FileExtractor(ins, tenant_id, get_fields()));
+    }
+}
+
+const snort::Connector::ID& FileExtractorService::internal_tinit()
+{ return log_id = logger->get_id(type.c_str()); }
+
+const snort::Connector::ID& FileExtractorService::get_log_id()
+{ return log_id; }
+
+//-------------------------------------------------------------------------
 //  IpsUserExtractorService
 //-------------------------------------------------------------------------
 
@@ -651,20 +781,24 @@ TEST_CASE("Service Type", "[extractor]")
     SECTION("to string")
     {
         ServiceType http = ServiceType::HTTP;
+        ServiceType ssh = ServiceType::SSH;
         ServiceType ftp = ServiceType::FTP;
         ServiceType ssl = ServiceType::SSL;
         ServiceType conn = ServiceType::CONN;
         ServiceType dns = ServiceType::DNS;
         ServiceType quic = ServiceType::QUIC;
+        ServiceType file = ServiceType::FILE;
         ServiceType weird = ServiceType::IPS_BUILTIN;
         ServiceType notice = ServiceType::IPS_USER;
         ServiceType any = ServiceType::ANY;
         ServiceType max = ServiceType::MAX;
 
         CHECK_FALSE(strcmp("http", http.c_str()));
+        CHECK_FALSE(strcmp("ssh", ssh.c_str()));
         CHECK_FALSE(strcmp("ftp", ftp.c_str()));
         CHECK_FALSE(strcmp("ssl", ssl.c_str()));
         CHECK_FALSE(strcmp("conn", conn.c_str()));
+        CHECK_FALSE(strcmp("file", file.c_str()));
         CHECK_FALSE(strcmp("dns", dns.c_str()));
         CHECK_FALSE(strcmp("quic", quic.c_str()));
         CHECK_FALSE(strcmp("weird", weird.c_str()));

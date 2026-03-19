@@ -28,11 +28,13 @@ public:
     enum Value : uint8_t
     {
         HTTP,
+        SSH,
         FTP,
         SSL,
         CONN,
         DNS,
         QUIC,
+        FILE,
         IPS_BUILTIN,
         IPS_USER,
         ANY,
@@ -52,6 +54,8 @@ public:
         {
         case HTTP:
             return "http";
+        case SSH:
+            return "ssh";
         case FTP:
             return "ftp";
         case SSL:
@@ -62,6 +66,8 @@ public:
             return "dns";
         case QUIC:
             return "quic";
+        case FILE:
+            return "file";
         case IPS_BUILTIN:
             return "weird";
         case IPS_USER:

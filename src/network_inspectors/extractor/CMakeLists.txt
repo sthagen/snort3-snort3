@@ -16,6 +16,8 @@ set( FILE_LIST
     extractor_detection.h
     extractor_dns.cc
     extractor_enums.h
+    extractor_file.cc
+    extractor_file.h
     extractor_flow_data.cc
     extractor_flow_data.h
     extractor_ftp.cc
@@ -29,6 +31,8 @@ set( FILE_LIST
     extractor_quic.h
     extractor_service.cc
     extractor_service.h
+    extractor_ssh.cc
+    extractor_ssh.h
     extractor_ssl.cc
     extractor_ssl.h
     extractors.cc

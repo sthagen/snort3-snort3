@@ -901,6 +901,13 @@ static void ParseDNSResponseMessage(Packet* p, DNSData* dnsSessionData, bool& ne
         // For DNS over TCP, the reused event object may hold domain names and IP addresses extracted
         // from previous DNS response message which must be cleared before processing a new DNS message.
         dnsSessionData->dns_events.clear_data();
+
+        // Clear resource record vectors to prevent unbounded growth across transactions
+        // These vectors should only contain data for the current DNS transaction, not accumulated
+        // data from all previous transactions in this long-lived TCP session.
+        dnsSessionData->answer_tabs.clear();
+        dnsSessionData->auth_tabs.clear();
+        dnsSessionData->addl_tabs.clear();
     }
 
     while (bytes_unused)
@@ -1355,7 +1362,7 @@ const InspectApi dns_api =
         sizeof(InspectApi),
         INSAPI_VERSION,
         0,
-        API_RESERVED,
+        PLUGIN_SO_RELOAD,
         API_OPTIONS,
         DNS_NAME,
         DNS_HELP,

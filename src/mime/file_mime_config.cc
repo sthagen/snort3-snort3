@@ -124,12 +124,12 @@ bool DecodeConfig::is_decompress_vba() const
 
 void DecodeConfig::set_decompress_buffer_size(uint32_t size)
 {
-    decompress_buffer_size = size;
+    decompress_buffer_size.store(size, std::memory_order_relaxed);
 }
 
 uint32_t DecodeConfig::get_decompress_buffer_size() const
 {
-    return decompress_buffer_size;
+    return decompress_buffer_size.load(std::memory_order_relaxed);
 }
 
 int64_t DecodeConfig::get_file_depth() const
@@ -145,6 +145,9 @@ bool DecodeConfig::is_decoding_enabled() const
 // update file depth and max_depth etc
 void DecodeConfig::sync_all_depths(const SnortConfig* sc)
 {
+    // FileInspect::configure does this but it may not happen first
+    FileService::set_max_file_depth(sc);
+
     file_depth = FileService::get_max_file_depth(get_file_config(sc));
     decode_enabled = (file_depth >= 0) or (b64_depth >= 0) or (qp_depth >= 0) or
         (bitenc_depth >= 0) or (uu_depth >= 0);
@@ -158,7 +161,7 @@ int DecodeConfig::get_max_depth(int decode_depth) const
     return 0;
 }
 
-//FIXIT-L update this after mime decode depths are revisited
+// FIXIT-L update this after mime decode depths are revisited
 void DecodeConfig::show(bool full) const
 {
     if ( !decode_enabled )
@@ -183,6 +186,6 @@ void DecodeConfig::show(bool full) const
     ConfigLogger::log_flag("decompress_swf", decompress_swf);
     ConfigLogger::log_flag("decompress_zip", decompress_zip);
     ConfigLogger::log_flag("decompress_vba", decompress_vba);
-    ConfigLogger::log_value("decompress_buffer_size", decompress_buffer_size);
+    ConfigLogger::log_value("decompress_buffer_size", decompress_buffer_size.load(std::memory_order_relaxed));
 }
 

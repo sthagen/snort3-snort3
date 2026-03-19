@@ -31,6 +31,7 @@
 
 #include "log/messages.h"
 #include "main/snort_config.h"
+#include "managers/inspector_manager.h"
 #include "mime/file_mime_process.h"
 #include "search_engines/search_tool.h"
 
@@ -59,8 +60,19 @@ void FileService::init()
     FileFlows::init();
 }
 
+void FileService::reset()
+{
+    if ( InspectorManager::get_inspector("file_inspect", Module::GLOBAL) )
+        return;
+
+    file_type_id_enabled.store(false, std::memory_order_relaxed);
+    file_signature_enabled = false;
+    file_capture_enabled = false;
+}
+
 void FileService::post_init()
 {
+    reset();
     MimeSession::init();
 
     FileConfig* const conf = get_file_config();
@@ -88,20 +100,21 @@ void FileService::post_init()
 
 void FileService::verify_reload(const SnortConfig* sc)
 {
+    reset();
     FileConfig* const conf = get_file_config(sc);
 
     if (!conf)
         return;
 
     if (max_files_cached != conf->max_files_cached)
-        ReloadError("Changing file_id.max_files_cached requires a restart.\n");
+        ReloadError("Changing file_inspect.max_files_cached requires a restart.\n");
 
     if (file_capture_enabled)
     {
         if (capture_memcap != conf->capture_memcap)
-            ReloadError("Changing file_id.capture_memcap requires a restart.\n");
+            ReloadError("Changing file_inspect.capture_memcap requires a restart.\n");
         if (capture_block_size != conf->capture_block_size)
-            ReloadError("Changing file_id.capture_block_size requires a restart.\n");
+            ReloadError("Changing file_inspect.capture_block_size requires a restart.\n");
     }
 
     if (conf->snort_protocol_id == UNKNOWN_PROTOCOL_ID)

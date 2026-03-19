@@ -55,6 +55,9 @@ Services and their events:
 
 * HTTP, HTTP2
   ** `eot` (request-response pair)
+* SSH
+  ** `algorithm` (key exchange with details)
+  ** `exchange` (key exchange complete)
 * FTP
   ** `request`
   ** `response`
@@ -65,6 +68,8 @@ Services and their events:
   ** `response`
 * connection (conn)
   ** `eof` (end of flow)
+* file
+  ** `eof` (end of file)
 * internal built-in checks which failed (weird)
   ** 'builtin' (internally-detected infraction is queued for further processing)
 * triggered IPS rule, whether built-in or text or SO (notice)
@@ -106,6 +111,34 @@ Fields supported for HTTP:
 * `orig_mime_types` - list with the content types of the files sent by client
 * `resp_mime_types` - list with the content types of the files sent by server
 
+Fields supported for SSH:
+
+* `version` - major version
+* `direction` - direction of the connection (LAN/WAN outbound/inbound)
+* `client.version` - the client's version string
+* `client.kex_alg` - key exchange algorithms listed by client
+* `client.host_key_alg` - server host key algorithms listed by client
+* `client.cipher_c2s_alg` - symmetric encryption algorithms (client-to-server direction) listed by client
+* `client.cipher_s2c_alg` - symmetric encryption algorithms (server-to-client direction) listed by client
+* `client.mac_c2s_alg` - MAC algorithms (client-to-server direction) listed by client
+* `client.mac_s2c_alg` - MAC algorithms (server-to-client direction) listed by client
+* `client.compression_c2s_alg` - compression algorithms (client-to-server direction) listed by client
+* `client.compression_s2c_alg` - compression algorithms (server-to-client direction) listed by client
+* `server.version` - the server's version string
+* `server.kex_alg` - key exchange algorithms listed by server
+* `server.host_key_alg` - server host key algorithms listed by server
+* `server.cipher_c2s_alg` - symmetric encryption algorithms (client-to-server direction) listed by server
+* `server.cipher_s2c_alg` - symmetric encryption algorithms (server-to-client direction) listed by server
+* `server.mac_c2s_alg` - MAC algorithms (client-to-server direction) listed by server
+* `server.mac_s2c_alg` - MAC algorithms (server-to-client direction) listed by server
+* `server.compression_c2s_alg` - compression algorithms (client-to-server direction) listed by server
+* `server.compression_s2c_alg` - compression algorithms (server-to-client direction) listed by server
+* `kex_alg` - key exchange algorithms in use (separated by comma if not the same: c2s, s2c)
+* `host_key_alg` - server host key algorithms in use (separated by comma if not the same: c2s, s2c)
+* `cipher_alg` - symmetric encryption algorithms in use (separated by comma if not the same: c2s, s2c)
+* `mac_alg` - MAC algorithms in use (separated by comma if not the same: c2s, s2c)
+* `compression_alg` - compression algorithms in use (separated by comma if not the same: c2s, s2c)
+
 Fields supported for FTP:
 
 * `command` - last command seen in a session
@@ -122,7 +155,7 @@ Fields supported for FTP:
 Fields supported for SSL:
 
 * `version` - SSL/TLS version that the server chose
-* `server_name_identifier` - Server Name Identifier ( SNI ) extracted from Client Hello
+* `server_name` - Server Name Identifier ( SNI ) extracted from Client Hello
 * `validation_status` - result of certificate validation
 * `subject` - RFC2253 formatted certificate subject information
 * `issuer` - RFC2253 formatted certificate issuer information
@@ -208,6 +241,23 @@ Each letter appears only once for each direction, regardless of how many times t
 UDP Events: d: Packet with payload.
 
 TCP Events: s: SYN, h: SYN-ACK, a: Pure ACK or PUSH, d: Packet with payload, f: FIN, r: Reset.
+
+Fields supported for file:
+
+* `filename` - filename from headers in network protocols
+* `fuid` - unique file identifier
+* `source` - a protocol associated with the file
+* `inspector` - inspector associated with the file analysis
+* `mime_type` - mime attachment type (or file type identified by file magic)
+* `is_orig` - if sender was originator of the file transfer
+* `seen_bytes` - number of bytes processed for analysis
+* `total_bytes` - total file size in bytes
+* 'duration' - duration the file was analyzed for, in seconds
+* `timeout` - if file analysis timed out
+* `sha256` - SHA256 digest of the file contents
+* `extracted`- name of captured file
+* `extracted_size` - number of bytes captured
+* `extracted_cutoff` - true if the file being captured was cut off so the whole file was not logged
 
 Fields supported for 'weird' and 'notice' logs:
 

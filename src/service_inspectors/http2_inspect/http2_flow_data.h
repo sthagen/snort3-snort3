@@ -21,7 +21,6 @@
 #define HTTP2_FLOW_DATA_H
 
 #include <queue>
-#include <vector>
 
 #include "flow/flow.h"
 #include "flow/stream_flow.h"
@@ -206,6 +205,7 @@ private:
     Http2Stream* get_hi_stream();
     Http2Stream* find_stream(const uint32_t key);
     void delete_processing_stream();
+    class snort::Inspector* handler;
 };
 
 class Http2FlowStreamIntf : public snort::StreamFlowIntf

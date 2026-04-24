@@ -1,5 +1,5 @@
 //--------------------------------------------------------------------------
-// Copyright (C) 2015-2026 Cisco and/or its affiliates. All rights reserved.
+// Copyright (C) 2026-2026 Cisco and/or its affiliates. All rights reserved.
 //
 // This program is free software; you can redistribute it and/or modify it
 // under the terms of the GNU General Public License Version 2 as published
@@ -16,27 +16,42 @@
 // 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 //--------------------------------------------------------------------------
 
-// author Hui Cao <huica@cisco.com>
+// file_decomp_zip_fuzz.cc author Jason Crowder <jasocrow@cisco.com>
 
-#ifndef FILE_INSPECT_H
-#define FILE_INSPECT_H
+#include "../file_decomp_zip.h"
 
-// file processing configuration
-//
-#include "framework/inspector.h"
+using namespace snort;
 
-class FileInspect : public snort::Inspector
+// Matches DEFAULT_DECOMP from mime/file_mime_config.h
+// Duplicated here to avoid pulling in dependencies
+#define DEFAULT_DECOMP 100000
+
+uint8_t out_data[DEFAULT_DECOMP] = { };
+
+extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
 {
-public:
-    FileInspect(class FileIdModule*);
-    ~FileInspect() override;
-    void eval(snort::Packet*) override { }
-    bool configure(snort::SnortConfig*) override;
-    void show(const snort::SnortConfig*) const override;
-    class FileConfig* config;
-};
+    uint32_t clamped_size = (uint32_t)size;
 
-unsigned get_file_adv_pub_id();
+    if (size > UINT32_MAX)
+    {
+        return 0;
+    }
 
-#endif
+    fd_session_t* fd = File_Decomp_New();
 
+    fd->File_Type = FILE_TYPE_ZIP;
+    fd->Next_In = data;
+    fd->Avail_In = clamped_size;
+    fd->Next_Out = out_data;
+    fd->Avail_Out = sizeof(out_data);
+
+    File_Decomp_Init_ZIP(fd);
+
+    File_Decomp_ZIP(fd);
+
+    File_Decomp_End_ZIP(fd);
+
+    File_Decomp_Free(fd);
+
+    return 0;
+}
